@@ -52,8 +52,7 @@ def create_app() -> FastAPI:
         version=__version__,
         lifespan=lifespan,
     )
-    # Temporarily disable CORS to test
-    if False:
+    if settings.cors_origins:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_origins,
@@ -63,13 +62,11 @@ def create_app() -> FastAPI:
         )
     app.include_router(api_router)
 
-    # Temporarily disable media mount to test
-    if False:
-        # Mount /media for user-uploaded files (avatars). Created lazily — must
-        # exist before StaticFiles is instantiated, so we ensure the directory.
-        media_root = Path(__file__).resolve().parent.parent / "media"
-        (media_root / "avatars").mkdir(parents=True, exist_ok=True)
-        app.mount("/media", StaticFiles(directory=media_root), name="media")
+    # Mount /media for user-uploaded files (avatars). Created lazily — must
+    # exist before StaticFiles is instantiated, so we ensure the directory.
+    media_root = Path(__file__).resolve().parent.parent / "media"
+    (media_root / "avatars").mkdir(parents=True, exist_ok=True)
+    app.mount("/media", StaticFiles(directory=media_root), name="media")
 
     # IMPORTANT: Do NOT serve static frontend files in development.
     # The Vite dev server handles this. Only serve in production.
