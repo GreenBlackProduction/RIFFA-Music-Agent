@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+from contextlib import suppress
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -137,10 +138,8 @@ async def upload_avatar(
     target = AVATAR_DIR / f"{user.id}-{token}.{ext}"
     # Drop any old avatar files for this user (keeps the disk tidy).
     for old in AVATAR_DIR.glob(f"{user.id}-*"):
-        try:
+        with suppress(OSError):
             old.unlink()
-        except OSError:
-            pass
     target.write_bytes(payload)
 
     # The frontend serves /media/* via the FastAPI static mount.

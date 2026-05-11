@@ -583,7 +583,7 @@ async def agent_chat(
         stats_block = await _build_user_stats(session, user)
         if stats_block:
             chat_messages.append({"role": "system", "content": stats_block})
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         logger.warning("agent_chat: stats lookup failed for user {}: {}", user.id, exc)
 
     for m in body.messages:

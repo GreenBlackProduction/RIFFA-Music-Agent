@@ -596,11 +596,11 @@ def vocal_gender(vocal: str) -> str | None:
 
 
 __all__ = [
+    "CONTEXT_COMBINATIONS",
+    "DYNAMIC_ELEMENTS",
     "GENRE_STYLES",
     "MOOD_PROFILES",
     "TEMPO_PROFILES",
-    "DYNAMIC_ELEMENTS",
-    "CONTEXT_COMBINATIONS",
     "SongParams",
     "build_suno_style",
     "vocal_gender",

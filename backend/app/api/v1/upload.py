@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import secrets
-from datetime import timedelta
 
 import boto3
 from botocore.client import Config
@@ -67,7 +66,7 @@ async def get_cover_upload_url(
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to access storage: {e}",
-            )
+            ) from e
 
     # Generate presigned URL for PUT (15 minutes expiry)
     expires_in = 900  # 15 minutes
@@ -85,7 +84,7 @@ async def get_cover_upload_url(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate upload URL: {e}",
-        )
+        ) from e
 
     # Public URL for accessing the file after upload
     public_url = f"{settings.s3_public_base_url}/{filename}"

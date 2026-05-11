@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 # Determine which .env file to use:
 # 1. Explicit override via RIFFA_BACKEND_ENV_FILE
 # 2. .env.dev if it exists next to this file's package root (local dev)

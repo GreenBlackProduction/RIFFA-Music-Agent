@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,8 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.config import get_settings
 from app.db.models import Generation, GenerationStatus, GenerationType
 from app.services.lyrics import make_lyrics_client
-from app.services.prompt_engineering import SongParams, build_suno_style, vocal_gender
 from app.services.nanobanana import NanoBananaError, make_nanobanana_client
+from app.services.prompt_engineering import SongParams, build_suno_style, vocal_gender
 from app.services.suno import SunoError, make_suno_client
 from app.services.wallet import InsufficientBalance, credit_tokens, deduct_tokens
 

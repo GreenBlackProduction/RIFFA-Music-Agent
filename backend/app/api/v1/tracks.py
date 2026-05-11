@@ -141,7 +141,7 @@ def _safe_filename(name: str, ext: str) -> str:
 def _embed_id3(mp3_bytes: bytes, *, title: str, artist: str, album: str, comment: str, cover_bytes: bytes | None) -> bytes:
     """Write ID3v2.3 tags into the mp3 buffer. Best-effort: returns original on failure."""
     try:
-        from mutagen.id3 import APIC, COMM, ID3, ID3NoHeaderError, TALB, TIT2, TPE1
+        from mutagen.id3 import APIC, COMM, ID3, TALB, TIT2, TPE1, ID3NoHeaderError
         from mutagen.mp3 import MP3
     except Exception as exc:
         logger.warning("mutagen import failed: {} — returning untagged file", exc)
@@ -228,7 +228,7 @@ async def download_track(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "audio missing")
 
     artist = _resolve_artist(user)
-    short_title = (gen.title or track.get("title") or _shorten_idea(((gen.params or {}).get("description") or ""))).strip()
+    short_title = (gen.title or track.get("title") or _shorten_idea((gen.params or {}).get("description") or "")).strip()
     if not short_title:
         short_title = "RIFFA Track"
     if _RIFFA_SUFFIX in short_title:

@@ -183,11 +183,11 @@ async def email_password_login(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     try:
         user = await login_user_by_email(session, email, body.password)
-    except AuthError:
+    except AuthError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неверный email или пароль",
-        )
+        ) from exc
     await session.commit()
     _set_session_cookie(response, settings, make_session_token(user.id))
     return {"user_id": user.id}

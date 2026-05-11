@@ -155,7 +155,7 @@ async def test_clarifying_question(
             json={
                 "module": "song",
                 "messages": [
-                    {"role": "agent", "content": "Привет! О чём пишем?"},  # noqa: RUF001
+                    {"role": "agent", "content": "Привет! О чём пишем?"},
                     {"role": "user", "content": "Хочу песню про море"},
                 ],
             },
@@ -194,7 +194,7 @@ async def test_done_returns_summary_and_prompt(
             json={
                 "module": "song",
                 "messages": [
-                    {"role": "agent", "content": "О чём пишем?"},  # noqa: RUF001
+                    {"role": "agent", "content": "О чём пишем?"},
                     {"role": "user", "content": "Лёгкая инди-поп песня про лето на море"},
                 ],
                 "selected_genre": "Pop",
@@ -244,7 +244,7 @@ async def test_non_json_gpt_response_falls_back_to_plain_reply(
             json={
                 "module": "song",
                 "messages": [
-                    {"role": "agent", "content": "О чём?"},  # noqa: RUF001
+                    {"role": "agent", "content": "О чём?"},
                     {"role": "user", "content": "что-то"},
                 ],
             },
@@ -288,7 +288,7 @@ async def test_caps_prompt_at_5000_chars(
             json={
                 "module": "song",
                 "messages": [
-                    {"role": "agent", "content": "О чём?"},  # noqa: RUF001
+                    {"role": "agent", "content": "О чём?"},
                     {"role": "user", "content": "many synths"},
                 ],
             },
@@ -332,7 +332,7 @@ async def test_done_returns_intent_for_instrumental_request(
             json={
                 "module": "song",
                 "messages": [
-                    {"role": "agent", "content": "О чём пишем?"},  # noqa: RUF001
+                    {"role": "agent", "content": "О чём пишем?"},
                     {
                         "role": "user",
                         "content": "сочный грув на ударных без вокала и без других инструментов",

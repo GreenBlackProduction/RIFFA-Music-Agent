@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from loguru import logger
 from redis.asyncio import Redis

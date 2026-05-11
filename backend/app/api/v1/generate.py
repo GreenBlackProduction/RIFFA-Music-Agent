@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import secrets
 import uuid
+from contextlib import suppress
 from typing import Any, Literal
 
+import boto3
 from arq import create_pool
 from arq.connections import RedisSettings
+from botocore.client import Config
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -396,10 +400,6 @@ async def convert_to_wav(
 # Upload presigned URL endpoint (temporary workaround for upload router issue)
 # ---------------------------------------------------------------------------
 
-import secrets
-import boto3
-from botocore.client import Config
-
 
 class PresignedUploadResponse(BaseModel):
     upload_url: str
@@ -431,10 +431,9 @@ def _ensure_bucket_cors(s3_client, bucket_name: str):
             }
         ]
     }
-    try:
+    # Ignore CORS errors in development — MinIO may not support them yet.
+    with suppress(Exception):
         s3_client.put_bucket_cors(Bucket=bucket_name, CORSConfiguration=cors_config)
-    except Exception:
-        pass  # Ignore CORS errors in development
 
 
 _COVER_ALLOWED_EXTS: frozenset[str] = frozenset({"mp3", "wav", "m4a", "ogg"})

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 
-from app.db.base import Base, get_engine
 from app.db import models  # noqa: F401
+from app.db.base import Base, get_engine
 
 
 async def main() -> None:

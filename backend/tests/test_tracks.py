@@ -266,7 +266,7 @@ async def test_download_streams_tagged_mp3(
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             pass
 
-        async def __aenter__(self) -> "_StubAsyncClient":
+        async def __aenter__(self) -> _StubAsyncClient:
             return self
 
         async def __aexit__(self, *args: Any) -> None:

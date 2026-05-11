@@ -1,5 +1,5 @@
 """Minimal test to isolate the 405 issue."""
-from fastapi import FastAPI, APIRouter
+from fastapi import APIRouter, FastAPI
 
 app = FastAPI()
 
