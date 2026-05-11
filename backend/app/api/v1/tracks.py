@@ -141,7 +141,20 @@ def _safe_filename(name: str, ext: str) -> str:
 def _embed_id3(mp3_bytes: bytes, *, title: str, artist: str, album: str, comment: str, cover_bytes: bytes | None) -> bytes:
     """Write ID3v2.3 tags into the mp3 buffer. Best-effort: returns original on failure."""
     try:
-        from mutagen.id3 import APIC, COMM, ID3, TALB, TIT2, TPE1, ID3NoHeaderError
+        # mutagen ships partial type info but doesn't re-export the ID3 frame
+        # classes via `__all__`, so mypy flags every frame constructor as both
+        # `attr-defined` and `no-untyped-call`. The runtime behaviour is fine
+        # and the call surface is tiny; silencing both error codes here keeps
+        # the rest of strict-mode useful.
+        from mutagen.id3 import (  # type: ignore[attr-defined]
+            APIC,
+            COMM,
+            ID3,
+            TALB,
+            TIT2,
+            TPE1,
+            ID3NoHeaderError,
+        )
         from mutagen.mp3 import MP3
     except Exception as exc:
         logger.warning("mutagen import failed: {} — returning untagged file", exc)
@@ -156,9 +169,9 @@ def _embed_id3(mp3_bytes: bytes, *, title: str, artist: str, album: str, comment
 
     try:
         if audio.tags is None:
-            audio.add_tags()
+            audio.add_tags()  # type: ignore[no-untyped-call]
     except ID3NoHeaderError:
-        audio.add_tags()
+        audio.add_tags()  # type: ignore[no-untyped-call]
 
     tags = audio.tags
     if tags is None:
@@ -168,15 +181,15 @@ def _embed_id3(mp3_bytes: bytes, *, title: str, artist: str, album: str, comment
     tags.delall("TPE1")
     tags.delall("TALB")
     tags.delall("COMM")
-    tags.add(TIT2(encoding=3, text=title))
-    tags.add(TPE1(encoding=3, text=artist))
-    tags.add(TALB(encoding=3, text=album))
-    tags.add(COMM(encoding=3, lang="eng", desc="", text=comment))
+    tags.add(TIT2(encoding=3, text=title))  # type: ignore[no-untyped-call]
+    tags.add(TPE1(encoding=3, text=artist))  # type: ignore[no-untyped-call]
+    tags.add(TALB(encoding=3, text=album))  # type: ignore[no-untyped-call]
+    tags.add(COMM(encoding=3, lang="eng", desc="", text=comment))  # type: ignore[no-untyped-call]
 
     if cover_bytes:
         tags.delall("APIC")
         tags.add(
-            APIC(
+            APIC(  # type: ignore[no-untyped-call]
                 encoding=3,
                 mime="image/jpeg",
                 type=3,

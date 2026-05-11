@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/Button";
-import { ModuleIcon } from "@/components/studio/ModuleIcon";
 import {
   agentChat,
   type AgentChatMessage,

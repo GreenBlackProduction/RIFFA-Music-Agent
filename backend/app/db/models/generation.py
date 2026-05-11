@@ -3,6 +3,7 @@
 import enum
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -80,8 +81,8 @@ class Generation(Base, TimestampMixin):
 
     cost_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    params: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    result: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    result: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     error_message: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     # Suno task reference (needed for extend / WAV convert on completed gens)

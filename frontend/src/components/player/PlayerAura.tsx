@@ -46,6 +46,10 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const freqRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const levelsRef = useRef({ low: 0, mid: 0, high: 0, energy: 0 });
+  // Store the latest callback in a ref so the rAF loop reads the current
+  // value without re-subscribing every parent render.
+  const onEnergyRef = useRef(onEnergy);
+  onEnergyRef.current = onEnergy;
 
   // Инициализация AudioContext + Analyser (один раз на <audio>).
   useEffect(() => {
@@ -170,7 +174,8 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
       prev.energy += (rawEnergy - prev.energy) * smooth;
 
       // Expose smoothed energy to parent for reactive glow border.
-      if (onEnergy) onEnergy(prev.energy);
+      const cb = onEnergyRef.current;
+      if (cb) cb(prev.energy);
 
       // Ненавязчивая «жизнь» даже без аудио-данных (пауза или CORS-тайнинг).
       const noSignal = prev.energy < 0.01;

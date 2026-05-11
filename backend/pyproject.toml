@@ -75,6 +75,32 @@ python_version = "3.12"
 plugins = ["pydantic.mypy"]
 strict = true
 
+# Third-party libraries without bundled type information.
+# Installing stubs (boto3-stubs, types-python-jose) would bloat the dev env;
+# we use these libraries through narrow surface areas and the runtime
+# behaviour is well-understood — silencing import-untyped is the pragmatic
+# trade-off and matches what the rest of the codebase already assumes.
+[[tool.mypy.overrides]]
+module = [
+    "boto3",
+    "boto3.*",
+    "botocore",
+    "botocore.*",
+    "jose",
+    "jose.*",
+    "mutagen",
+    "mutagen.*",
+]
+ignore_missing_imports = true
+
+# Alembic auto-generated migrations are infrastructure code — they call
+# `op.add_column(...)` etc. through Alembic's untyped helpers, which has
+# no equivalent typed surface. Excluding the directory is the standard
+# pattern for Alembic + strict mypy.
+[[tool.mypy.overrides]]
+module = "app.db.migrations.*"
+ignore_errors = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

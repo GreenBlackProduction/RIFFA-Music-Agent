@@ -538,7 +538,7 @@ def _coerce_intent(raw: Any, module_hint: ModuleKind) -> AgentIntent | None:
 
     params = AgentIntentParams(
         description=str(raw_params.get("description") or "")[:500],
-        text_mode=text_mode,  # type: ignore[arg-type]
+        text_mode=text_mode,
         lyrics=str(raw_params.get("lyrics") or "")[:5000],
         genre=str(raw_params.get("genre") or "")[:64],
         custom_genre=str(raw_params.get("custom_genre") or "")[:128],
@@ -549,8 +549,8 @@ def _coerce_intent(raw: Any, module_hint: ModuleKind) -> AgentIntent | None:
     )
 
     return AgentIntent(
-        module=module_val,  # type: ignore[arg-type]
-        confidence=confidence,  # type: ignore[arg-type]
+        module=module_val,
+        confidence=confidence,
         params=params,
         note=str(raw.get("note") or "")[:280],
     )
@@ -595,9 +595,12 @@ async def agent_chat(
         )
 
     try:
-        resp = await client.chat.completions.create(
+        # `response_format` accepts the {"type": "json_object"} literal at
+        # runtime, but the typed-dict variant in openai 1.61 is too narrow
+        # for mypy to pick the right overload — silence just this call.
+        resp = await client.chat.completions.create(  # type: ignore[call-overload]
             model="gpt-4o",
-            messages=chat_messages,  # type: ignore[arg-type]
+            messages=chat_messages,
             temperature=0.55,
             max_tokens=1800,
             response_format={"type": "json_object"},

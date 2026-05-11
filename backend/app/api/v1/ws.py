@@ -28,7 +28,7 @@ async def ws_generation_progress(websocket: WebSocket, gen_id: str) -> None:
     await websocket.accept()
     settings = get_settings()
 
-    redis: Redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    redis: Redis[str] = Redis.from_url(settings.redis_url, decode_responses=True)
     pubsub = redis.pubsub()
     channel = _CHANNEL.format(gen_id)
     await pubsub.subscribe(channel)
@@ -55,5 +55,5 @@ async def ws_generation_progress(websocket: WebSocket, gen_id: str) -> None:
         logger.error("WS error for gen {}: {}", gen_id, exc)
     finally:
         await pubsub.unsubscribe(channel)
-        await redis.aclose()
+        await redis.aclose()  # type: ignore[attr-defined]
         logger.debug("WS client disconnected for gen {}", gen_id)

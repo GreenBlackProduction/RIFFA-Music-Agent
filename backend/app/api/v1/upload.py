@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+from typing import Any
 
 import boto3
 from botocore.client import Config
@@ -26,7 +27,7 @@ class PresignedUploadResponse(BaseModel):
     expires_in: int  # seconds
 
 
-def _get_s3_client(settings: Settings):
+def _get_s3_client(settings: Settings) -> Any:
     """Create boto3 S3 client for MinIO/S3."""
     return boto3.client(
         "s3",
@@ -97,6 +98,6 @@ async def get_cover_upload_url(
 
 
 @router.post("/test-post")
-async def test_post_endpoint():
+async def test_post_endpoint() -> dict[str, str]:
     """Test endpoint to verify POST works."""
     return {"message": "POST works!"}

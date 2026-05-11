@@ -26,14 +26,18 @@ def encode_token(claims: dict[str, Any], ttl: timedelta) -> str:
     payload = dict(claims)
     payload["iat"] = int(_now().timestamp())
     payload["exp"] = int((_now() + ttl).timestamp())
-    return jwt.encode(payload, settings.secret_key, algorithm=JWT_ALGORITHM)
+    token: str = jwt.encode(payload, settings.secret_key, algorithm=JWT_ALGORITHM)
+    return token
 
 
 def decode_token(token: str) -> dict[str, Any]:
     """Decode and validate a JWT, raising :class:`TokenError` on failure."""
     settings = get_settings()
     try:
-        return jwt.decode(token, settings.secret_key, algorithms=[JWT_ALGORITHM])
+        payload: dict[str, Any] = jwt.decode(
+            token, settings.secret_key, algorithms=[JWT_ALGORITHM]
+        )
+        return payload
     except JWTError as exc:
         raise TokenError(str(exc)) from exc
 

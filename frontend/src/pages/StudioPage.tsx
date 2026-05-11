@@ -598,11 +598,15 @@ export function StudioPage() {
     return () => document.body.classList.remove("studio-landing");
   }, [activeModule]);
 
-  // Cleanup recording on unmount
+  // Cleanup recording on unmount. Inline the stop() call instead of
+  // referencing the local `stopRecording` so the effect's deps list stays
+  // honest (otherwise react-hooks/exhaustive-deps wants every render-fresh
+  // closure listed, even though we only need teardown on unmount).
   useEffect(() => {
     return () => {
-      if (isRecording) {
-        stopRecording();
+      const recorder = mediaRecorderRef.current;
+      if (recorder && isRecording) {
+        recorder.stop();
       }
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current);
@@ -997,15 +1001,6 @@ export function StudioPage() {
       alert(`Не удалось загрузить запись: ${msg}`);
       setState((prev) => ({ ...prev, coverFileName: "", coverUrl: "" }));
     }
-  }
-
-  function generateCoverAutoTitle() {
-    const guesses = [
-      "Lofi remake", "Cinematic cover", "Neon night version", "Unplugged take",
-      "Trap refix", "Ambient lullaby", "Synthwave recall", "Acoustic retelling",
-    ];
-    const t = guesses[Math.floor(Math.random() * guesses.length)];
-    update("coverTitle", `${t} · ${new Date().getFullYear()}`);
   }
 
   function startWithIdea(e: React.FormEvent) {

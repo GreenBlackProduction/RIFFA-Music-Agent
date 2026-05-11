@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import "./VoiceRecorder.css";
 
 interface VoiceRecorderProps {
@@ -13,7 +13,11 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  // Hold the AudioContext in a ref instead of state — the cleanup needs the
+  // exact instance created during this effect run, and storing it in state
+  // would race with React batching (the previous render's `audioContext`
+  // could be `null` when cleanup fires).
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
     if (!isRecording) return;
@@ -29,7 +33,7 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
         source.connect(analyser);
 
         analyserRef.current = analyser;
-        setAudioContext(ctx);
+        audioContextRef.current = ctx;
       } catch (err) {
         console.error("Failed to initialize audio:", err);
       }
@@ -38,8 +42,10 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
     initAudio();
 
     return () => {
-      if (audioContext) {
-        audioContext.close();
+      const ctx = audioContextRef.current;
+      if (ctx) {
+        ctx.close().catch(() => undefined);
+        audioContextRef.current = null;
       }
     };
   }, [isRecording]);

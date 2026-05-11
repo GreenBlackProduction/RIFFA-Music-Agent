@@ -105,7 +105,8 @@ class SunoClient:
                         timeout=120.0,
                     )
                     resp.raise_for_status()
-                    return resp.json()  # type: ignore[return-value]
+                    data: dict[str, Any] = resp.json()
+                    return data
                 except httpx.HTTPStatusError as exc:
                     code = exc.response.status_code
                     body = exc.response.text[:300]
@@ -537,7 +538,7 @@ class SunoClient:
                 flag = str(data.get("successFlag", ""))
 
                 if flag == "SUCCESS":
-                    wav_url = data.get("response", {}).get("audioWavUrl", "")
+                    wav_url = str(data.get("response", {}).get("audioWavUrl") or "")
                     if wav_url:
                         return wav_url
 

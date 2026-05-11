@@ -65,7 +65,7 @@ class LyricsResult(BaseModel):
 async def _enqueue(redis_url: str, gen_id: str) -> None:
     pool = await create_pool(RedisSettings.from_dsn(redis_url))
     await pool.enqueue_job("run_generation", gen_id)
-    await pool.aclose()
+    await pool.aclose()  # type: ignore[attr-defined]
 
 
 def _ws_url(request: Request, gen_id: str) -> str:

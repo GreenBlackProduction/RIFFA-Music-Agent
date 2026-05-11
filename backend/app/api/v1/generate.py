@@ -141,7 +141,7 @@ async def _enqueue(ctx_redis_url: str, gen_id: str) -> None:
     redis_settings = RedisSettings.from_dsn(ctx_redis_url)
     pool = await create_pool(redis_settings)
     await pool.enqueue_job("run_generation", gen_id)
-    await pool.aclose()
+    await pool.aclose()  # type: ignore[attr-defined]
 
 
 def _ws_url(request: Request, gen_id: str) -> str:
@@ -407,7 +407,7 @@ class PresignedUploadResponse(BaseModel):
     expires_in: int
 
 
-def _get_s3_client(settings: Settings):
+def _get_s3_client(settings: Settings) -> Any:
     """Create boto3 S3 client for MinIO/S3."""
     return boto3.client(
         "s3",
@@ -419,7 +419,7 @@ def _get_s3_client(settings: Settings):
     )
 
 
-def _ensure_bucket_cors(s3_client, bucket_name: str):
+def _ensure_bucket_cors(s3_client: Any, bucket_name: str) -> None:
     """Ensure bucket has CORS configuration for frontend uploads."""
     cors_config = {
         "CORSRules": [

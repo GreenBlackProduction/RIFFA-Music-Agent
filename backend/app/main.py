@@ -1,6 +1,7 @@
 """FastAPI application entrypoint."""
 
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -17,7 +18,7 @@ from app.core.config import get_settings
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Application lifespan: init external clients."""
     settings = get_settings()
     if settings.sentry_dsn:

@@ -158,7 +158,7 @@ def _to_out(
         like_count=gen.like_count,
         dislike_count=gen.dislike_count,
         score=gen.like_count - gen.dislike_count,
-        my_vote=my_vote,  # type: ignore[arg-type]
+        my_vote=my_vote,
         published_at=(gen.published_at or gen.created_at).isoformat(),
         is_own=is_own,
     )

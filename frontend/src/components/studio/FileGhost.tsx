@@ -6,6 +6,12 @@
  * delete mutation (React Query) — this hook is purely for the visual ghost.
  */
 
+// File intentionally exports both a hook (`useFileGhosts`) and a component
+// (`FileGhostsOverlay`); react-refresh's HMR guard would otherwise complain,
+// but the pair is used together at exactly one call-site so splitting them
+// across files just adds noise.
+/* eslint-disable react-refresh/only-export-components */
+
 import { createPortal } from "react-dom";
 import { useCallback, useState } from "react";
 

@@ -97,7 +97,7 @@ def _to_out(gen: Generation) -> GenerationOut:
         tempo=gen.tempo,
         vocal=gen.vocal,
         cost_tokens=gen.cost_tokens,
-        rating=gen.rating.value if gen.rating else None,
+        rating=gen.rating if gen.rating else None,
         share_id=gen.share_id,
         share_views=gen.share_views,
         is_public=bool(gen.is_public),
@@ -357,7 +357,7 @@ async def retry_generation(
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     pool = await create_pool(redis_settings)
     await pool.enqueue_job("run_generation", str(new_gen.id))
-    await pool.aclose()
+    await pool.aclose()  # type: ignore[attr-defined]
 
     await session.commit()
 
