@@ -9,7 +9,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, ClassVar
 
+from arq import cron
 from loguru import logger
+from sqlalchemy import delete as sql_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -78,6 +80,29 @@ async def _publish(ctx: dict[str, Any], gen_id: str, payload: dict[str, Any]) ->
 # ---------------------------------------------------------------------------
 
 
+async def _purge_expired_trash(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    retention_days: int = 7,
+) -> int:
+    """Hard-delete generations soft-deleted more than ``retention_days`` ago.
+
+    Returns the number of rows removed so the caller can log it.
+    """
+    from datetime import timedelta
+
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+    async with session_factory() as session:
+        result = await session.execute(
+            sql_delete(Generation).where(
+                Generation.deleted_at.is_not(None),
+                Generation.deleted_at <= cutoff,
+            )
+        )
+        await session.commit()
+    return int(result.rowcount or 0)
+
+
 async def startup(ctx: dict[str, Any]) -> None:
     _ensure_log_sink()
     settings = get_settings()
@@ -87,20 +112,20 @@ async def startup(ctx: dict[str, Any]) -> None:
     ctx["settings"] = settings
     logger.info("Arq worker started — logs duplicated to {}", _LOG_FILE)
 
-    # Auto-purge trash items older than 7 days on every worker start.
-    from datetime import timedelta
-    from sqlalchemy import delete as sql_delete
-    cutoff = datetime.now(UTC) - timedelta(days=7)
-    async with session_factory() as session:
-        result = await session.execute(
-            sql_delete(Generation).where(
-                Generation.deleted_at.is_not(None),
-                Generation.deleted_at <= cutoff,
-            )
-        )
-        await session.commit()
-        if result.rowcount:
-            logger.info("Trash auto-purge: hard-deleted {} old generation(s)", result.rowcount)
+    # Auto-purge trash items older than 7 days on every worker start. The
+    # daily cron below also runs but the boot-time pass catches up on any
+    # purges missed while the worker was down.
+    removed = await _purge_expired_trash(session_factory)
+    if removed:
+        logger.info("Trash auto-purge (startup): hard-deleted {} old generation(s)", removed)
+
+
+async def purge_trash(ctx: dict[str, Any]) -> None:
+    """Arq cron task — daily sweep of soft-deleted generations older than 7d."""
+    session_factory: async_sessionmaker[AsyncSession] = ctx["session_factory"]
+    removed = await _purge_expired_trash(session_factory)
+    if removed:
+        logger.info("Trash auto-purge (cron): hard-deleted {} old generation(s)", removed)
 
 
 async def shutdown(ctx: dict[str, Any]) -> None:
@@ -536,6 +561,11 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
 
 class WorkerSettings:
     functions: ClassVar[list[Any]] = [run_generation]
+    cron_jobs: ClassVar[list[Any]] = [
+        # Daily 03:17 UTC sweep of the soft-delete trash. Off-peak time so the
+        # query never collides with user-driven generation traffic.
+        cron(purge_trash, hour=3, minute=17, run_at_startup=False),
+    ]
     on_startup = startup
     on_shutdown = shutdown
     max_jobs = 50

@@ -316,6 +316,10 @@ export interface CoverSongParams {
   lyrics?: string;
   vocal_gender?: "m" | "f" | null;
   instrumental?: boolean;
+  /** Suno styleWeight (0..1) — how strictly to follow the supplied style. */
+  style_weight?: number | null;
+  /** Suno weirdnessConstraint (0..1) — creative deviation from the original. */
+  weirdness_constraint?: number | null;
   track_name?: string;
 }
 
@@ -370,38 +374,31 @@ export interface PresignedUploadResponse {
   expires_in: number;
 }
 
-export function getCoverUploadUrl(): Promise<PresignedUploadResponse> {
+export function getCoverUploadUrl(extension = "mp3"): Promise<PresignedUploadResponse> {
   return apiFetch("/api/v1/generate/upload-cover-url", {
     method: "POST",
+    body: JSON.stringify({ extension }),
   });
 }
 
 export async function uploadCoverFile(file: File): Promise<string> {
-  console.log("uploadCoverFile: Starting upload for", file.name);
+  // S3 key encodes the file extension so Suno can sniff format from URL.
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "mp3";
+  const { upload_url, public_url } = await getCoverUploadUrl(ext);
 
-  // Step 1: Get presigned URL
-  console.log("uploadCoverFile: Getting presigned URL...");
-  const { upload_url, public_url } = await getCoverUploadUrl();
-  console.log("uploadCoverFile: Got presigned URL:", upload_url.substring(0, 50) + "...");
-
-  // Step 2: Upload file directly to S3/MinIO
-  console.log("uploadCoverFile: Uploading to S3/MinIO...");
+  // Upload file directly to S3/MinIO via the presigned URL. We deliberately
+  // do NOT set Content-Type — the URL was signed without it, and adding it
+  // here would produce a SignatureDoesNotMatch error.
   const uploadResponse = await fetch(upload_url, {
     method: "PUT",
     body: file,
-    // Don't set Content-Type header to avoid signature mismatch with presigned URL
   });
-
-  console.log("uploadCoverFile: Upload response status:", uploadResponse.status);
-
   if (!uploadResponse.ok) {
-    const errorText = await uploadResponse.text();
-    console.error("uploadCoverFile: Upload failed:", errorText);
-    throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+    const errorText = await uploadResponse.text().catch(() => "");
+    throw new Error(
+      `Upload failed (${uploadResponse.status}): ${errorText || uploadResponse.statusText}`,
+    );
   }
-
-  // Step 3: Return public URL for use in generate/cover_song
-  console.log("uploadCoverFile: Upload successful, public URL:", public_url);
   return public_url;
 }
 

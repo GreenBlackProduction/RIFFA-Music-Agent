@@ -1,3 +1,6 @@
+# Russian labels intentionally use EN DASH for BPM ranges — Cyrillic content
+# triggers `RUF001` (ambiguous chars) across the file; suppress globally.
+# ruff: noqa: RUF001
 """Normalize Generation.mood from human-readable labels to stable keys.
 
 Older Studio code stored the *label* of the chosen mood/tempo chip in

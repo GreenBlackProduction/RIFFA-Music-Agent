@@ -437,8 +437,18 @@ def _ensure_bucket_cors(s3_client, bucket_name: str):
         pass  # Ignore CORS errors in development
 
 
+_COVER_ALLOWED_EXTS: frozenset[str] = frozenset({"mp3", "wav", "m4a", "ogg"})
+
+
+class CoverUploadUrlRequest(BaseModel):
+    # File extension hint (mp3 / wav / m4a / ogg). Defaults to mp3 for
+    # backwards compatibility — older clients submitted no body at all.
+    extension: str = Field(default="mp3", max_length=8)
+
+
 @router.post("/upload-cover-url", response_model=PresignedUploadResponse)
 async def get_cover_upload_url(
+    body: CoverUploadUrlRequest | None = None,
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),
 ) -> PresignedUploadResponse:
@@ -450,8 +460,14 @@ async def get_cover_upload_url(
     handing out a mock URL — the cover flow used to fail downstream with a
     confusing error because Suno could not download a localhost mock path.
     """
+    ext = (body.extension if body else "mp3").lower().lstrip(".")
+    if ext not in _COVER_ALLOWED_EXTS:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Поддерживаемые форматы кавера: {', '.join(sorted(_COVER_ALLOWED_EXTS))}.",
+        )
     token = secrets.token_urlsafe(16)
-    filename = f"covers/{user.id}/{token}.mp3"
+    filename = f"covers/{user.id}/{token}.{ext}"
     expires_in = 900  # 15 minutes
 
     try:

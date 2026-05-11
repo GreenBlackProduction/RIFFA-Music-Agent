@@ -23,6 +23,7 @@ import {
   type AgentIntent,
 } from "@/lib/api/client";
 import { SUNO_LIMITS } from "@/lib/sunoConstraints";
+import { blobToWav } from "@/lib/audio/recordToWav";
 import { useGenerationStore } from "@/store/generation";
 import "./StudioPage.css";
 
@@ -929,12 +930,21 @@ export function StudioPage() {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        // MediaRecorder always produces webm/opus on Chrome (and mp4/aac on
+        // Safari) — neither is in Suno's allow-list (mp3/wav/m4a/ogg). Decode
+        // via WebAudio and re-encode to 16-bit PCM WAV before upload.
+        const mimeType = mediaRecorder.mimeType || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         stream.getTracks().forEach((track) => track.stop());
-
-        // Convert to File and upload
-        const file = new File([audioBlob], `recording-${Date.now()}.webm`, { type: "audio/webm" });
-        await uploadRecordedFile(file);
+        try {
+          const wavFile = await blobToWav(audioBlob, `recording-${Date.now()}.wav`);
+          await uploadRecordedFile(wavFile);
+        } catch (err) {
+          const msg =
+            err instanceof Error ? err.message : "Не удалось сконвертировать запись в WAV.";
+          alert(`Не удалось обработать запись: ${msg}`);
+          setState((prev) => ({ ...prev, coverFileName: "", coverUrl: "" }));
+        }
         setIsRecording(false);
         if (recordingTimerRef.current) {
           clearInterval(recordingTimerRef.current);
@@ -1106,6 +1116,16 @@ export function StudioPage() {
           track_name: title,
         });
       } else if (activeModule === "cover") {
+        // Suno styleWeight / weirdnessConstraint — UI stores them as strings
+        // (chip values such as "0.65"). Parse to floats and clamp to [0, 1];
+        // omit when blank so backend can keep them unset.
+        const parseRatio = (raw: string): number | null => {
+          const trimmed = raw.trim();
+          if (!trimmed) return null;
+          const num = Number.parseFloat(trimmed);
+          if (!Number.isFinite(num)) return null;
+          return Math.max(0, Math.min(1, num));
+        };
         response = await generateCoverSong({
           upload_url: state.coverUrl,
           genre: state.coverGenre === "custom" ? "" : state.coverGenre,
@@ -1119,6 +1139,8 @@ export function StudioPage() {
               ? state.coverVocalGender
               : null,
           instrumental: state.coverInstrumental === "yes",
+          style_weight: parseRatio(state.coverStyleWeight),
+          weirdness_constraint: parseRatio(state.coverWeirdness),
           track_name: resolvedTrackName,
         });
         title =
