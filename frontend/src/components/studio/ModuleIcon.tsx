@@ -4,32 +4,31 @@ type IconKind = "song" | "instrumental" | "sound_effect" | "cover" | "cover_art"
 
 interface Props { kind: IconKind; className?: string; }
 
-const MP4_ICONS: Partial<Record<IconKind, string>> = {
-  song:         "/icons/song.mp4",
-  instrumental: "/icons/instrumental.mp4",
-  sound_effect: "/icons/sfx.mp4",
-  cover:        "/icons/cover.mp4",
-  cover_art:    "/icons/cover-art.mp4",
+const ICON_SOURCES: Partial<Record<IconKind, string>> = {
+  song:         "/icons/song.png",
+  instrumental: "/icons/instrumental.png",
+  sound_effect: "/icons/sfx.png",
+  cover:        "/icons/cover.png",
+  cover_art:    "/icons/cover-art.png",
+  generator:    "/icons/agent.gif",
 };
 
 export function ModuleIcon({ kind, className }: Props) {
   const cls = ["module-icon", `module-icon--${kind}`, className].filter(Boolean).join(" ");
-  const mp4Src = MP4_ICONS[kind];
-  if (mp4Src) {
+  const iconSrc = ICON_SOURCES[kind];
+
+  if (iconSrc) {
     return (
-      <video
-        src={mp4Src}
-        className={`${cls} module-icon--video`}
-        autoPlay
-        muted
-        loop
-        playsInline
-        disablePictureInPicture
+      <img
+        src={iconSrc}
+        alt={kind}
+        className={`${cls} module-icon--image`}
         aria-hidden
       />
     );
   }
-  // Fallback SVG for generator kind
+
+  // Fallback SVG for unknown kinds
   return <GeneratorIcon className={cls} />;
 }
 
