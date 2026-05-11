@@ -564,7 +564,19 @@ async def agent_chat(
     session: AsyncSession = Depends(db_session),
 ) -> AgentChatResponse:
     """Stateless chat turn — frontend replays full message history each call."""
-    # No early return for empty messages — user always writes first.
+    # When the frontend just opens the chat, it sends an empty history to
+    # request the canned opener. We respond locally without hitting GPT —
+    # this saves a round-trip and is also covered by
+    # `tests/test_agent.py::test_first_turn_returns_canned_opening_without_calling_gpt`.
+    if not body.messages:
+        return AgentChatResponse(
+            reply=(
+                "Привет! Я RIFFA Agent — помогу собрать промпт для нашей "
+                "AI-студии. Расскажи в двух словах, что хочется сделать: "
+                "трек, инструментал, обложку или эффект?"
+            ),
+            done=False,
+        )
 
     api_key = settings.apiyi_key or settings.openai_api_key
     if not api_key:

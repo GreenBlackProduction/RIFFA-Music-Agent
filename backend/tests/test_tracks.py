@@ -14,8 +14,9 @@ from fastapi import status as http_status
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.api.v1 import tracks as tracks_module
+from app.api.v1 import tracks as tracks_module  # noqa: F401  # kept for clarity
 from app.api.v1.tracks import _resolve_artist, _shorten_idea, format_track_name
+from app.core.config import Settings, get_settings
 from app.core.deps import current_user, db_session
 from app.db.base import Base
 from app.db.models import Generation, GenerationStatus, GenerationType, User
@@ -130,6 +131,18 @@ def test_shorten_idea_trims_at_word_boundary() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _make_settings(*, openai_api_key: str, openai_base_url: str = "") -> Settings:
+    """Build a Settings override for FastAPI's `dependency_overrides` map.
+
+    The previous version of these tests tried to monkeypatch `get_settings`
+    on the tracks module, which does NOT work — FastAPI stores the actual
+    callable when `Depends(get_settings)` is registered, so attribute
+    patching the import has no effect on the resolved settings. Switching
+    to `app.dependency_overrides[get_settings]` is the supported hook.
+    """
+    return Settings(openai_api_key=openai_api_key, openai_base_url=openai_base_url)
+
+
 @pytest.mark.asyncio
 async def test_auto_title_uses_gpt_when_available(client_factory, alice: User) -> None:
     """When OPENAI_API_KEY is configured and GPT returns text, we use it."""
@@ -141,17 +154,19 @@ async def test_auto_title_uses_gpt_when_available(client_factory, alice: User) -
         async def generate_title(self, prompt: str) -> str:
             return "Снежный какао"
 
-    with (
-        patch("app.services.lyrics.LyricsClient", _StubLyrics),
-        patch.object(tracks_module, "get_settings") as gs_mock,
-    ):
-        gs_mock.return_value.openai_api_key = "fake-key"
-        gs_mock.return_value.openai_base_url = "https://api.apiyi.com/v1"
-        async with client_factory(alice) as client:
-            resp = await client.post(
-                "/api/v1/tracks/auto-title",
-                json={"idea": "Уютная зимняя песня про снег и горячий какао"},
-            )
+    app.dependency_overrides[get_settings] = lambda: _make_settings(
+        openai_api_key="fake-key", openai_base_url="https://api.apiyi.com/v1"
+    )
+    try:
+        with patch("app.services.lyrics.LyricsClient", _StubLyrics):
+            async with client_factory(alice) as client:
+                resp = await client.post(
+                    "/api/v1/tracks/auto-title",
+                    json={"idea": "Уютная зимняя песня про снег и горячий какао"},
+                )
+    finally:
+        app.dependency_overrides.pop(get_settings, None)
+
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["short_title"] == "Снежный какао"
@@ -164,14 +179,16 @@ async def test_auto_title_falls_back_to_idea_slice_when_gpt_unavailable(
     client_factory, alice: User
 ) -> None:
     """No OPENAI key → we synthesize a title from the idea string."""
-    with patch.object(tracks_module, "get_settings") as gs_mock:
-        gs_mock.return_value.openai_api_key = ""
-        gs_mock.return_value.openai_base_url = ""
+    app.dependency_overrides[get_settings] = lambda: _make_settings(openai_api_key="")
+    try:
         async with client_factory(alice) as client:
             resp = await client.post(
                 "/api/v1/tracks/auto-title",
                 json={"idea": "Тест без ключа GPT просто короткая идея"},
             )
+    finally:
+        app.dependency_overrides.pop(get_settings, None)
+
     assert resp.status_code == 200
     body = resp.json()
     assert body["artist"] == "alice"
