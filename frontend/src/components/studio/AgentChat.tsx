@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/Button";
+import { ModuleIcon } from "@/components/studio/ModuleIcon";
 import {
   agentChat,
   type AgentChatMessage,
@@ -123,14 +124,9 @@ function extractLyrics(text: string): string {
 
 function AgentAvatar() {
   return (
-    <img
-      src="/icons/agent.gif"
-      alt="RIFFA AI Agent"
-      width={28}
-      height={28}
-      className="agent-chat__avatar-img"
-      aria-hidden="true"
-    />
+    <div className="agent-chat__avatar-wrapper">
+      <ModuleIcon kind="generator" className="agent-chat__avatar-icon" />
+    </div>
   );
 }
 
