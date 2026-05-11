@@ -105,6 +105,10 @@ class CoverSongRequest(BaseModel):
     lyrics: str = Field(default="", max_length=5000)
     vocal_gender: str | None = None
     instrumental: bool = False
+    # Suno styleWeight / weirdnessConstraint — both 0..1, sent verbatim to
+    # /generate/upload-cover when provided. Optional.
+    style_weight: float | None = Field(default=None, ge=0.0, le=1.0)
+    weirdness_constraint: float | None = Field(default=None, ge=0.0, le=1.0)
     track_name: str = Field(default="", max_length=80)
     idempotency_key: str = Field(default="", max_length=64)
 
@@ -438,39 +442,26 @@ async def get_cover_upload_url(
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),
 ) -> PresignedUploadResponse:
-    """
-    Generate a presigned URL for uploading a cover song source audio file.
+    """Generate a presigned PUT URL for uploading a cover-song source audio.
 
-    The client uploads the file directly to S3/MinIO using this URL,
-    then passes the public_url to /api/v1/generate/cover_song.
-
-    DEV MODE: Returns mock URLs when MinIO is not available.
+    The client uploads the file directly to S3/MinIO using ``upload_url`` and
+    then passes ``public_url`` to ``/api/v1/generate/cover_song``. If the
+    storage backend is not reachable we raise 503 instead of silently
+    handing out a mock URL — the cover flow used to fail downstream with a
+    confusing error because Suno could not download a localhost mock path.
     """
-    # Generate unique filename
     token = secrets.token_urlsafe(16)
     filename = f"covers/{user.id}/{token}.mp3"
+    expires_in = 900  # 15 minutes
 
-    # Try to connect to S3/MinIO, but fall back to mock URLs if unavailable
     try:
         s3_client = _get_s3_client(settings)
-
-        # Try to ensure bucket exists
         try:
             s3_client.head_bucket(Bucket=settings.s3_bucket_media)
         except Exception:
-            try:
-                s3_client.create_bucket(Bucket=settings.s3_bucket_media)
-                _ensure_bucket_cors(s3_client, settings.s3_bucket_media)
-            except Exception:
-                # MinIO not available, use mock URLs
-                raise ConnectionError("MinIO not available")
-
-        # Ensure CORS is configured
+            s3_client.create_bucket(Bucket=settings.s3_bucket_media)
         _ensure_bucket_cors(s3_client, settings.s3_bucket_media)
 
-        # Generate presigned URL for PUT (15 minutes expiry)
-        # Don't specify ContentType in Params to avoid signature mismatch
-        expires_in = 900  # 15 minutes
         upload_url = s3_client.generate_presigned_url(
             "put_object",
             Params={
@@ -480,17 +471,16 @@ async def get_cover_upload_url(
             ExpiresIn=expires_in,
         )
         public_url = f"{settings.s3_public_base_url}/{filename}"
-
-        # Log for debugging
-        print(f"Generated presigned URL for {filename}")
-        print(f"Upload URL: {upload_url[:100]}...")
-
-    except Exception as e:
-        # MinIO not available - return mock URLs for development
-        # In production, this would be an error
-        expires_in = 900
-        upload_url = f"http://localhost:9000/mock-upload/{filename}"
-        public_url = f"http://localhost:9000/mock-media/{filename}"
+    except Exception as exc:
+        # MinIO/S3 unavailable — fail loudly so the UI can show the real
+        # cause instead of attempting a PUT against a non-existent host.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Хранилище для загрузки кавер-треков недоступно. "
+                "Проверьте, что MinIO/S3 запущен и доступен."
+            ),
+        ) from exc
 
     return PresignedUploadResponse(
         upload_url=upload_url,

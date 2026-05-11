@@ -374,18 +374,51 @@ class SunoClient:
         weirdness_constraint: float | None = None,
         progress_cb: ProgressCb | None = None,
     ) -> SunoResult:
-        payload: dict[str, Any] = {
-            "uploadUrl": upload_url,
-            "customMode": True,
-            "instrumental": instrumental,
-            "model": "V5_5",
-            "style": _strip_artist_names(style)[:1000],
-            "title": title[:80],
-            "callBackUrl": "https://google.com",
-        }
-        if not instrumental and prompt:
-            payload["prompt"] = prompt[:5000]
-        if vocal_gender in {"m", "f"}:
+        # Suno /generate/upload-cover parameter rules
+        #   customMode=true  + instrumental=true   → style, title, uploadUrl required
+        #   customMode=true  + instrumental=false  → style, title, prompt (≤5000), uploadUrl required
+        #   customMode=false                       → prompt (≤500) + uploadUrl only;
+        #                                            style/title MUST be empty.
+        # See https://docs.sunoapi.org/suno-api/upload-and-cover-audio
+        clean_style = _strip_artist_names(style)[:1000]
+        clean_title = title[:100]
+
+        if instrumental:
+            payload: dict[str, Any] = {
+                "uploadUrl": upload_url,
+                "customMode": True,
+                "instrumental": True,
+                "model": "V5_5",
+                "style": clean_style,
+                "title": clean_title,
+                "callBackUrl": "https://google.com",
+            }
+        elif prompt:
+            payload = {
+                "uploadUrl": upload_url,
+                "customMode": True,
+                "instrumental": False,
+                "model": "V5_5",
+                "style": clean_style,
+                "title": clean_title,
+                "prompt": prompt[:5000],
+                "callBackUrl": "https://google.com",
+            }
+        else:
+            # Custom Mode requires prompt when not instrumental; without lyrics
+            # fall back to Non-Custom Mode where only prompt+uploadUrl are sent.
+            # We seed prompt from the user's style brief so the cover still
+            # reflects the desired direction.
+            desc = (clean_style or "cover version").strip()[:500] or "cover version"
+            payload = {
+                "uploadUrl": upload_url,
+                "customMode": False,
+                "instrumental": False,
+                "model": "V5_5",
+                "prompt": desc,
+                "callBackUrl": "https://google.com",
+            }
+        if vocal_gender in {"m", "f"} and not instrumental:
             payload["vocalGender"] = vocal_gender
         if style_weight is not None:
             payload["styleWeight"] = max(0.0, min(1.0, style_weight))
