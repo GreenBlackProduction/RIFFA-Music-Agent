@@ -1,8 +1,9 @@
 # RIFFA Web — План разработки
 
-> Последнее обновление: 2026-05-08
+> Последнее обновление: 2026-05-11
 > Статус: **локальная разработка** — frontend `:5173`, backend `:8000`, arq-воркер; postgres/redis/minio в docker-compose
 > Запуск: `.\start-all.ps1` (единое окно, все сервисы из venv)
+> CI: GitHub Actions — backend (ruff + mypy + pytest) и frontend (eslint + tsc) **зелёные** (PR #1)
 
 ---
 
@@ -201,10 +202,13 @@ riffa-web/
 - [ ] `POST /api/v1/generate/cover_art` → arq-таска → NanoBanana (через APIYI proxy)
 - [ ] 3 модели в UI готово (Nano Banana / 2 / Pro), осталось привязать backend
 
-### Cover song upload pipeline
-- [ ] `POST /api/v1/upload/cover-source` → presigned MinIO/S3
-- [ ] UI: использовать presigned URL вместо текстового поля
-- [ ] После upload автоматически передавать в `generate/cover_song`
+### Cover song upload pipeline — пайплайн доделан в PR #1
+- [x] `POST /api/v1/generate/upload-cover-url` → presigned PUT в MinIO/S3, отдаёт публичный URL для Suno
+- [x] UI Studio: drag-and-drop + MediaRecorder используют presigned URL
+- [x] Запись с микрофона: WebAudio API декодирует webm/mp4 и пишет 16-bit PCM WAV перед загрузкой (Suno не принимает webm)
+- [x] Параметры кавера: `styleWeight` / `weirdnessConstraint` пробрасываются в `/generate/cover_song` и доходят до Suno V5.5
+- [x] Допустимые форматы аудио расширены до `mp3 / wav / m4a / ogg`
+- [x] Прозрачная ошибка вместо тихих mock-URL'ов: если MinIO недоступен, эндпоинт отдаёт **503 Storage Unavailable** (фронт показывает читаемое сообщение)
 
 ### Оплата
 - [ ] Robokassa: форма оплаты, webhook подтверждения, зачисление токенов
@@ -230,8 +234,46 @@ riffa-web/
 - [ ] Error boundary + toast-уведомления об ошибках
 - [ ] Rate limiting на API-роутерах генерации
 - [ ] Тесты: pytest для новых endpoints (register, change-password, display-name, admin-flow)
-- [ ] CI: GitHub Actions lint + test + docker build
+- [x] CI: GitHub Actions lint + test (backend + frontend) — добавлены и зелёные в PR #1
+- [ ] CI: docker build (отдельный job — пока не настроен)
 - [ ] При первом запуске на чистой БД: alembic upgrade head вместо create_all + stamp
+
+---
+
+## История PR
+
+### PR #1 — fix(studio): cover-version uploads, avatars, radio mood counter, trash cron
+
+Дата: 2026-05-11 · Бранч: `devin/1778505414-fix-cover-avatar-radio-trash`
+
+**Исправлено 4 проблемы, заявленные пользователем:**
+
+1. **Модуль «Кавер-версия»** — загрузка треков и запись с микрофона:
+   - `services/suno.py`: `customMode` теперь подаётся в Suno строго по спецификации v5.5 (`style + prompt + title + uploadUrl` обязательны)
+   - `api/v1/generate.py::upload-cover-url`: убран тихий mock-URL, при недоступном MinIO/S3 возвращается **503 Storage Unavailable**
+   - Frontend `recordToWav.ts` (новый): WebAudio API декодирует webm/mp4 и пишет 16-bit PCM WAV перед загрузкой
+   - `CoverSongRequest` / `CoverSongParams`: добавлены `styleWeight` и `weirdnessConstraint` для проброса в Suno
+   - Список допустимых mime-типов: `mp3 / wav / m4a / ogg`
+
+2. **Аватарка пользователя**:
+   - `app/main.py`: убран `if False:` который отключал монтирование `/media` — аватарки теперь раздаются как статика
+
+3. **Счётчик радио по настроениям**:
+   - `StudioPage.tsx`: песни и инструменталы шлют mood КЛЮЧОМ (`"happy"`), а не лейблом (`"😊 Радостное"`) — теперь группировка `mood_counts` сходится со счётчиком в плейлисте «Все треки»
+   - Миграция `006_normalize_mood_keys.py`: бэкфилл legacy-строк, у которых mood был сохранён как лейбл
+   - `api/v1/radio.py`: нормализация mood на чтении для устойчивости к старым записям
+
+4. **Корзина (7 дней)**:
+   - `tasks/__init__.py`: Arq `cron_jobs` — ежедневная задача `trash_sweep` в 03:17 UTC, физически удаляет всё с `deleted_at` старше 7 дней (раньше срабатывало только при перезапуске воркера)
+   - `api/v1/history.py`: подтверждено, что `delete_generation` / `/history/trash` / `/restore` / `/purge` корректно работают через soft-delete
+
+**Дополнительно почищен пред-существующий техдолг:**
+- 89 ошибок `ruff` → 0
+- 50 ошибок `mypy` (strict) → 0 (boto3-stubs, ArqRedis.aclose, type annotations, openai overloads и пр.)
+- 6 предупреждений ESLint (`exhaustive-deps`, unused imports) → 0
+- 2 сломанных pytest-теста на `main` починены:
+  - `test_first_turn_returns_canned_opening_without_calling_gpt` — добавлен ранний выход из `agent_chat` для пустой истории (фронт всегда так открывает чат)
+  - `test_auto_title_uses_gpt_when_available` — переписан на `app.dependency_overrides[get_settings]` (FastAPI Depends() не уважает `patch.object()` модуля)
 
 ---
 
@@ -272,13 +314,16 @@ riffa-web/
 
 ---
 
-## Сводка тестов (на момент 2026-05-05)
+## Сводка тестов (на момент 2026-05-11)
 
 | Уровень | Команда | Результат |
 |---|---|---|
 | Backend | `pytest -q` | **62 passed** |
-| Frontend | `npm run lint` | 0 warnings |
+| Backend | `ruff check app tests` | 0 errors |
+| Backend | `mypy app` | 0 errors (strict mode) |
+| Frontend | `npm run lint` (`eslint --max-warnings=0`) | 0 warnings |
 | Frontend | `npx tsc --noEmit` | 0 errors |
+| CI | GitHub Actions `backend` + `frontend` | **pass** (PR #1) |
 
 Тесты: agent (9) · health · lyrics (7) · music_enricher (6) · radio (12) · security · suno_lyrics (3) · telegram_auth · tracks (12).
 
