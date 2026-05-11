@@ -124,8 +124,8 @@ function extractLyrics(text: string): string {
 function AgentAvatar() {
   return (
     <img
-      src="/riffa-logo.png"
-      alt="RIFFA"
+      src="/icons/agent.gif"
+      alt="RIFFA AI Agent"
       width={28}
       height={28}
       className="agent-chat__avatar-img"
@@ -612,7 +612,7 @@ export function AgentChat({
                 ? thinkingStatus
                 : messages.length === 0
                 ? "Жду твоего сообщения"
-                : "GPT-4o · собираю промт"}
+                : "Собираю промт"}
             </p>
           </div>
         </div>

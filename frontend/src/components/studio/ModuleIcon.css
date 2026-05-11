@@ -23,9 +23,15 @@
   filter: drop-shadow(0 0 12px rgba(124,255,31,0.6));
 }
 
-/* Дополнительное свечение для GIF (агент) */
+/* Дополнительное свечение + вращение для GIF агента */
 .tile:hover .module-icon--generator.module-icon--image {
   filter: drop-shadow(0 0 16px rgba(124,255,31,0.8));
+  animation: rotate-360 2s linear infinite;
+}
+
+@keyframes rotate-360 {
+  from { transform: scale(1.15) rotate(0deg); }
+  to { transform: scale(1.15) rotate(360deg); }
 }
 
 /* MP4 icons (legacy, если остались): remove black background via screen blending */
