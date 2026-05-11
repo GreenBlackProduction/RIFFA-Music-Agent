@@ -122,11 +122,13 @@ function extractLyrics(text: string): string {
   return lyrics;
 }
 
-function AgentAvatar() {
+function AgentAvatar({ thinking }: { thinking?: boolean }) {
   return (
-    <div className="agent-chat__avatar-wrapper">
-      <ModuleIcon kind="generator" className="agent-chat__avatar-icon" />
-    </div>
+    <img
+      src="/icons/chatgpt.png"
+      alt="AI Agent"
+      className={`agent-chat__avatar-icon ${thinking ? 'agent-chat__avatar-icon--thinking' : ''}`}
+    />
   );
 }
 
@@ -596,9 +598,7 @@ export function AgentChat({
     <div className="agent-chat">
       <header className="agent-chat__head">
         <div className="agent-chat__head-left">
-          <span className="agent-chat__avatar" aria-hidden="true">
-            <AgentAvatar />
-          </span>
+          <AgentAvatar thinking={thinking} />
           <div>
             <strong>RIFFA Agent</strong>
             <p className="agent-chat__head-hint">

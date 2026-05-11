@@ -79,8 +79,36 @@
 }
 
 .agent-chat__avatar-icon {
-  width: 28px !important;
-  height: 28px !important;
+  width: 40px !important;
+  height: 40px !important;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 12px rgba(124, 255, 31, 0.6));
+  animation: avatar-rotate 8s linear infinite;
+}
+
+.agent-chat__avatar-icon--thinking {
+  animation: avatar-rotate-pulse 2s ease-in-out infinite;
+}
+
+@keyframes avatar-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes avatar-rotate-pulse {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(90deg) scale(1.15);
+  }
+  50% {
+    transform: rotate(180deg) scale(1);
+  }
+  75% {
+    transform: rotate(270deg) scale(1.15);
+  }
 }
 
 .agent-chat__head strong {

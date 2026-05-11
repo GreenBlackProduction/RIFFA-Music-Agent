@@ -10,11 +10,17 @@ const ICON_SOURCES: Partial<Record<IconKind, string>> = {
   sound_effect: "/icons/sfx.png",
   cover:        "/icons/cover.png",
   cover_art:    "/icons/cover-art.png",
-  generator:    "/icons/agent.gif",
+  // generator uses SVG, not image file
 };
 
 export function ModuleIcon({ kind, className }: Props) {
   const cls = ["module-icon", `module-icon--${kind}`, className].filter(Boolean).join(" ");
+
+  // Always use SVG for generator
+  if (kind === "generator") {
+    return <GeneratorIcon className={cls} />;
+  }
+
   const iconSrc = ICON_SOURCES[kind];
 
   if (iconSrc) {

@@ -17,14 +17,26 @@
   filter: drop-shadow(0 0 0px rgba(124,255,31,0));
 }
 
+/* Active state in builder head */
+.builder-head__icon--active .module-icon--image {
+  filter: drop-shadow(0 0 12px rgba(124,255,31,0.6));
+}
+
+.builder-head__icon--active .module-icon--generator.module-icon--image {
+  filter: drop-shadow(0 0 16px rgba(124,255,31,0.8));
+  animation: rotate-360 2s linear infinite;
+}
+
 /* Hover эффект: увеличение + свечение */
-.tile:hover .module-icon--image {
+.tile:hover .module-icon--image,
+.tile--active .module-icon--image {
   transform: scale(1.15);
   filter: drop-shadow(0 0 12px rgba(124,255,31,0.6));
 }
 
 /* Дополнительное свечение + вращение для GIF агента */
-.tile:hover .module-icon--generator.module-icon--image {
+.tile:hover .module-icon--generator.module-icon--image,
+.tile--active .module-icon--generator.module-icon--image {
   filter: drop-shadow(0 0 16px rgba(124,255,31,0.8));
   animation: rotate-360 2s linear infinite;
 }

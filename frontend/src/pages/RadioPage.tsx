@@ -232,7 +232,7 @@ export function RadioPage() {
       <section className="radio-hero radio-hero--compact">
         <div className="radio-hero__body">
           <div className="radio-hero__head">
-            <span className="radio-hero__badge">RIFFA Radio</span>
+            <img src="/icons/radio.png" alt="Radio" className="radio-hero__icon" />
             <h1>Эфир сообщества</h1>
           </div>
           <div className="radio-stats">

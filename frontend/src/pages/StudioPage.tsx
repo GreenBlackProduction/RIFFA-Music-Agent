@@ -1343,7 +1343,7 @@ export function StudioPage() {
 
           <button
             type="button"
-            className="tile tile--featured-square"
+            className={`tile tile--featured-square${activeModule === featured.id ? " tile--active" : ""}`}
             onClick={() => openModule(featured.id)}
           >
             <div className="tile__inner">
@@ -1361,7 +1361,7 @@ export function StudioPage() {
             <button
               key={m.id}
               type="button"
-              className={`tile tile--row${m.postponed ? " tile--postponed" : ""}`}
+              className={`tile tile--row${m.postponed ? " tile--postponed" : ""}${activeModule === m.id ? " tile--active" : ""}`}
               onClick={() => !m.postponed && openModule(m.id)}
               disabled={m.postponed}
             >
@@ -1392,7 +1392,7 @@ export function StudioPage() {
             ← Все модули
           </button>
           <div className="builder-head__main">
-            <span className="builder-head__icon" aria-hidden="true">
+            <span className="builder-head__icon builder-head__icon--active" aria-hidden="true">
               <ModuleIcon kind={activeModule} />
             </span>
             <div className="builder-head__text">
