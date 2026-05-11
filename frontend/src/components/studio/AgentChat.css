@@ -70,11 +70,17 @@
   box-shadow: 0 0 12px rgba(124, 255, 31, 0.2);
 }
 
-.agent-chat__avatar-img {
-  width: 32px;
-  height: 32px;
-  object-fit: cover;
-  border-radius: 50%;
+.agent-chat__avatar-wrapper {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agent-chat__avatar-icon {
+  width: 28px !important;
+  height: 28px !important;
 }
 
 .agent-chat__head strong {
