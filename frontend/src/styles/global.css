@@ -1,0 +1,977 @@
+/* RIFFA — design tokens, typography, animated background.
+ * Эстетика: Apple-минимализм + неоновые акценты из логотипа.
+ */
+
+:root {
+  /* Палитра */
+  --bg: #1d1d38;
+  --bg-2: #222246;
+  --bg-card: #1a1a30;    /* тёмная подложка карточек с градиентами поверх */
+
+  --panel: rgba(255, 255, 255, 0.05);
+  --panel-strong: rgba(255, 255, 255, 0.09);
+  --panel-elev: rgba(24, 24, 40, 0.7);
+
+  --text: #f6f4ff;
+  --muted: #9b95b6;
+  --muted-2: #6c6786;
+
+  --accent: #7cff1f;        /* neon green */
+  --accent-2: #ff5a00;      /* neon orange */
+  --accent-3: #d600ff;      /* neon purple */
+  --accent-soft: rgba(124, 255, 31, 0.16);
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --danger: #fb7185;
+  --success: #34d399;
+
+  /* Светлые акцентные тона (текст на полупрозрачных акцентных фонах) */
+  --accent-light: #cfff9a;
+  --accent-light-2: #ffbe8f;
+  --accent-light-3: #f0b9ff;
+  --accent-bright: #b8ff6a;
+  --accent-gold: #ffd166;
+  --text-on-accent: #0a0c10;
+
+  /* Радиусы */
+  --radius-sm: 14px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-xl: 36px;
+  --radius-pill: 999px;
+
+  /* Тени */
+  --shadow-soft: 0 24px 80px rgba(0, 0, 0, 0.32);
+  --shadow-glow: 0 0 60px rgba(124, 255, 31, 0.18);
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-8: 48px;
+  --space-10: 64px;
+
+  /* Blur levels */
+  --blur-sm: 8px;
+  --blur-md: 16px;
+  --blur-lg: 28px;
+
+  /* Z-index layers */
+  --z-content: 1;
+  --z-sticky: 10;
+  --z-overlay: 40;
+  --z-sidebar: 50;
+  --z-modal: 100;
+  --z-toast: 200;
+
+  /* ─── Typography ──────────────────────────────────────
+   *  --font-brand:   Sora 800 — логотип, hero-заголовки
+   *  --font-display: Sora 600/700 — заголовки карточек, h2-h3
+   *  --font-body:    Manrope 400/500/600 — основной текст
+   *  --font-ui:      Manrope 500/600 — чипы, кнопки, мелкие ярлыки
+   *  --font-mono:    JetBrains Mono — промт-код, пресеты
+   * ─────────────────────────────────────────────────── */
+  --font-brand:   "Sora",          "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Sora",          "Manrope",       ui-sans-serif, system-ui, sans-serif;
+  --font-body:    "Manrope",       "Inter",         ui-sans-serif, system-ui, sans-serif;
+  --font-ui:      "Manrope",       "Inter",         ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono","SF Mono",       ui-monospace, monospace;
+}
+
+/* ── Brand name — используется в сайдбаре, топбаре и логин-странице ── */
+.brand-name {
+  font-family: var(--font-brand);
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #ffffff;
+  line-height: 1;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+}
+
+.brand-name__sub {
+  font-family: var(--font-brand);
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-left: 3px;
+  opacity: 0.9;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100vw;
+}
+
+html,
+body {
+  overflow-x: clip;
+}
+
+body {
+  color: var(--text);
+  font-family: var(--font-body);
+  font-feature-settings: "ss01", "cv11", "liga";
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.008em;   /* Manrope немного теснее Inter на -0.008 */
+  background: var(--bg);
+  position: relative;
+}
+
+/* Manrope хорошо идёт без лигатур в tiny-UI — применяем явно */
+.filter-chip,
+.file-radio,
+.file-play-pill,
+.file-del,
+.gp-act,
+.gp-time,
+.gp-sub,
+.gp-title,
+.gp-queue-item,
+.file-item__meta,
+.file-item__title,
+.agent-suggestion-chip {
+  font-family: var(--font-ui);
+}
+
+/* filter-chip — чуть свободнее в трекинге для читаемости при 12px */
+.filter-chip {
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* file-item заголовок и мета */
+.file-item__title { font-weight: 600; letter-spacing: -0.01em; }
+.file-item__meta  { font-weight: 400; letter-spacing:  0.005em; }
+
+/* Radio-кнопка "В эфире" / "Radio" */
+.file-radio { font-weight: 600; letter-spacing: 0.02em; }
+
+/* Мелкие кнопки в плеере */
+.gp-act--radio { font-weight: 600; letter-spacing: 0.015em; }
+.gp-time        { letter-spacing: 0.02em; }
+
+/* Suggestion chips агента */
+.agent-suggestion-chip { font-weight: 500; letter-spacing: 0.01em; }
+
+/* ── Animated gradient blobs ──────────────────────────
+ * Три blur-облака медленно дрейфуют, перетекая друг в друга.
+ * Цвета — из логотипа: салатовый, оранжевый, пурпурный.
+ */
+
+/* Gradient blobs — без filter:blur (GPU repaint на каждый кадр).
+ * Мягкость достигается через широкие radial-gradient + увеличенный размер.
+ * will-change: transform → браузер заранее создаёт compositor layer. */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+  z-index: -1;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+body::before {
+  width: 90vw;
+  height: 90vw;
+  top: -40vw;
+  left: -20vw;
+  background: radial-gradient(circle,
+    rgba(124, 255, 31, 0.28) 0%,
+    rgba(124, 255, 31, 0.10) 45%,
+    transparent 72%);
+  animation: float-1 14s ease-in-out infinite;
+}
+
+body::after {
+  width: 85vw;
+  height: 85vw;
+  bottom: -38vw;
+  right: -22vw;
+  background: radial-gradient(circle,
+    rgba(214, 0, 255, 0.26) 0%,
+    rgba(214, 0, 255, 0.08) 45%,
+    transparent 72%);
+  animation: float-2 16s ease-in-out infinite;
+}
+
+#root::before,
+#root::after {
+  content: "";
+  position: fixed;
+  pointer-events: none;
+  z-index: -1;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+#root::before {
+  width: 75vw;
+  height: 75vw;
+  top: 20vh;
+  left: 25vw;
+  background: radial-gradient(circle,
+    rgba(255, 90, 0, 0.20) 0%,
+    rgba(255, 90, 0, 0.07) 45%,
+    transparent 72%);
+  animation: float-3 18s ease-in-out infinite;
+}
+
+/* мятно-лаймовый blob */
+#root::after {
+  width: 70vw;
+  height: 70vw;
+  top: 50vh;
+  left: 0vw;
+  background: radial-gradient(circle,
+    rgba(184, 255, 106, 0.20) 0%,
+    rgba(184, 255, 106, 0.07) 45%,
+    transparent 72%);
+  animation: float-4 20s ease-in-out infinite;
+}
+
+@keyframes float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(10vw, 8vh) scale(1.14); }
+  66% { transform: translate(-6vw, 14vh) scale(0.92); }
+}
+
+@keyframes float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40% { transform: translate(-12vw, -10vh) scale(1.1); }
+  75% { transform: translate(8vw, -6vh) scale(0.9); }
+}
+
+@keyframes float-3 {
+  0%, 100% { transform: translate(0, 0) scale(0.95); }
+  50% { transform: translate(-14vw, 10vh) scale(1.2); }
+}
+
+@keyframes float-4 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(12vw, -12vh) scale(1.12); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  body::after,
+  #root::before,
+  #root::after {
+    animation: none;
+  }
+}
+
+/* Ставим CSS-анимации на паузу когда вкладка скрыта */
+body.page-hidden::before,
+body.page-hidden::after {
+  animation-play-state: paused;
+}
+#root.page-hidden::before,
+#root.page-hidden::after {
+  animation-play-state: paused;
+}
+body.page-hidden * {
+  animation-play-state: paused;
+}
+
+/* ── Scrollbar (фирменный стиль, видим везде) ─────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 255, 31, 0.55) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+}
+*::-webkit-scrollbar-thumb {
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(124, 255, 31, 0.7), rgba(214, 0, 255, 0.7));
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.2s ease;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(124, 255, 31, 0.95), rgba(255, 90, 0, 0.85));
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ── Typography ───────────────────────────────────── */
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+h1 { font-size: clamp(28px, 5vw, 56px); line-height: 1.05; }
+h2 { font-size: clamp(22px, 3vw, 32px); line-height: 1.15; }
+h3 { font-size: 18px; line-height: 1.3; }
+
+p { margin: 0; line-height: 1.6; }
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button { cursor: pointer; }
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: rgba(124, 255, 31, 0.35);
+  color: var(--text);
+}
+
+/* Утилиты */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--panel);
+  backdrop-filter: blur(12px);
+}
+
+.muted { color: var(--muted); }
+
+/* ══════════════════════════════════════════════════════
+   File item — единый компонент файла для всего сайта.
+   LibraryCard, ProfilePage "Мои файлы", RadioPage.
+   Структура столбцов: [36px icon/play] [1fr info] [auto actions] [auto indicator/right]
+══════════════════════════════════════════════════════ */
+
+.file-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  min-width: 0;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+/* Если в строке используется доп. колонка (Radio: лайки/дизлайки в file-item__right),
+ * то добавляется четвёртая колонка с auto-шириной. */
+.file-item:has(.file-item__right) {
+  grid-template-columns: 36px minmax(0, 1fr) auto auto;
+}
+.file-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(124, 255, 31, 0.25);
+}
+.file-item--active {
+  border-color: var(--accent);
+  background: rgba(124, 255, 31, 0.08);
+}
+/* Тень активного через ::before — только opacity (дешевле box-shadow) */
+.file-item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 8px 24px rgba(124, 255, 31, 0.14);
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+.file-item--active::before { opacity: 1; }
+
+/* Кликабельные элементы (LibraryCard role=button) */
+.file-item[role="button"] { cursor: pointer; }
+
+/* col 1 — иконка типа файла (Library, Profile) */
+.file-item__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+/* Cover art rendered inside .file-item__icon. ``cover`` modifier removes the
+ * background tint so the image fills the slot edge-to-edge. */
+.file-item__icon--cover {
+  background: rgba(255, 255, 255, 0.02);
+}
+.file-item__icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* col 1 — кнопка Play (Radio) */
+.file-item__play-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(124, 255, 31, 0.45);
+  background: linear-gradient(135deg, rgba(124, 255, 31, 0.25), rgba(214, 0, 255, 0.2));
+  color: #fff;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.file-item__play-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 20px rgba(124, 255, 31, 0.25);
+}
+
+/* col 2 — название + мета */
+.file-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.file-item__title {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.file-item__meta {
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* col 3 — .file-actions (dl + bolt + radio) — стили в секции ниже */
+
+/* col 4 — индикатор воспроизведения (Library / Profile: ▶ / ❚❚) */
+.file-item__indicator {
+  width: 22px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.file-item--active .file-item__indicator { color: var(--accent); }
+
+/* col 4 — дополнительные кнопки справа (Radio: 👍 👎 + статистика) */
+.file-item__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.file-item__stats {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ── Мобильный ≤540px: кнопки уходят под название ─────
+   Ряд 1: [icon/play spans] [info]       [indicator/right]
+   Ряд 2: [icon/play cont.] [file-actions] [right если Radio]
+──────────────────────────────────────────────────────── */
+@media (max-width: 540px) {
+  .file-item {
+    grid-template-columns: 36px 1fr auto;
+    grid-template-rows: auto auto;
+    height: auto;
+    min-height: 52px;
+    padding: 8px 12px;
+    gap: 4px 10px; /* row-gap 4px между строкой заголовка и строкой кнопок */
+  }
+  /* Иконка / play-btn — занимает оба ряда, центрирована */
+  .file-item__icon,
+  .file-item__play-btn {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    align-self: center;
+  }
+  /* Info — ряд 1 */
+  .file-item__info   { grid-column: 2; grid-row: 1; padding-top: 3px; }
+  /* Actions — ряд 2, под названием */
+  .file-item .file-actions {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+    padding-bottom: 3px;
+  }
+  /* Индикатор (▶) — ряд 1, правый */
+  .file-item__indicator {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+    padding-top: 3px;
+  }
+  /* Правые кнопки (👍👎) — ряд 2 */
+  .file-item__right {
+    grid-column: 3;
+    grid-row: 2;
+    align-self: center;
+    gap: 4px;
+    padding-bottom: 3px;
+  }
+  /* Статистика прослушиваний скрыта на мобильном */
+  .file-item__stats { display: none; }
+}
+
+/* ══════════════════════════════════════════════════════
+   Filter chips — единый стиль для всех фильтров сайта:
+   LibraryCard "Мои генерации", ProfilePage "Мои файлы",
+   RadioPage chart-ranges.
+══════════════════════════════════════════════════════ */
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.filter-chip:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+.filter-chip--active {
+  border-color: rgba(124, 255, 31, 0.5);
+  background: linear-gradient(
+    135deg,
+    rgba(124, 255, 31, 0.18),
+    rgba(255, 90, 0, 0.14),
+    rgba(214, 0, 255, 0.16)
+  );
+  background-origin: border-box;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 0 16px rgba(124, 255, 31, 0.2);
+  transition: background 0ms, border-color 0ms;
+}
+
+/* ── Custom branded dropdown (FilterSelect) ────────── */
+
+.fsel { position: relative; width: 100%; }
+
+.fsel__btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+.fsel__btn:hover {
+  border-color: rgba(124, 255, 31, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+.fsel__btn--open {
+  border-color: rgba(124, 255, 31, 0.55);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  box-shadow: 0 0 0 1px rgba(124, 255, 31, 0.12) inset;
+}
+.fsel__btn--set { /* когда выбрано не дефолтное значение */
+  border-color: rgba(124, 255, 31, 0.35);
+  color: var(--accent-light);
+}
+
+.fsel__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fsel__arrow {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 160ms ease;
+}
+.fsel__btn--open .fsel__arrow { transform: rotate(180deg); }
+
+/* меню рендерится через React portal — position:fixed задаётся через style */
+.fsel__menu {
+  position: fixed;
+  z-index: 500;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: rgba(14, 12, 24, 0.98);
+  backdrop-filter: blur(20px);
+  overflow-y: auto;
+  max-height: 260px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(124, 255, 31, 0.06);
+  animation: fsel-in 120ms ease;
+}
+@keyframes fsel-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+.fsel__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 100ms ease;
+}
+.fsel__item:hover { background: rgba(255, 255, 255, 0.07); }
+.fsel__item--active {
+  color: var(--accent-light);
+  background: rgba(124, 255, 31, 0.08);
+}
+.fsel__item + .fsel__item { border-top: 1px solid rgba(255, 255, 255, 0.04); }
+
+.fsel__check {
+  width: 14px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ══════════════════════════════════════════════════════
+   File action buttons — shared across LibraryCard,
+   RadioPage and ProfilePage. Always same size & look.
+══════════════════════════════════════════════════════ */
+
+.file-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+/* ── Скачать ── */
+.file-dl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+.file-dl:hover {
+  border-color: rgba(124, 255, 31, 0.4);
+  color: var(--text);
+  background: rgba(124, 255, 31, 0.08);
+}
+
+/* ── Молния ── */
+.file-bolt-wrap { position: relative; }
+
+.file-bolt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 120ms ease;
+}
+.file-bolt:hover,
+.file-bolt--open {
+  border-color: rgba(255, 214, 0, 0.55);
+  color: rgba(255, 214, 0, 0.95);
+  background: rgba(255, 214, 0, 0.09);
+}
+
+.file-bolt-menu {
+  position: fixed;   /* rendered via portal — coords set by JS */
+  z-index: 500;      /* above GlobalPlayer (z: 100) and overlays (z: 40) */
+  min-width: 200px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-strong);
+  background: rgba(16, 14, 26, 0.97);
+  backdrop-filter: blur(16px);
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 214, 0, 0.08);
+  animation: file-bolt-menu-in 140ms ease;
+}
+@keyframes file-bolt-menu-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+.file-bolt-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms ease;
+}
+.file-bolt-menu button:hover { background: rgba(255, 255, 255, 0.07); }
+.file-bolt-menu button + button { border-top: 1px solid var(--border); }
+
+/* ── Радио — капсула с текстом ── */
+.file-radio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, color 160ms ease;
+}
+.file-radio:hover {
+  border-color: rgba(124, 255, 31, 0.5);
+  background: rgba(124, 255, 31, 0.08);
+  color: var(--text);
+}
+.file-radio--on {
+  border-color: rgba(124, 255, 31, 0.55);
+  background: linear-gradient(
+    135deg,
+    rgba(124, 255, 31, 0.22),
+    rgba(255, 90, 0, 0.16),
+    rgba(214, 0, 255, 0.18)
+  );
+  background-origin: border-box;
+  color: #fff;
+  box-shadow: 0 0 14px rgba(124, 255, 31, 0.28);
+}
+
+/* ── Play/Pause овальная пилюля с фирменным неоном ── */
+.file-play-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 38px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(124, 255, 31, 0.45);
+  background:
+    radial-gradient(120% 100% at 0% 0%, rgba(124, 255, 31, 0.15), transparent 60%),
+    radial-gradient(120% 100% at 100% 100%, rgba(214, 0, 255, 0.15), transparent 60%),
+    rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 120ms ease, box-shadow 180ms ease, border-color 180ms ease,
+    background 180ms ease;
+}
+.file-play-pill__icon {
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+.file-play-pill:hover {
+  border-color: rgba(124, 255, 31, 0.85);
+  box-shadow:
+    0 0 18px rgba(124, 255, 31, 0.35),
+    0 0 28px rgba(214, 0, 255, 0.18);
+  transform: scale(1.04);
+}
+.file-play-pill:active { transform: scale(0.96); }
+.file-play-pill--active {
+  border-color: rgba(124, 255, 31, 0.7);
+  background:
+    radial-gradient(120% 100% at 0% 0%, rgba(124, 255, 31, 0.32), transparent 55%),
+    radial-gradient(120% 100% at 100% 100%, rgba(214, 0, 255, 0.28), transparent 55%),
+    rgba(255, 255, 255, 0.06);
+  color: #fff;
+  box-shadow: 0 0 16px rgba(124, 255, 31, 0.35);
+}
+.file-play-pill--playing {
+  animation: file-play-pulse 2s ease-in-out infinite;
+}
+@keyframes file-play-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 16px rgba(124, 255, 31, 0.32),
+      0 0 22px rgba(214, 0, 255, 0.18);
+  }
+  50% {
+    box-shadow:
+      0 0 26px rgba(124, 255, 31, 0.55),
+      0 0 36px rgba(214, 0, 255, 0.32);
+  }
+}
+
+/* ── Красная круглая кнопка удаления (40-55% прозрачность) ── */
+.file-del {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 80, 60, 0.45);
+  background: rgba(255, 80, 60, 0.18);   /* ~45% «прозрачность» */
+  color: rgba(255, 139, 107, 0.78);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.55;
+  transition: opacity 160ms ease, background 160ms ease, border-color 160ms ease,
+    transform 180ms ease, color 160ms ease;
+}
+.file-del:hover {
+  opacity: 1;
+  background: rgba(255, 80, 60, 0.32);
+  border-color: rgba(255, 80, 60, 0.85);
+  color: #ff8b6b;
+  transform: scale(1.08);
+}
+.file-del:active { transform: scale(0.92); }
+.file-del:disabled { cursor: default; }
+
+/* ── Ghost overlay (анимация испарения файла на исходной позиции) ──
+ * Когда пользователь удаляет файл, исходный .file-item сразу удаляется из
+ * списка → CSS Grid перепаковывает оставшиеся элементы вверх (магнит).
+ * Поверх старой позиции отображается ghost-копия, которая разлетается за
+ * 1 с — это .file-item--ghost + .file-item--deleting. */
+.file-item--ghost {
+  background:
+    radial-gradient(120% 120% at 50% 50%, rgba(255, 80, 60, 0.22), transparent 70%),
+    rgba(20, 20, 32, 0.85);
+  border-color: rgba(255, 80, 60, 0.55);
+  box-shadow: 0 0 24px rgba(255, 80, 60, 0.4);
+}
+
+.file-item--deleting {
+  animation: file-item-evaporate 1s cubic-bezier(0.4, 0.0, 0.7, 1) forwards;
+  pointer-events: none;
+}
+@keyframes file-item-evaporate {
+  0%   { opacity: 1;   transform: scale(1);    filter: blur(0);
+         box-shadow: 0 0 18px rgba(255, 80, 60, 0.45); }
+  35%  { opacity: 1;   transform: scale(1.06); filter: blur(0);
+         box-shadow: 0 0 32px rgba(255, 80, 60, 0.7); }
+  70%  { opacity: 0.6; transform: scale(1.18); filter: blur(2px);
+         box-shadow: 0 0 48px rgba(255, 80, 60, 0.85); }
+  100% { opacity: 0;   transform: scale(0.7);  filter: blur(8px); }
+}
+
+/* Концентрический «всплеск» вокруг ghost — расходится наружу. */
+.file-item__ghost-burst {
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  border: 2px solid rgba(255, 120, 90, 0.7);
+  animation: file-item-burst 0.9s ease-out forwards;
+}
+@keyframes file-item-burst {
+  0%   { opacity: 0.85; transform: scale(0.85); border-width: 3px; }
+  60%  { opacity: 0.4;  transform: scale(1.35); border-width: 1.5px; }
+  100% { opacity: 0;    transform: scale(1.8);  border-width: 0; }
+}

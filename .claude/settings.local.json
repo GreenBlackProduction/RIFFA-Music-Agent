@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//d/Боты/RiffaBot/**)",
+      "PowerShell(Set-Location \"d:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\Stable vers\\\\riffaweb5\\\\backend\"; $env:RIFFA_BACKEND_ENV_FILE = \".env.dev\"; .venv\\\\Scripts\\\\python.exe -m alembic upgrade head 2>&1)",
+      "Bash(Copy-Item \"D:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\иконки\\\\MP4\\\\блок создание песни.mp4\" \"d:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\Stable vers\\\\riffaweb5\\\\frontend\\\\public\\\\icons\\\\song.mp4\" -Force)",
+      "Bash(Copy-Item \"D:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\иконки\\\\MP4\\\\блок создания интрументала.mp4\" \"d:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\Stable vers\\\\riffaweb5\\\\frontend\\\\public\\\\icons\\\\instrumental.mp4\" -Force)",
+      "Bash(Copy-Item \"D:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\иконки\\\\MP4\\\\блок создания звукового эффекта.mp4\" \"d:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\Stable vers\\\\riffaweb5\\\\frontend\\\\public\\\\icons\\\\sfx.mp4\" -Force)",
+      "Bash(Copy-Item \"D:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\иконки\\\\MP4\\\\блок создания кавер версия.mp4\" \"d:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\Stable vers\\\\riffaweb5\\\\frontend\\\\public\\\\icons\\\\cover.mp4\" -Force)",
+      "Bash(Copy-Item \"D:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\иконки\\\\MP4\\\\генерация обложка.mp4\" \"d:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\Stable vers\\\\riffaweb5\\\\frontend\\\\public\\\\icons\\\\cover-art.mp4\" -Force)",
+      "Bash(New-Item -ItemType Directory -Force \"d:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\Stable vers\\\\riffaweb5\\\\frontend\\\\public\\\\sounds\")",
+      "Bash(Out-Null)",
+      "Bash(Copy-Item \"C:\\\\Users\\\\Razer\\\\Downloads\\\\RIFFAadmin - SFX tun notification \\(RIFFAMusic\\).mp3\" \"d:\\\\Боты\\\\RiffaBot\\\\ВЭБ\\\\Stable vers\\\\riffaweb5\\\\frontend\\\\public\\\\sounds\\\\notification.mp3\" -Force)"
+    ]
+  }
+}
