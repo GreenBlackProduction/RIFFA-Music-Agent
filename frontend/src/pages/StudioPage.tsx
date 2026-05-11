@@ -1018,14 +1018,14 @@ export function StudioPage() {
 
     const genreValue =
       state.genre === "custom" && state.customGenre.trim() ? state.customGenre.trim() : state.genre;
+    // Always send the stable KEY (e.g. "happy") to the backend so the Radio mood
+    // grid can group by mood reliably. Labels are for display only.
     const moodValue =
-      state.mood === "custom" && state.customMood.trim()
-        ? state.customMood.trim()
-        : valueLabel(state.mood, MOODS);
+      state.mood === "custom" && state.customMood.trim() ? state.customMood.trim() : state.mood;
     const tempoValue =
       state.tempo === "custom" && state.customTempo.trim()
         ? state.customTempo.trim()
-        : valueLabel(state.tempo, TEMPOS);
+        : state.tempo;
 
     setSubmitting(true);
     setSubmitError(null);
