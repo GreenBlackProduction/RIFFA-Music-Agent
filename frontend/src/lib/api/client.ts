@@ -1,0 +1,783 @@
+/**
+ * Минимальный fetch-клиент с авто-парсингом JSON и обработкой ошибок.
+ * Все запросы идут через /api — Vite-прокси отправит их на FastAPI.
+ * Куки сессии передаются автоматически (credentials: "include").
+ */
+
+export interface ApiError {
+  status: number;
+  detail: string;
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers ?? {}),
+    },
+    ...init,
+  });
+
+  const text = await response.text();
+  const data = text ? (JSON.parse(text) as unknown) : undefined;
+
+  if (!response.ok) {
+    const detail =
+      (typeof data === "object" &&
+      data !== null &&
+      "detail" in data &&
+      typeof (data as { detail: unknown }).detail === "string"
+        ? (data as { detail: string }).detail
+        : `Request failed with status ${response.status}`) || "Request failed";
+    const error: ApiError = { status: response.status, detail };
+    throw error;
+  }
+
+  return data as T;
+}
+
+export interface ModelEntry {
+  id: string;
+  name: string;
+  description: string;
+  cost_tokens: number;
+}
+
+export type ModelCatalog = Record<string, ModelEntry[]>;
+
+export function fetchModels(): Promise<ModelCatalog> {
+  return apiFetch<ModelCatalog>("/api/v1/models");
+}
+
+export interface HealthInfo {
+  status: string;
+  env: string;
+  version: string;
+}
+
+export function fetchHealth(): Promise<HealthInfo> {
+  return apiFetch<HealthInfo>("/api/v1/health");
+}
+
+export interface CurrentUser {
+  id: number;
+  display_name: string;
+  telegram_user_id: number | null;
+  telegram_username: string | null;
+  email: string | null;
+  avatar_url: string | null;
+  locale: string;
+  balance_tokens: number;
+  is_admin: boolean;
+  is_banned: boolean;
+  notice_message: string | null;
+  notice_kind: "ban" | "warning" | null;
+  referral_code: string | null;
+}
+
+export function fetchCurrentUser(): Promise<CurrentUser> {
+  return apiFetch<CurrentUser>("/api/v1/users/me");
+}
+
+export interface RedeemPromoResponse {
+  code: string;
+  tokens_granted: number;
+  balance_tokens: number;
+}
+
+export function redeemPromo(code: string): Promise<RedeemPromoResponse> {
+  return apiFetch<RedeemPromoResponse>("/api/v1/users/redeem-promo", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
+export interface TelegramWidgetPayload {
+  id: number;
+  auth_date: number;
+  hash: string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+}
+
+export function loginWithTelegramWidget(
+  payload: TelegramWidgetPayload,
+): Promise<{ user_id: number; created: boolean }> {
+  return apiFetch("/api/v1/auth/telegram/widget", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function loginWithTelegramInitData(
+  initData: string,
+): Promise<{ user_id: number; created: boolean }> {
+  return apiFetch("/api/v1/auth/telegram/initdata", {
+    method: "POST",
+    body: JSON.stringify({ init_data: initData }),
+  });
+}
+
+export function registerWithEmail(
+  email: string,
+  password: string,
+): Promise<{ user_id: number; created: boolean }> {
+  return apiFetch("/api/v1/auth/email/register", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function loginWithEmail(
+  email: string,
+  password: string,
+): Promise<{ user_id: number }> {
+  return apiFetch("/api/v1/auth/email/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export function requestEmailMagicLink(email: string): Promise<{ status: string }> {
+  return apiFetch("/api/v1/auth/email/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function verifyEmailToken(token: string): Promise<{ ok: boolean; user_id: number }> {
+  return apiFetch(`/api/v1/auth/email/verify?token=${encodeURIComponent(token)}`);
+}
+
+export function logout(): Promise<{ ok: boolean }> {
+  return apiFetch("/api/v1/auth/logout", { method: "POST" });
+}
+
+export function retryGeneration(genId: string): Promise<GenerateResponse> {
+  return apiFetch(`/api/v1/history/${genId}/retry`, { method: "POST" });
+}
+
+export function updateDisplayName(name: string): Promise<{ display_name: string }> {
+  return apiFetch("/api/v1/users/display-name", {
+    method: "PATCH",
+    body: JSON.stringify({ display_name: name }),
+  });
+}
+
+export function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: boolean }> {
+  return apiFetch("/api/v1/users/change-password", {
+    method: "POST",
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+}
+
+/** Загрузить новый аватар пользователя (multipart/form-data). Backend
+ *  принимает image/png|jpeg|webp до ~4 МБ и кладёт публичный URL в
+ *  `users.avatar_url`. */
+export async function uploadAvatar(file: File): Promise<{ avatar_url: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const response = await fetch("/api/v1/users/avatar", {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+  const text = await response.text();
+  const data = text ? (JSON.parse(text) as { detail?: string; avatar_url?: string }) : undefined;
+  if (!response.ok) {
+    const detail = (data && data.detail) || `Request failed with status ${response.status}`;
+    const err: ApiError = { status: response.status, detail };
+    throw err;
+  }
+  return data as { avatar_url: string };
+}
+
+// ---------------------------------------------------------------------------
+// Generation types
+// ---------------------------------------------------------------------------
+
+export interface GenerateResponse {
+  generation_id: string;
+  ws_url: string;
+}
+
+export interface Track {
+  audio_url: string;
+  audio_id: string;
+  image_url: string | null;
+  duration: number;
+  title: string;
+}
+
+export interface GenerationOut {
+  id: string;
+  type: string;
+  status: string;
+  title: string;
+  genre: string | null;
+  mood: string | null;
+  tempo: string | null;
+  vocal: string | null;
+  cost_tokens: number;
+  rating: "like" | "dislike" | null;
+  share_id: string | null;
+  share_views: number;
+  is_public: boolean;
+  published_at: string | null;
+  published_track_index: number | null;
+  play_count: number;
+  like_count: number;
+  dislike_count: number;
+  tracks: Track[];
+  lyrics: string | null;
+  wav_url: string | null;
+  image_url: string | null;
+  published_track_indices: number[] | null;
+  error_message: string | null;
+  deleted_at: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface HistoryPage {
+  items: GenerationOut[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+// ---------------------------------------------------------------------------
+// Generate API
+// ---------------------------------------------------------------------------
+
+export interface SongParams {
+  description: string;
+  text_mode?: "ai" | "custom" | "none";
+  lyrics?: string;
+  genre?: string;
+  custom_genre?: string;
+  mood?: string;
+  tempo?: string;
+  vocal?: string;
+  agent_prompt?: string;
+  track_name?: string;
+}
+
+export function generateSong(params: SongParams): Promise<GenerateResponse> {
+  return apiFetch("/api/v1/generate/song", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export interface InstrumentalParams {
+  description?: string;
+  genre?: string;
+  custom_genre?: string;
+  mood?: string;
+  tempo?: string;
+  agent_prompt?: string;
+  track_name?: string;
+}
+
+export function generateInstrumental(params: InstrumentalParams): Promise<GenerateResponse> {
+  return apiFetch("/api/v1/generate/instrumental", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export interface SoundEffectParams {
+  prompt: string;
+  agent_prompt?: string;
+  track_name?: string;
+}
+
+export function generateSoundEffect(params: SoundEffectParams): Promise<GenerateResponse> {
+  return apiFetch("/api/v1/generate/sound_effect", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export interface OccasionParams {
+  occasion_type: string;
+  answers?: Record<string, string>;
+  genre?: string;
+  mood?: string;
+  vocal?: string;
+  agent_prompt?: string;
+}
+
+export function generateOccasion(params: OccasionParams): Promise<GenerateResponse> {
+  return apiFetch("/api/v1/generate/occasion", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export interface CoverSongParams {
+  upload_url: string;
+  genre?: string;
+  custom_genre?: string;
+  mood?: string;
+  tempo?: string;
+  style?: string;
+  lyrics?: string;
+  vocal_gender?: "m" | "f" | null;
+  instrumental?: boolean;
+  /** Suno styleWeight (0..1) — how strictly to follow the supplied style. */
+  style_weight?: number | null;
+  /** Suno weirdnessConstraint (0..1) — creative deviation from the original. */
+  weirdness_constraint?: number | null;
+  track_name?: string;
+}
+
+export function generateCoverSong(params: CoverSongParams): Promise<GenerateResponse> {
+  return apiFetch("/api/v1/generate/cover_song", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export function extendTrack(params: {
+  generation_id: string;
+  audio_id: string;
+  prompt?: string;
+  style?: string;
+  continue_at?: number;
+}): Promise<GenerateResponse> {
+  return apiFetch("/api/v1/generate/extend", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export function generateCoverArt(params: {
+  prompt: string;
+  model?: string;
+  title?: string;
+}): Promise<GenerateResponse> {
+  return apiFetch("/api/v1/generate/cover_art", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export function convertToWav(params: {
+  generation_id: string;
+  audio_id: string;
+}): Promise<GenerateResponse> {
+  return apiFetch("/api/v1/generate/wav_convert", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Upload API — presigned URLs for cover song source files
+// ---------------------------------------------------------------------------
+
+export interface PresignedUploadResponse {
+  upload_url: string;
+  public_url: string;
+  expires_in: number;
+}
+
+export function getCoverUploadUrl(extension = "mp3"): Promise<PresignedUploadResponse> {
+  return apiFetch("/api/v1/generate/upload-cover-url", {
+    method: "POST",
+    body: JSON.stringify({ extension }),
+  });
+}
+
+export async function uploadCoverFile(file: File): Promise<string> {
+  // S3 key encodes the file extension so Suno can sniff format from URL.
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "mp3";
+  const { upload_url, public_url } = await getCoverUploadUrl(ext);
+
+  // Upload file directly to S3/MinIO via the presigned URL. We deliberately
+  // do NOT set Content-Type — the URL was signed without it, and adding it
+  // here would produce a SignatureDoesNotMatch error.
+  const uploadResponse = await fetch(upload_url, {
+    method: "PUT",
+    body: file,
+  });
+  if (!uploadResponse.ok) {
+    const errorText = await uploadResponse.text().catch(() => "");
+    throw new Error(
+      `Upload failed (${uploadResponse.status}): ${errorText || uploadResponse.statusText}`,
+    );
+  }
+  return public_url;
+}
+
+// ---------------------------------------------------------------------------
+// Lyrics API — Suno generates the text, GPT-4o only enriches the prompt.
+// ---------------------------------------------------------------------------
+
+export interface LyricsDraftParams {
+  topic: string;
+  genre?: string;
+  mood?: string;
+  tempo?: string;
+  vocal?: string;
+  language?: string;
+  agent_prompt?: string;
+}
+
+export interface LyricsDraftResponse {
+  task_id: string;
+  ws_url: string;
+}
+
+export type LyricsDraftStatus = "queued" | "processing" | "completed" | "failed";
+
+export interface LyricsDraftResult {
+  task_id: string;
+  status: LyricsDraftStatus;
+  title: string | null;
+  lyrics: string | null;
+  error: string | null;
+}
+
+export function createLyricsDraft(params: LyricsDraftParams): Promise<LyricsDraftResponse> {
+  return apiFetch("/api/v1/lyrics", {
+    method: "POST",
+    body: JSON.stringify(params),
+  });
+}
+
+export function fetchLyricsDraft(taskId: string): Promise<LyricsDraftResult> {
+  return apiFetch(`/api/v1/lyrics/${taskId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Agent chat (stateless GPT-4o prompt engineer with clarifying questions)
+// ---------------------------------------------------------------------------
+
+export type AgentModuleKind =
+  | "song"
+  | "instrumental"
+  | "cover_song"
+  | "sound_effect"
+  | "occasion"
+  | "cover_art";
+
+export interface AgentIntentParams {
+  description?: string;
+  text_mode?: "ai" | "custom" | "none";
+  lyrics?: string;
+  genre?: string;
+  custom_genre?: string;
+  mood?: string;
+  tempo?: string;
+  vocal?: string;
+  occasion_type?: string;
+}
+
+export interface AgentIntent {
+  module: AgentModuleKind;
+  confidence: "high" | "medium" | "low";
+  params: AgentIntentParams;
+  note: string;
+}
+
+export interface AgentChatMessage {
+  role: "agent" | "user";
+  content: string;
+}
+
+export interface AgentChatRequest {
+  module: AgentModuleKind;
+  messages: AgentChatMessage[];
+  selected_genre?: string;
+  selected_mood?: string;
+  selected_tempo?: string;
+  selected_vocal?: string;
+}
+
+export interface AgentChatResponse {
+  reply: string;
+  done: boolean;
+  summary: string;
+  prompt: string;
+  intent: AgentIntent | null;
+  suggestions: string[];
+}
+
+export function agentChat(req: AgentChatRequest): Promise<AgentChatResponse> {
+  return apiFetch("/api/v1/agent/chat", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// History API
+// ---------------------------------------------------------------------------
+
+export function fetchHistory(
+  params: { type?: string; mood?: string; status?: string; page?: number; limit?: number } = {},
+): Promise<HistoryPage> {
+  const q = new URLSearchParams();
+  if (params.type) q.set("type", params.type);
+  if (params.mood) q.set("mood", params.mood);
+  if (params.status) q.set("status", params.status);
+  if (params.page) q.set("page", String(params.page));
+  if (params.limit) q.set("limit", String(params.limit));
+  const qs = q.toString();
+  return apiFetch(`/api/v1/history${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchGeneration(id: string): Promise<GenerationOut> {
+  return apiFetch(`/api/v1/history/${id}`);
+}
+
+export function deleteGeneration(id: string): Promise<void> {
+  return apiFetch(`/api/v1/history/${id}`, { method: "DELETE" });
+}
+
+export function restoreGeneration(id: string): Promise<void> {
+  return apiFetch(`/api/v1/history/${id}/restore`, { method: "POST" });
+}
+
+export function fetchTrash(page?: number): Promise<HistoryPage> {
+  return apiFetch(`/api/v1/history/trash${page && page > 1 ? `?page=${page}` : ""}`);
+}
+
+export function purgeTrash(): Promise<void> {
+  return apiFetch("/api/v1/history/trash/purge", { method: "DELETE" });
+}
+
+export function rateGeneration(
+  id: string,
+  rating: "like" | "dislike" | "remove",
+): Promise<void> {
+  return apiFetch(`/api/v1/history/${id}/rating`, {
+    method: "POST",
+    body: JSON.stringify({ rating }),
+  });
+}
+
+export function shareGeneration(id: string): Promise<{ share_id: string; share_url: string }> {
+  return apiFetch(`/api/v1/history/${id}/share`, { method: "POST" });
+}
+
+export function unshareGeneration(id: string): Promise<void> {
+  return apiFetch(`/api/v1/history/${id}/share`, { method: "DELETE" });
+}
+
+export interface RadioToggleResponse {
+  id: string;
+  is_public: boolean;
+  published_at: string | null;
+  published_track_index: number | null;
+}
+
+export function toggleHistoryRadio(
+  id: string,
+  isPublic: boolean,
+  trackIndex: number | null = null,
+): Promise<RadioToggleResponse> {
+  // ``track_index`` is required for multi-variant generations: the radio
+  // button is per-track (V1 / V2) — clicking V1 must publish V1 only and
+  // not the other variant. Backend validates the index against the result
+  // tracks list and rejects out-of-range values.
+  const body: Record<string, unknown> = { is_public: isPublic };
+  if (isPublic && trackIndex !== null) {
+    body.track_index = trackIndex;
+  }
+  return apiFetch(`/api/v1/history/${id}/radio`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Public Radio API
+// ---------------------------------------------------------------------------
+
+export type RadioKind = "song" | "instrumental" | "cover";
+export type RadioPeriod = "today" | "week" | "month" | "all";
+export type RadioSort = "recent" | "score" | "plays";
+export type RadioVote = "like" | "dislike" | null;
+
+export interface RadioTrackOut {
+  id: string;
+  kind: RadioKind;
+  title: string;
+  author: string;
+  genre: string | null;
+  mood: string | null;
+  tempo: string | null;
+  vocal: string | null;
+  audio_url: string;
+  image_url: string | null;
+  duration: number;
+  play_count: number;
+  like_count: number;
+  dislike_count: number;
+  score: number;
+  my_vote: RadioVote;
+  published_at: string;
+  is_own: boolean;
+}
+
+export interface RadioListResponse {
+  items: RadioTrackOut[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface RadioStats {
+  total_tracks: number;
+  total_plays: number;
+  total_likes: number;
+  today_tracks: number;
+  today_plays: number;
+}
+
+export interface RadioListParams {
+  mood?: string;
+  genre?: string;
+  vocal?: "vocal" | "instrumental";
+  period?: RadioPeriod;
+  sort?: RadioSort;
+  page?: number;
+  limit?: number;
+}
+
+export function fetchRadio(params: RadioListParams = {}): Promise<RadioListResponse> {
+  const q = new URLSearchParams();
+  if (params.mood) q.set("mood", params.mood);
+  if (params.genre) q.set("genre", params.genre);
+  if (params.vocal) q.set("vocal", params.vocal);
+  if (params.period) q.set("period", params.period);
+  if (params.sort) q.set("sort", params.sort);
+  if (params.page) q.set("page", String(params.page));
+  if (params.limit) q.set("limit", String(params.limit));
+  const qs = q.toString();
+  return apiFetch(`/api/v1/radio${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchRadioStats(): Promise<RadioStats> {
+  return apiFetch("/api/v1/radio/stats");
+}
+
+export interface RadioMoodCounts {
+  counts: Record<string, number>;
+  total: number;
+  vocal: number;
+  instrumental: number;
+}
+
+export function fetchRadioMoodCounts(): Promise<RadioMoodCounts> {
+  return apiFetch("/api/v1/radio/mood-counts");
+}
+
+export function fetchMyRadioCollection(
+  params: { page?: number; limit?: number } = {},
+): Promise<RadioListResponse> {
+  const q = new URLSearchParams();
+  if (params.page) q.set("page", String(params.page));
+  if (params.limit) q.set("limit", String(params.limit));
+  const qs = q.toString();
+  return apiFetch(`/api/v1/radio/me/collection${qs ? `?${qs}` : ""}`);
+}
+
+export interface RadioVoteResponse {
+  my_vote: RadioVote;
+  like_count: number;
+  dislike_count: number;
+}
+
+export function voteRadioTrack(
+  id: string,
+  rating: "like" | "dislike" | "remove",
+): Promise<RadioVoteResponse> {
+  return apiFetch(`/api/v1/radio/${id}/vote`, {
+    method: "POST",
+    body: JSON.stringify({ rating }),
+  });
+}
+
+export function recordRadioPlay(id: string): Promise<void> {
+  return apiFetch(`/api/v1/radio/${id}/play`, { method: "POST" });
+}
+
+// ---------------------------------------------------------------------------
+// Public share
+// ---------------------------------------------------------------------------
+
+export interface PublicGenerationOut {
+  share_id: string;
+  title: string;
+  type: string;
+  genre: string | null;
+  mood: string | null;
+  share_views: number;
+  tracks: Track[];
+  lyrics: string | null;
+  created_at: string;
+}
+
+export function fetchSharedGeneration(shareId: string): Promise<PublicGenerationOut> {
+  return apiFetch(`/api/v1/share/${shareId}`);
+}
+
+// ---------------------------------------------------------------------------
+// Track utilities (auto-title + tagged download)
+// ---------------------------------------------------------------------------
+
+export interface AutoTitleResponse {
+  track_name: string;
+  artist: string;
+  short_title: string;
+}
+
+export function requestAutoTitle(idea: string, artist?: string): Promise<AutoTitleResponse> {
+  return apiFetch("/api/v1/tracks/auto-title", {
+    method: "POST",
+    body: JSON.stringify({ idea, artist: artist ?? "" }),
+  });
+}
+
+/** Same-origin URL of the ID3-tagged Suno mp3 proxy. */
+export function trackDownloadUrl(generationId: string, trackIndex: number): string {
+  return `/api/v1/tracks/${encodeURIComponent(generationId)}/${trackIndex}/download`;
+}
+
+// ---------------------------------------------------------------------------
+// Generation WebSocket helper
+// ---------------------------------------------------------------------------
+
+export type ProgressEvent =
+  | { status: "processing"; step?: string; poll?: number; elapsed?: number }
+  | { status: "completed"; result: Record<string, unknown> }
+  | { status: "failed"; error: string };
+
+export function openGenerationSocket(
+  wsUrl: string,
+  onMessage: (event: ProgressEvent) => void,
+  onClose?: () => void,
+): WebSocket {
+  const ws = new WebSocket(wsUrl);
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data as string) as ProgressEvent;
+      onMessage(data);
+    } catch {
+      // ignore malformed frames
+    }
+  };
+  if (onClose) ws.onclose = onClose;
+  return ws;
+}

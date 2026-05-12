@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from app.api.v1.users import upload_avatar; from app.api.v1.radio import my_collection; from app.main import create_app; app = create_app\\(\\); print\\('OK', len\\(app.routes\\)\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(grep -n \"</section>$\\\\|</div>$\\\\|profile-card--files\" \"d:/Боты/RiffaBot/ВЭБ/Stable vers/riffaweb5/frontend/src/pages/ProfilePage.tsx\")",
+      "Bash(grep -n \"</div>$\" \"d:/Боты/RiffaBot/ВЭБ/Stable vers/riffaweb5/frontend/src/pages/ProfilePage.tsx\")"
+    ]
+  }
+}

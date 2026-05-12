@@ -1,0 +1,1 @@
+import{j as r}from"./query-Bj0IszaH.js";import{P as e}from"./Panel-BFL8xGQ9.js";import"./vendor-Ccj2W8FH.js";function m(){return r.jsxs(e,{children:[r.jsx("h1",{children:"Мои генерации"}),r.jsx("p",{className:"muted",children:"Список треков с фильтрами по типу, настроению и дате. Появится после интеграции с реальной генерацией."})]})}export{m as LibraryPage};
