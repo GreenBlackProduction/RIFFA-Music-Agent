@@ -68,35 +68,18 @@ interface GenStats {
 }
 
 const MOCK_STATS: readonly GenStats[] = [
-  { type: "song", label: "Песни", count: 42, color: "var(--accent)" },
-  { type: "instrumental", label: "Инструменталы", count: 17, color: "var(--accent-2)" },
-  { type: "cover", label: "Каверы", count: 8, color: "var(--accent-3)" },
-  { type: "sfx", label: "Звук. эффекты", count: 23, color: "#37bbfe" },
-  { type: "cover_art", label: "Обложки", count: 14, color: "#ffd166" },
+  { type: "song", label: "Песни", count: 0, color: "var(--accent)" },
+  { type: "instrumental", label: "Инструменталы", count: 0, color: "var(--accent-2)" },
+  { type: "cover", label: "Каверы", count: 0, color: "var(--accent-3)" },
+  { type: "sfx", label: "Звук. эффекты", count: 0, color: "#37bbfe" },
+  { type: "cover_art", label: "Обложки", count: 0, color: "#ffd166" },
 ];
 
-const MOCK_GENRES: readonly { name: string; count: number }[] = [
-  { name: "Synthwave", count: 14 },
-  { name: "Lofi", count: 11 },
-  { name: "Cinematic", count: 9 },
-  { name: "Trap", count: 7 },
-  { name: "Indie", count: 5 },
-];
+const MOCK_GENRES: readonly { name: string; count: number }[] = [];
 
-const MOCK_MOODS: readonly { name: string; count: number }[] = [
-  { name: "Энергичное", count: 22 },
-  { name: "Мечтательное", count: 16 },
-  { name: "Драматичное", count: 11 },
-  { name: "Спокойное", count: 9 },
-];
+const MOCK_MOODS: readonly { name: string; count: number }[] = [];
 
-const MOCK_BPM: readonly { range: string; count: number }[] = [
-  { range: "60–80", count: 8 },
-  { range: "80–100", count: 14 },
-  { range: "100–120", count: 29 },
-  { range: "120–140", count: 17 },
-  { range: "140–180", count: 6 },
-];
+const MOCK_BPM: readonly { range: string; count: number }[] = [];
 
 // «Мои файлы» получает данные из того же источника, что и «Мои генерации» (StudioPage),
 // через useLibraryItems(). Разные фильтры — один и тот же файл видимый в обоих
@@ -110,22 +93,7 @@ interface Review {
   date: string;
 }
 
-const SEED_REVIEWS: readonly Review[] = [
-  {
-    id: "r1",
-    author: "Алексей",
-    rating: 5,
-    text: "Кавер моей старой песни в стиле synthwave — ровно то что нужно было. Без студии за 2 минуты.",
-    date: "2026-04-20",
-  },
-  {
-    id: "r2",
-    author: "Мария",
-    rating: 4,
-    text: "Агент неплохо собирает промпт, но иногда теряется на настроении. Звук хороший.",
-    date: "2026-04-15",
-  },
-];
+const SEED_REVIEWS: readonly Review[] = [];
 
 const MOCK_DOCS: readonly { id: string; title: string; hint: string; href: string }[] = [
   { id: "terms", title: "Пользовательское соглашение", hint: "Версия от 01.04.2026", href: "#" },
@@ -241,9 +209,9 @@ export function ProfilePage() {
 
   const displayName = user?.display_name ?? "Гость";
   const userEmail = user?.email ?? "demo@riffa.studio";
-  const userBalance = user?.balance_tokens ?? 340;
+  const userBalance = user?.balance_tokens ?? 0;
   const userInitial = displayName.slice(0, 1).toUpperCase();
-  const joinDate = "С нами с апреля 2026";
+  const joinDate = "";
 
   // ── Nickname editing ──
   const [editingName, setEditingName] = useState(false);
@@ -1209,12 +1177,12 @@ export function ProfilePage() {
 
           <div className="referral-stats">
             <div className="referral-stat">
-              <strong>7</strong>
+              <strong>0</strong>
               <span>приглашено</span>
             </div>
             <div className="referral-stat">
               <strong className="referral-stat__amount">
-                420
+                0
                 <Coin size={18} className="riffa-coin--after" />
               </strong>
               <span>бонусных на баланс</span>
