@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import secrets
 import uuid
 from contextlib import suppress
@@ -12,6 +13,7 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from botocore.client import Config
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -521,9 +523,6 @@ async def cover_proxy(
 ) -> Any:
     """Proxy for cover files stored in MinIO — allows Suno to download
     files when s3_public_base_url points to localhost."""
-    from fastapi.responses import StreamingResponse
-    import io
-
     s3_client = _get_s3_client(settings)
     try:
         obj = s3_client.get_object(Bucket=settings.s3_bucket_media, Key=path)
