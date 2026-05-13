@@ -1089,20 +1089,7 @@ export function ProfilePage() {
                 </div>
               </div>
 
-              <div className="taste-group">
-                <h3 className="taste-group__title">BPM</h3>
-                <div className="bpm-bars">
-                  {MOCK_BPM.map((b) => (
-                    <div key={b.range} className="bpm-bar">
-                      <div
-                        className="bpm-bar__fill"
-                        style={{ height: `${(b.count / 30) * 100}%` }}
-                      />
-                      <span>{b.range}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+
             </div>
           </div>
         </section>
