@@ -88,17 +88,29 @@ export function LibraryCard() {
   // Delete with OPTIMISTIC cache update — file disappears from the list
   // immediately. If the API call fails, we rollback.
   const deleteMutation = useMutation({
-    mutationFn: (generationId: string) => deleteGeneration(generationId),
-    onMutate: async (generationId) => {
+    mutationFn: ({ generationId, trackIndex }: { generationId: string; trackIndex: number | null }) =>
+      deleteGeneration(generationId, trackIndex),
+    onMutate: async ({ generationId, trackIndex }) => {
       // Cancel any in-flight refetches so they don't overwrite our optimistic update.
       await queryClient.cancelQueries({ queryKey: HISTORY_QUERY_KEY });
       // Snapshot all current history caches so we can roll back on error.
       const snapshots = queryClient.getQueriesData<HistoryPage>({
         queryKey: HISTORY_QUERY_KEY,
       });
-      // Filter the deleted generation out of every cached page.
+      // Filter the deleted generation/track out of every cached page.
       queryClient.setQueriesData<HistoryPage>({ queryKey: HISTORY_QUERY_KEY }, (old) => {
         if (!old?.items) return old;
+        if (trackIndex !== null) {
+          // Per-track: remove only that track from the generation's result.
+          return {
+            ...old,
+            items: old.items.map((g: GenerationOut) => {
+              if (g.id !== generationId) return g;
+              const tracks = g.tracks.filter((_: unknown, i: number) => i !== trackIndex);
+              return { ...g, tracks };
+            }).filter((g: GenerationOut) => g.tracks.length > 0),
+          };
+        }
         return {
           ...old,
           items: old.items.filter((g: GenerationOut) => g.id !== generationId),
@@ -274,10 +286,14 @@ export function LibraryCard() {
                 downloadUrl={
                   it.trackIndex !== null
                     ? trackDownloadUrl(it.generationId, it.trackIndex)
-                    : undefined
+                    : it.type === "cover_art" && it.coverUrl
+                      ? it.coverUrl
+                      : undefined
                 }
                 title={it.title}
                 isMusicType={canBolt}
+                isImageType={it.type === "cover_art"}
+                imageUrl={it.type === "cover_art" ? it.coverUrl ?? undefined : undefined}
                 canRadio={canRadio}
                 fileId={it.id}
                 isPublic={it.isPublic}
@@ -300,7 +316,7 @@ export function LibraryCard() {
                 onPlayPause={it.audioUrl ? () => handleClick(it) : undefined}
                 onDelete={(rect) => {
                   showGhost(it, rect);
-                  deleteMutation.mutate(it.generationId);
+                  deleteMutation.mutate({ generationId: it.generationId, trackIndex: it.trackIndex });
                 }}
               />
             </div>

@@ -363,6 +363,7 @@ export function generateCoverArt(params: {
   prompt: string;
   model?: string;
   title?: string;
+  reference_url?: string;
 }): Promise<GenerateResponse> {
   return apiFetch("/api/v1/generate/cover_art", {
     method: "POST",
@@ -540,8 +541,9 @@ export function fetchGeneration(id: string): Promise<GenerationOut> {
   return apiFetch(`/api/v1/history/${id}`);
 }
 
-export function deleteGeneration(id: string): Promise<void> {
-  return apiFetch(`/api/v1/history/${id}`, { method: "DELETE" });
+export function deleteGeneration(id: string, trackIndex?: number | null): Promise<void> {
+  const qs = trackIndex !== null && trackIndex !== undefined ? `?track_index=${trackIndex}` : "";
+  return apiFetch(`/api/v1/history/${id}${qs}`, { method: "DELETE" });
 }
 
 export function restoreGeneration(id: string): Promise<void> {
@@ -591,7 +593,7 @@ export function toggleHistoryRadio(
   // not the other variant. Backend validates the index against the result
   // tracks list and rejects out-of-range values.
   const body: Record<string, unknown> = { is_public: isPublic };
-  if (isPublic && trackIndex !== null) {
+  if (trackIndex !== null) {
     body.track_index = trackIndex;
   }
   return apiFetch(`/api/v1/history/${id}/radio`, {
@@ -769,15 +771,83 @@ export function openGenerationSocket(
   onMessage: (event: ProgressEvent) => void,
   onClose?: () => void,
 ): WebSocket {
-  const ws = new WebSocket(wsUrl);
-  ws.onmessage = (e) => {
+  let retries = 0;
+  const maxRetries = 5;
+  let terminated = false;
+
+  function connect(): WebSocket {
+    const ws = new WebSocket(wsUrl);
+    ws.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data as string) as ProgressEvent;
+        retries = 0;
+        onMessage(data);
+        if (data.status === "completed" || data.status === "failed") {
+          terminated = true;
+        }
+      } catch {
+        // ignore malformed frames
+      }
+    };
+    ws.onclose = () => {
+      if (terminated) {
+        onClose?.();
+        return;
+      }
+      if (retries < maxRetries) {
+        retries++;
+        setTimeout(() => {
+          if (!terminated) {
+            const newWs = connect();
+            Object.assign(ws, { _reconnected: newWs });
+          }
+        }, Math.min(1000 * retries, 5000));
+      } else {
+        onClose?.();
+      }
+    };
+    ws.onerror = () => {
+      // onerror always fires before onclose; let onclose handle retry
+    };
+    return ws;
+  }
+
+  return connect();
+}
+
+/** Poll generation status via HTTP (fallback when WS is unreliable). */
+export function pollGenerationStatus(
+  generationId: string,
+  onUpdate: (event: ProgressEvent) => void,
+  intervalMs = 3000,
+): { stop: () => void } {
+  let active = true;
+  async function tick() {
+    if (!active) return;
     try {
-      const data = JSON.parse(e.data as string) as ProgressEvent;
-      onMessage(data);
+      const gen = await apiFetch<{
+        status: string;
+        result?: Record<string, unknown>;
+        error_message?: string;
+        tracks?: Array<Record<string, unknown>>;
+      }>(`/api/v1/history/${generationId}`);
+      if (!active) return;
+      if (gen.status === "completed") {
+        onUpdate({ status: "completed", result: gen.result ?? { tracks: gen.tracks } });
+        active = false;
+        return;
+      }
+      if (gen.status === "failed") {
+        onUpdate({ status: "failed", error: gen.error_message ?? "Ошибка генерации" });
+        active = false;
+        return;
+      }
+      onUpdate({ status: "processing", step: "generating" });
     } catch {
-      // ignore malformed frames
+      // API error — keep polling
     }
-  };
-  if (onClose) ws.onclose = onClose;
-  return ws;
+    if (active) setTimeout(tick, intervalMs);
+  }
+  setTimeout(tick, intervalMs);
+  return { stop: () => { active = false; } };
 }

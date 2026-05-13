@@ -91,17 +91,18 @@ body.studio-landing .main {
 
 @media (max-width: 1180px) {
   .app-shell {
-    height: auto;
+    height: 100dvh;
     min-height: 100dvh;
-    overflow-x: hidden;
-    overflow-y: visible;
+    max-height: 100dvh;
+    overflow: hidden;
   }
 
   .main {
-    height: auto;
-    min-height: 100dvh;
+    height: 100dvh;
+    min-height: 0;
     overflow-x: hidden;
-    overflow-y: visible;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     padding: var(--space-4) var(--space-3) var(--space-8);
   }
 }

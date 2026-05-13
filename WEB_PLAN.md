@@ -1,128 +1,109 @@
-# RIFFA Web - План работы после перезагрузки
+# RIFFA Web - План работы
 
-## 🎯 Текущая задача
-Исправить модуль записи голоса и загрузки файлов для генерации кавера.
+## Дата обновления: 2026-05-12
 
-## ✅ Что уже сделано
+## Выполненные задачи (2026-05-12)
 
-### Фронтенд
-1. **Создан компонент VoiceRecorder** с визуализацией звуковых волн
-   - `frontend/src/components/studio/VoiceRecorder.tsx`
-   - `frontend/src/components/studio/VoiceRecorder.css`
-   - Модальное окно с Web Audio API визуализацией
+### 1. Прогресс-бар генерации — мобильная версия
+- **Файл**: `frontend/src/components/layout/ActiveGenerations.css`
+- Прогресс-бар перемещён вниз страницы при компактном отображении (max-width: 1180px)
+- `position: fixed; bottom: 0` вместо `top`
+- Плеер тоже поднят с учётом нового расположения
 
-2. **Обновлён StudioPage.tsx**
-   - Добавлены функции записи: `startRecording()`, `stopRecording()`, `cancelRecording()`
-   - Интегрирован компонент VoiceRecorder
+### 2. Кнопка шеринга трека
+- **Файл**: `frontend/src/components/studio/FileActions.tsx`
+- Добавлена кнопка "Поделиться треком" в меню молнии (bolt menu)
+- Вызывает `shareGeneration(generationId)` — генерирует уникальную ссылку
+- Ссылка автоматически копируется в буфер обмена
+- Гостевой пользователь попадает на `/s/{shareId}` — может только слушать
 
-3. **Обновлён API клиент**
-   - `frontend/src/lib/api/client.ts`
-   - Эндпоинт изменён на `/api/v1/generate/upload-cover-url`
+### 3. Модуль генерации кавера
+- **Файлы**: `frontend/src/components/studio/VoiceRecorder.tsx`, `frontend/src/pages/StudioPage.tsx`, `backend/app/services/suno.py`, `backend/app/tasks/__init__.py`
+- Исправлена визуализация записи голоса: добавлено состояние `analyserReady` для корректной синхронизации Web Audio API с рендерингом canvas
+- Очистка потоков микрофона при отмене/закрытии записи
+- MediaRecorder теперь использует timeslice (250ms) для потоковой записи
+- Улучшена обработка ошибок Suno API — теперь выводится код и текст ошибки
+- Добавлено предупреждение в лог если upload URL — localhost (Suno не может скачать)
 
-4. **Конфигурация Vite**
-   - `frontend/vite.config.ts`
-   - Прокси настроен на `http://localhost:8002`
+### 4. Загрузка аватара профиля
+- **Файл**: `backend/app/api/v1/users.py`
+- Эндпоинт `POST /users/avatar` теперь возвращает `{"avatar_url": "..."}` (раньше ничего не возвращал)
 
-### Бэкенд
-1. **Создан эндпоинт загрузки**
-   - `backend/app/api/v1/generate.py`
-   - POST `/api/v1/generate/upload-cover-url`
-   - Возвращает presigned URL для S3/MinIO
-   - Fallback на mock URLs если MinIO недоступен
+### 5. Обложка — полноэкранный просмотр
+- **Файл**: `frontend/src/components/layout/ActiveGenerations.tsx`
+- Превью обложки теперь рендерится через `createPortal(document.body)` — открывается поверх всего интерфейса, а не внутри сайдбара
 
-2. **Установлены зависимости**
-   - sentry-sdk, loguru, arq, boto3, asyncpg, aiosqlite
+### 6. Корзина (удаление файлов)
+- **Файл**: `backend/app/api/v1/history.py`
+- Маршруты `/trash` и `/trash/purge` перенесены ПЕРЕД `/{gen_id}` — раньше FastAPI перехватывал `/trash` как UUID и возвращал 404
+- Фронтенд уже имел полную реализацию корзины (фильтр, восстановление, очистка)
 
-3. **Конфигурация**
-   - `backend/.env.dev` - временно переключено на SQLite (НЕ РАБОТАЕТ - нужен PostgreSQL!)
+### 7. Радио — мультивариантные треки
+- **Файл**: `frontend/src/lib/api/client.ts`
+- `toggleHistoryRadio` теперь всегда отправляет `track_index` (и при публикации, и при снятии с радио)
+- Раньше при снятии V2 с радио удалялись все варианты (track_index не передавался)
 
-## ❌ Текущая проблема
+### 8. Логотип сайта
+- Логотип сайдбара уже совпадает с логотипом страницы входа (`/riffa-logo.png` + "RIFFAStudio")
+- Логотип кликабельный — ведёт на `/studio` через `<NavLink>`
 
-**База данных не работает:**
-- PostgreSQL требует Docker
-- Docker Desktop не запускается
-- SQLite не поддерживает UUID (используется в моделях)
-- Бэкенд возвращает 500 Internal Server Error
+### 9. Звуковые эффекты — кнопка "Свой звук"
+- **Файл**: `frontend/src/pages/StudioPage.tsx`
+- Кнопка "Свой звук" теперь выделена классом `chip--custom` (подсвечивается)
+- При нажатии открывается текстовое поле для ввода своего варианта звука
+- Добавлено поле `sfxCustomSource` в состояние
+- Значение используется в `buildPrompt` при генерации
 
-## 🔧 Что делать после перезагрузки
+### 10. Изображения — скачивание и улучшение
+- **Файлы**: `frontend/src/components/studio/FileActions.tsx`, `frontend/src/components/studio/LibraryCard.tsx`
+- Для cover_art файлов добавлена кнопка скачивания (используется `coverUrl` как downloadUrl)
+- Кнопка молнии (bolt menu) для изображений с опцией "Улучшить качество (Pro)" — генерирует новую обложку через `nano-banana-pro`
+- Кнопка "Поделиться" также доступна для изображений
 
-### ШАГ 1: Запустить Docker Desktop
-```
-1. Открыть Docker Desktop из меню Пуск
-2. Дождаться "Engine running" (1-2 минуты)
-3. Проверить: docker ps
-```
+### 11. Агент — вопрос о тексте на обложке
+- **Файл**: `backend/app/api/v1/agent.py`
+- STEP 4 в COVER ART FLOW разбит на три под-шага (4a, 4b, 4c)
+- 4a: Спрашивает ТОЛЬКО "Нужен ли текст?" и ждёт ответа
+- 4b: Если "да" — спрашивает "Какой текст?" и ждёт
+- 4c: Если "нет" — добавляет "no text, no typography" в prompt
 
-### ШАГ 2: Запустить сервисы
-```powershell
-cd "D:\Боты\RiffaBot\ВЭБ\Stable vers\riffaweb5"
-docker-compose up -d
-```
-
-Запустятся:
-- PostgreSQL (порт 5432)
-- Redis (порт 6379)  
-- MinIO (порты 9000, 9001)
-
-### ШАГ 3: Вернуть PostgreSQL
-Отредактировать `backend/.env.dev`:
-```
-DATABASE_URL=postgresql+asyncpg://riffa:riffa@localhost:5432/riffa
-```
-
-### ШАГ 4: Запустить бэкенд
-```powershell
-cd "D:\Боты\RiffaBot\ВЭБ\Stable vers\riffaweb5\backend"
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8002
-```
-
-### ШАГ 5: Запустить фронтенд
-```powershell
-cd "D:\Боты\RiffaBot\ВЭБ\Stable vers\riffaweb5\frontend"
-npm run dev
-```
-
-### ШАГ 6: Тестировать
-```
-1. Открыть http://localhost:5173
-2. Залогиниться
-3. Перейти в Studio
-4. Попробовать запись голоса (должно открыться модальное окно)
-5. Попробовать загрузку файла
-```
-
-## 📝 Важные порты
-
-- Фронтенд: **5173**
-- Бэкенд: **8002**
-- PostgreSQL: **5432**
-- Redis: **6379**
-- MinIO API: **9000**
-- MinIO Console: **9001**
-
-## 🐛 Решённые проблемы
-
-1. ✅ "uploadCoverFile is not defined" - добавлен импорт
-2. ✅ 405 Method Not Allowed - убиты дублирующиеся процессы
-3. ✅ Отсутствующие зависимости - установлены
-4. ✅ Конфликт портов - бэкенд на 8002
-5. ⏳ База данных - требует Docker
-
-## 🔍 Альтернатива (если Docker не работает)
-
-1. Установить PostgreSQL для Windows
-2. Создать БД: `riffa` / `riffa:riffa`
-3. Запустить миграции Alembic
-4. Установить Redis для Windows
-
-## 📂 Ключевые файлы
-
-- `backend/.env.dev` - конфигурация БД
-- `frontend/vite.config.ts` - прокси на 8002
-- `backend/app/api/v1/generate.py` - эндпоинт загрузки
-- `frontend/src/components/studio/VoiceRecorder.tsx` - компонент записи
-- `frontend/src/pages/StudioPage.tsx` - интеграция записи
+### 12. Анализ и оптимизация
+- Удалены отладочные `console.log` из StudioPage.tsx (загрузка файлов кавера)
+- Структура кода проверена — нет критических ошибок
+- Маршруты API упорядочены для корректной работы FastAPI
 
 ---
-**Дата**: 2026-05-11
-**Статус**: Ожидание перезагрузки и запуска Docker
+
+## Архитектура проекта
+
+### Стек
+- **Фронтенд**: React + TypeScript + Vite (порт 5173)
+- **Бэкенд**: FastAPI + SQLAlchemy + Arq (порт 8002)
+- **БД**: PostgreSQL (5432)
+- **Кэш/очереди**: Redis (6379)
+- **Хранилище**: MinIO S3 (9000/9001)
+- **AI**: Suno API v5.5, OpenAI GPT-4o, NanoBanana
+
+### Ключевые файлы
+- `frontend/src/pages/StudioPage.tsx` — главная страница студии
+- `frontend/src/components/studio/FileActions.tsx` — действия с файлами
+- `frontend/src/components/studio/LibraryCard.tsx` — библиотека файлов
+- `frontend/src/lib/api/client.ts` — API клиент
+- `frontend/src/lib/library.ts` — типы и утилиты библиотеки
+- `backend/app/api/v1/history.py` — API истории генераций
+- `backend/app/api/v1/agent.py` — AI-агент промпт-инженер
+- `backend/app/services/suno.py` — клиент Suno API
+- `backend/app/tasks/__init__.py` — фоновые задачи генерации
+
+### Порты
+| Сервис | Порт |
+|--------|------|
+| Фронтенд (Vite) | 5173 |
+| Бэкенд (FastAPI) | 8002 |
+| PostgreSQL | 5432 |
+| Redis | 6379 |
+| MinIO API | 9000 |
+| MinIO Console | 9001 |
+
+---
+**Статус**: Все 12 задач выполнены

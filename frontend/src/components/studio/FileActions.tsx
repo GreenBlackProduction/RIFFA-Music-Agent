@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { convertToWav } from "@/lib/api/client";
+import { convertToWav, shareGeneration, generateCoverArt } from "@/lib/api/client";
 import { usePlayer } from "@/store/player";
 import { useGenerationStore } from "@/store/generation";
 
@@ -33,6 +33,10 @@ interface Props {
    *  rendered list (so siblings magnetize up), and rendering a "ghost" at the
    *  captured rect that plays the explosion animation for ~1s. */
   onDelete?: (rect: DOMRect | null) => void;
+  /** Whether this is an image (cover_art) file. */
+  isImageType?: boolean;
+  /** Image URL for cover_art files (for download/enhance). */
+  imageUrl?: string;
 }
 
 export function FileActions({
@@ -51,11 +55,15 @@ export function FileActions({
   isPlaying,
   onPlayPause,
   onDelete,
+  isImageType,
+  imageUrl,
 }: Props) {
   const dlHref = downloadUrl || audioUrl;
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ bottom: number; right: number } | null>(null);
   const [wavPending, setWavPending] = useState(false);
+  const [sharePending, setSharePending] = useState(false);
+  const [enhancePending, setEnhancePending] = useState(false);
   const boltBtnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -107,6 +115,44 @@ export function FileActions({
     }
   }
 
+  async function handleShare() {
+    if (!generationId || sharePending) return;
+    setSharePending(true);
+    try {
+      const resp = await shareGeneration(generationId);
+      const shareUrl = `${window.location.origin}/s/${resp.share_id}`;
+      await navigator.clipboard.writeText(shareUrl);
+      setMenuOpen(false);
+    } catch {
+      // silent
+    } finally {
+      setSharePending(false);
+    }
+  }
+
+  async function handleEnhanceImage() {
+    if (!generationId || enhancePending) return;
+    setEnhancePending(true);
+    setMenuOpen(false);
+    try {
+      const resp = await generateCoverArt({
+        prompt: `enhance and upscale: ${title || "cover art"}`,
+        model: "nano-banana-pro",
+        title: `${title || "Обложка"} (HD)`,
+      });
+      trackGeneration(
+        resp.generation_id,
+        resp.ws_url,
+        "cover_art",
+        `HD: ${title || "Обложка"}`,
+      );
+    } catch {
+      // silent
+    } finally {
+      setEnhancePending(false);
+    }
+  }
+
   function handleDeleteClick(e: React.MouseEvent<HTMLButtonElement>) {
     if (!onDelete) return;
     const parent = e.currentTarget.closest<HTMLElement>(".file-item");
@@ -138,15 +184,15 @@ export function FileActions({
         </a>
       )}
 
-      {isMusicType && (
+      {(isMusicType || isImageType) && (
         <div className="file-bolt-wrap">
           <button
             ref={boltBtnRef}
             type="button"
-            className={`file-bolt${menuOpen ? " file-bolt--open" : ""}${wavPending ? " file-bolt--pending" : ""}`}
+            className={`file-bolt${menuOpen ? " file-bolt--open" : ""}${wavPending || enhancePending ? " file-bolt--pending" : ""}`}
             onClick={openMenu}
-            title="Действия с треком"
-            disabled={wavPending}
+            title={isImageType ? "Действия с изображением" : "Действия с треком"}
+            disabled={wavPending || enhancePending}
             aria-expanded={menuOpen}
             aria-haspopup="menu"
           >
@@ -218,18 +264,53 @@ export function FileActions({
             className="file-bolt-menu"
             style={{ bottom: menuPos.bottom, right: menuPos.right }}
           >
-            <button type="button" role="menuitem" onClick={() => setMenuOpen(false)}>
-              🔁&nbsp; Продлить трек
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => void handleWavConvert()}
-              disabled={!canWav}
-              title={canWav ? undefined : "Нет audio_id для конвертации"}
-            >
-              💿&nbsp; Конвертировать в WAV
-            </button>
+            {isImageType ? (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void handleEnhanceImage()}
+                  disabled={enhancePending}
+                >
+                  {enhancePending ? "⏳" : "✨"}&nbsp; Улучшить качество (Pro)
+                </button>
+                {generationId && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void handleShare()}
+                    disabled={sharePending}
+                  >
+                    {sharePending ? "⏳" : "🔗"}&nbsp; Поделиться
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                <button type="button" role="menuitem" onClick={() => setMenuOpen(false)}>
+                  🔁&nbsp; Продлить трек
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void handleWavConvert()}
+                  disabled={!canWav}
+                  title={canWav ? undefined : "Нет audio_id для конвертации"}
+                >
+                  💿&nbsp; Конвертировать в WAV
+                </button>
+                {generationId && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void handleShare()}
+                    disabled={sharePending}
+                  >
+                    {sharePending ? "⏳" : "🔗"}&nbsp; Поделиться треком
+                  </button>
+                )}
+              </>
+            )}
           </div>,
           document.body,
         )}

@@ -4,6 +4,10 @@
   gap: var(--space-2);
   padding: 0 var(--space-2);
   margin-top: var(--space-3);
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .active-gen-panel__head {
@@ -282,7 +286,7 @@
 @media (max-width: 1180px) {
   .collapsed-gen-progress {
     position: fixed;
-    top: 0;
+    bottom: 0;
     left: 0;
     right: 0;
     z-index: 220;
@@ -299,8 +303,8 @@
     min-height: 30px;
     padding: 5px 12px 6px;
     background: rgba(12, 10, 24, 0.9);
-    border-bottom: 1px solid rgba(124, 255, 31, 0.28);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    border-top: 1px solid rgba(124, 255, 31, 0.28);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.28);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
   }
@@ -352,8 +356,7 @@
   }
 
   body.has-global-player .collapsed-gen-progress {
-    top: auto;
-    bottom: 8px;
+    bottom: 68px;
     left: 12px;
     right: 12px;
   }
@@ -362,18 +365,10 @@
     border: 1px solid rgba(124, 255, 31, 0.3);
     border-radius: 12px;
   }
-
-  body.has-global-player.has-collapsed-progress .global-player {
-    bottom: 58px;
-  }
 }
 
 @media (max-width: 560px) {
-  body.has-global-player.has-collapsed-progress .global-player {
-    bottom: 70px;
-  }
-
   body.has-global-player .collapsed-gen-progress {
-    bottom: 6px;
+    bottom: 72px;
   }
 }

@@ -447,6 +447,7 @@ class CoverUploadUrlRequest(BaseModel):
 
 @router.post("/upload-cover-url", response_model=PresignedUploadResponse)
 async def get_cover_upload_url(
+    request: Request,
     body: CoverUploadUrlRequest | None = None,
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),
@@ -485,7 +486,16 @@ async def get_cover_upload_url(
             },
             ExpiresIn=expires_in,
         )
-        public_url = f"{settings.s3_public_base_url}/{filename}"
+        # If s3_public_base_url is localhost, Suno can't reach it.
+        # Use the server's own proxy endpoint instead.
+        base = settings.s3_public_base_url
+        if any(h in base for h in ("localhost", "127.0.0.1", "0.0.0.0")):
+            forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip()
+            proto = forwarded_proto or request.url.scheme
+            host = request.headers.get("x-forwarded-host") or request.headers.get("host") or str(request.url.netloc)
+            public_url = f"{proto}://{host}/api/v1/generate/cover-proxy/{filename}"
+        else:
+            public_url = f"{base}/{filename}"
     except Exception as exc:
         # MinIO/S3 unavailable — fail loudly so the UI can show the real
         # cause instead of attempting a PUT against a non-existent host.
@@ -502,3 +512,30 @@ async def get_cover_upload_url(
         public_url=public_url,
         expires_in=expires_in,
     )
+
+
+@router.get("/cover-proxy/{path:path}")
+async def cover_proxy(
+    path: str,
+    settings: Settings = Depends(get_settings),
+) -> Any:
+    """Proxy for cover files stored in MinIO — allows Suno to download
+    files when s3_public_base_url points to localhost."""
+    from fastapi.responses import StreamingResponse
+    import io
+
+    s3_client = _get_s3_client(settings)
+    try:
+        obj = s3_client.get_object(Bucket=settings.s3_bucket_media, Key=path)
+        content = obj["Body"].read()
+        content_type = obj.get("ContentType", "audio/mpeg")
+        return StreamingResponse(
+            io.BytesIO(content),
+            media_type=content_type,
+            headers={"Content-Disposition": f"inline; filename={path.split('/')[-1]}"},
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Файл не найден в хранилище",
+        ) from exc

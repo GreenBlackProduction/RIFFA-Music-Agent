@@ -259,6 +259,7 @@ export function ProfilePage() {
     try {
       await updateDisplayName(trimmed);
       setEditingName(false);
+      await refreshAuth();
     } catch { /* keep editing open */ }
     finally { setNameSaving(false); }
   };
@@ -800,8 +801,9 @@ export function ProfilePage() {
             </p>
             <div className="balance-display__label">доступно к использованию</div>
             <div className="balance-display__conversions">
-              <span>≈ {Math.round(userBalance / 10)} песен</span>
-              <span>≈ {Math.round(userBalance / 3)} SFX</span>
+              <span>≈ {Math.floor(userBalance / 2)} песен</span>
+              <span>≈ {Math.floor(userBalance / 0.5)} SFX</span>
+              <span>≈ {Math.floor(userBalance / 1)} обложек</span>
             </div>
           </div>
 
@@ -821,7 +823,7 @@ export function ProfilePage() {
                   {p.tokens}
                   <Coin size={18} className="riffa-coin--after" />
                 </strong>
-                <span className="token-pack__gens">{p.gens} генераций</span>
+                <span className="token-pack__gens">{Math.floor(p.tokens / 2)} песен · {Math.floor(p.tokens / 0.5)} SFX · {p.tokens} обложек</span>
                 <div className="token-pack__price">
                   <span className="token-pack__price-label">Цена:</span>
                   <span className="token-pack__price-value">{p.priceRub}₽</span>

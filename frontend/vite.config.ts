@@ -21,6 +21,10 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      "/media": {
+        target: apiTarget,
+        changeOrigin: true,
+      },
     },
   },
   build: {

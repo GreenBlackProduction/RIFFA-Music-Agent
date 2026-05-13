@@ -360,6 +360,14 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             }
 
         elif gen.type == GenerationType.cover_song:
+            upload_url = params.get("upload_url", "")
+            # Suno needs a publicly accessible URL — localhost won't work.
+            if any(h in upload_url for h in ("localhost", "127.0.0.1", "0.0.0.0")):
+                logger.warning(
+                    "Cover upload URL is localhost-only: {} — Suno cannot access it",
+                    upload_url,
+                )
+
             # Build style from genre, mood, tempo, and additional details
             style_parts = []
             genre = params.get("genre", "") or params.get("custom_genre", "")
@@ -375,7 +383,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             final_style = ", ".join(style_parts)[:1000]  # Suno limit
 
             _dump_payload(gen_id, "cover_song", {
-                "upload_url": params["upload_url"],
+                "upload_url": upload_url,
                 "genre": genre,
                 "mood": params.get("mood", ""),
                 "tempo": params.get("tempo", ""),
@@ -386,7 +394,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 "vocal_gender": params.get("vocal_gender"),
             })
             suno_result = await suno.generate_cover(
-                upload_url=params["upload_url"],
+                upload_url=upload_url,
                 style=final_style,
                 prompt=params.get("lyrics", ""),
                 title=gen.title or "Cover",

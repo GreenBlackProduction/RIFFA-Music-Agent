@@ -24,18 +24,19 @@
   transform: scale(0.97);
 }
 
-.chip--active {
-  border-color: rgba(124, 255, 31, 0.45);
+.chip--active,
+.chip[aria-pressed="true"] {
+  border-color: rgba(124, 255, 31, 0.45) !important;
   background: linear-gradient(
     135deg,
     rgba(124, 255, 31, 0.18),
     rgba(255, 90, 0, 0.14),
     rgba(214, 0, 255, 0.16)
-  );
+  ) !important;
   background-origin: border-box;
   color: #fff;
   box-shadow: 0 0 18px rgba(124, 255, 31, 0.2);
-  transition: background 0ms, border-color 0ms, transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: none;
 }
 
 /* Custom option chip (dashed border, visually distinct by default) */
