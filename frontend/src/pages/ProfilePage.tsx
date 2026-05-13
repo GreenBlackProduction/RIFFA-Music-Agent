@@ -67,19 +67,24 @@ interface GenStats {
   color: string;
 }
 
-const MOCK_STATS: readonly GenStats[] = [
-  { type: "song", label: "Песни", count: 0, color: "var(--accent)" },
-  { type: "instrumental", label: "Инструменталы", count: 0, color: "var(--accent-2)" },
-  { type: "cover", label: "Каверы", count: 0, color: "var(--accent-3)" },
-  { type: "sfx", label: "Звук. эффекты", count: 0, color: "#37bbfe" },
-  { type: "cover_art", label: "Обложки", count: 0, color: "#ffd166" },
+const STAT_META: readonly { type: string; label: string; color: string }[] = [
+  { type: "song", label: "Песни", color: "var(--accent)" },
+  { type: "instrumental", label: "Инструменталы", color: "var(--accent-2)" },
+  { type: "cover", label: "Каверы", color: "var(--accent-3)" },
+  { type: "sfx", label: "Звук. эффекты", color: "#37bbfe" },
+  { type: "cover_art", label: "Обложки", color: "#ffd166" },
 ];
 
-const MOCK_GENRES: readonly { name: string; count: number }[] = [];
-
-const MOCK_MOODS: readonly { name: string; count: number }[] = [];
-
-const MOCK_BPM: readonly { range: string; count: number }[] = [];
+function countBy<T>(items: readonly T[], key: (item: T) => string): { name: string; count: number }[] {
+  const map = new Map<string, number>();
+  for (const it of items) {
+    const k = key(it);
+    if (k) map.set(k, (map.get(k) ?? 0) + 1);
+  }
+  return Array.from(map.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+}
 
 // «Мои файлы» получает данные из того же источника, что и «Мои генерации» (StudioPage),
 // через useLibraryItems(). Разные фильтры — один и тот же файл видимый в обоих
@@ -536,9 +541,18 @@ export function ProfilePage() {
     }
   };
 
-  // ── Stats ──
-  const totalGens = MOCK_STATS.reduce((acc, s) => acc + s.count, 0);
-  const maxStat = Math.max(...MOCK_STATS.map((s) => s.count));
+  // ── Stats (computed from real library data) ──
+  const genStats: GenStats[] = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const it of libraryItems) counts.set(it.type, (counts.get(it.type) ?? 0) + 1);
+    return STAT_META.map((m) => ({ ...m, count: counts.get(m.type) ?? 0 }));
+  }, [libraryItems]);
+
+  const genreStats = useMemo(() => countBy(libraryItems, (i) => i.genre), [libraryItems]);
+  const moodStats = useMemo(() => countBy(libraryItems, (i) => i.mood), [libraryItems]);
+
+  const totalGens = genStats.reduce((acc, s) => acc + s.count, 0);
+  const maxStat = Math.max(1, ...genStats.map((s) => s.count));
 
   return (
     <div className="profile-container">
@@ -1025,7 +1039,7 @@ export function ProfilePage() {
                 <span>генераций всего</span>
               </div>
               <div className="stat-bars">
-                {MOCK_STATS.map((s) => (
+                {genStats.map((s) => (
                   <div key={s.type} className="stat-bar">
                     <div className="stat-bar__head">
                       <span>{s.label}</span>
@@ -1054,7 +1068,7 @@ export function ProfilePage() {
               <div className="taste-group">
                 <h3 className="taste-group__title">Жанры</h3>
                 <div className="taste-chips">
-                  {MOCK_GENRES.map((g) => (
+                  {genreStats.map((g) => (
                     <span key={g.name} className="taste-chip">
                       {g.name}
                       <small>{g.count}</small>
@@ -1066,7 +1080,7 @@ export function ProfilePage() {
               <div className="taste-group">
                 <h3 className="taste-group__title">Настроение</h3>
                 <div className="taste-chips">
-                  {MOCK_MOODS.map((m) => (
+                  {moodStats.map((m) => (
                     <span key={m.name} className="taste-chip">
                       {m.name}
                       <small>{m.count}</small>
