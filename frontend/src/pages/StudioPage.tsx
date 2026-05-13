@@ -193,6 +193,7 @@ interface SongState {
   instrumentalExtra: string;
   instrumentalPreset: PresetKey | "";
   sfxSource: string;
+  sfxCustomSource: string;
   sfxEnv: string;
   sfxDuration: string;
   sfxStyle: string;
@@ -213,6 +214,7 @@ interface SongState {
   coverWeirdness: string;
   coverArtPrompt: string;
   coverArtModel: string;
+  coverArtRefUrl: string;
   /** Track-name step (last UI step before submit). "auto" — agent names it
    *  (`Artist - Idea (RIFFAMusic)`); "manual" — user types the name. */
   trackNameMode: "auto" | "manual";
@@ -240,6 +242,7 @@ const INITIAL_STATE: SongState = {
   instrumentalExtra: "",
   instrumentalPreset: "",
   sfxSource: "impact",
+  sfxCustomSource: "",
   sfxEnv: "studio",
   sfxDuration: "short",
   sfxStyle: "cinematic",
@@ -260,6 +263,7 @@ const INITIAL_STATE: SongState = {
   coverWeirdness: "0.5",
   coverArtPrompt: "",
   coverArtModel: "nano-banana",
+  coverArtRefUrl: "",
   trackNameMode: "auto",
   trackName: "",
 };
@@ -344,7 +348,10 @@ function buildPrompt(module: Module, state: SongState): string {
   }
 
   if (module === "sound_effect") {
-    parts.push(`Sound source: ${valueLabel(state.sfxSource, SFX_SOURCES)}`);
+    const sfxSrc = state.sfxSource === "custom" && state.sfxCustomSource.trim()
+      ? state.sfxCustomSource.trim()
+      : valueLabel(state.sfxSource, SFX_SOURCES);
+    parts.push(`Sound source: ${sfxSrc}`);
     parts.push(`Environment: ${valueLabel(state.sfxEnv, SFX_ENVS)}`);
     parts.push(`Duration: ${valueLabel(state.sfxDuration, SFX_DURATIONS)}`);
     parts.push(`Character: ${valueLabel(state.sfxStyle, SFX_STYLES)}`);
@@ -383,6 +390,9 @@ function buildPrompt(module: Module, state: SongState): string {
       body.push(`prompt: ${state.coverArtPrompt.trim()}`);
     } else {
       body.push("prompt: — (нужно заполнить самим или через чат с агентом)");
+    }
+    if (state.coverArtRefUrl) {
+      body.push("reference_image: загружен (учесть стиль и композицию референса)");
     }
     body.push("aspect: 1:1 · size: 1024×1024");
     return body.join("\n");
@@ -907,9 +917,7 @@ export function StudioPage() {
 
     // Upload file to S3/MinIO via presigned URL
     try {
-      console.log("Uploading cover file:", file.name, file.size, file.type);
       const publicUrl = await uploadCoverFile(file);
-      console.log("Upload successful, URL:", publicUrl);
       setState((prev) => ({ ...prev, coverUrl: publicUrl }));
     } catch (err) {
       console.error("Upload error:", err);
@@ -956,7 +964,7 @@ export function StudioPage() {
         }
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(250);
       setIsRecording(true);
       setRecordingTime(0);
 
@@ -990,10 +998,8 @@ export function StudioPage() {
 
   async function uploadRecordedFile(file: File) {
     try {
-      console.log("Uploading recorded file:", file.name, file.size, file.type);
       setState((prev) => ({ ...prev, coverFileName: file.name, coverUrl: "" }));
       const uploadedUrl = await uploadCoverFile(file);
-      console.log("Upload successful, URL:", uploadedUrl);
       setState((prev) => ({ ...prev, coverUrl: uploadedUrl }));
     } catch (err) {
       console.error("Upload error:", err);
@@ -1153,6 +1159,9 @@ export function StudioPage() {
           prompt: state.coverArtPrompt.trim(),
           model: state.coverArtModel || "nano-banana",
           title,
+          ...(state.coverArtRefUrl && !state.coverArtRefUrl.startsWith("data:")
+            ? { reference_url: state.coverArtRefUrl }
+            : {}),
         });
       } else {
         return;
@@ -1597,7 +1606,34 @@ export function StudioPage() {
           <div className="builder-grid">
             <div className="builder-step">
               <strong>Источник звука</strong>
-              {renderChipRow(SFX_SOURCES, "sfxSource")}
+              <div className="chip-row">
+                {SFX_SOURCES.filter(([v]) => v !== "custom").map(([value, label]) => (
+                  <Chip
+                    key={value}
+                    active={state.sfxSource === value}
+                    onClick={() => update("sfxSource", value)}
+                  >
+                    {label}
+                  </Chip>
+                ))}
+                <Chip
+                  active={state.sfxSource === "custom"}
+                  onClick={() => update("sfxSource", "custom")}
+                  className="chip--custom"
+                >
+                  ✏️ Свой звук
+                </Chip>
+              </div>
+              {state.sfxSource === "custom" && (
+                <input
+                  className="inline-input"
+                  type="text"
+                  placeholder="Например: Crash cymbal, Rain drops, Engine roar..."
+                  value={state.sfxCustomSource}
+                  onChange={(e) => update("sfxCustomSource", e.target.value)}
+                  maxLength={128}
+                />
+              )}
             </div>
             <div className="builder-step">
               <strong>Среда</strong>
@@ -1676,7 +1712,7 @@ export function StudioPage() {
                   disabled={!!state.coverFileName || isRecording}
                   title="Записать голос"
                 >
-                  🎤 Записать голос
+                  🎤 Запись звука
                 </button>
                 {state.coverFileName && (
                   <button
@@ -1854,6 +1890,100 @@ export function StudioPage() {
                 placeholder="Например: neon retro city at night, vaporwave gradient sky, lone figure on balcony, cinematic, no text"
               />
             </label>
+
+            <div className="builder-step">
+              <strong>Референс изображение</strong>
+              <span className="muted">
+                Загрузите изображение, вставьте ссылку или нажмите Ctrl+V для вставки из буфера.
+              </span>
+              <div
+                className={`ref-upload${state.coverArtRefUrl ? " ref-upload--has-preview" : ""}`}
+                onPaste={(e) => {
+                  const items = e.clipboardData?.items;
+                  if (!items) return;
+                  for (const item of items) {
+                    if (item.type.startsWith("image/")) {
+                      e.preventDefault();
+                      const file = item.getAsFile();
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          if (typeof reader.result === "string") update("coverArtRefUrl", reader.result);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                      return;
+                    }
+                    if (item.type === "text/plain") {
+                      item.getAsString((text) => {
+                        const trimmed = text.trim();
+                        if (/^https?:\/\/.+/i.test(trimmed)) update("coverArtRefUrl", trimmed);
+                      });
+                      return;
+                    }
+                  }
+                }}
+                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const file = e.dataTransfer?.files?.[0];
+                  if (file && file.type.startsWith("image/")) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      if (typeof reader.result === "string") update("coverArtRefUrl", reader.result);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+              >
+                <div className="ref-upload__controls">
+                  <input
+                    type="text"
+                    className="inline-input"
+                    placeholder="Вставьте URL изображения..."
+                    value={state.coverArtRefUrl.startsWith("data:") ? "" : state.coverArtRefUrl}
+                    onChange={(e) => update("coverArtRefUrl", e.target.value)}
+                  />
+                  <label className="ref-upload__btn">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          if (typeof reader.result === "string") update("coverArtRefUrl", reader.result);
+                        };
+                        reader.readAsDataURL(file);
+                        e.target.value = "";
+                      }}
+                    />
+                    📎 Файл
+                  </label>
+                </div>
+                {state.coverArtRefUrl && (
+                  <div className="ref-upload__preview">
+                    <img src={state.coverArtRefUrl} alt="Референс" />
+                    <button
+                      type="button"
+                      className="ref-upload__remove"
+                      onClick={() => update("coverArtRefUrl", "")}
+                      aria-label="Убрать референс"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+                {!state.coverArtRefUrl && (
+                  <div className="ref-upload__hint">
+                    Перетащите изображение сюда или нажмите Ctrl+V
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

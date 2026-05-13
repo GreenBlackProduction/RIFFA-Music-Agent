@@ -12,6 +12,7 @@
  */
 
 import { AnimatePresence, motion, type Variants } from "framer-motion";
+import { createPortal } from "react-dom";
 import { useEffect, useMemo, useState } from "react";
 
 import { retryGeneration } from "@/lib/api/client";
@@ -326,7 +327,7 @@ export function ActiveGenerations() {
         ))}
       </AnimatePresence>
 
-      {preview && (
+      {preview && createPortal(
         <div
           className="active-gen-preview"
           role="dialog"
@@ -351,7 +352,8 @@ export function ActiveGenerations() {
             onClick={(e) => e.stopPropagation()}
           />
           <div className="active-gen-preview__title">{preview.title}</div>
-        </div>
+        </div>,
+        document.body,
       )}
     </section>
   );

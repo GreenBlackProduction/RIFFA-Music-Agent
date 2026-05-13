@@ -202,6 +202,45 @@ async def list_history(
     )
 
 
+@router.get("/trash", response_model=HistoryPage)
+async def list_trash(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+) -> HistoryPage:
+    """List generations the user has moved to trash (not yet purged)."""
+    from sqlalchemy import func
+
+    stmt = (
+        select(Generation)
+        .where(Generation.user_id == user.id, Generation.deleted_at.is_not(None))
+    )
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await session.execute(count_stmt)).scalar_one()
+    stmt = stmt.order_by(desc(Generation.deleted_at)).offset((page - 1) * limit).limit(limit)
+    rows = (await session.execute(stmt)).scalars().all()
+    return HistoryPage(items=[_to_out(g) for g in rows], total=total, page=page, limit=limit)
+
+
+@router.delete("/trash/purge", status_code=status.HTTP_204_NO_CONTENT)
+async def purge_trash(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+) -> Response:
+    """Permanently delete all trashed items for this user."""
+    from sqlalchemy import delete as sql_delete
+
+    await session.execute(
+        sql_delete(Generation).where(
+            Generation.user_id == user.id,
+            Generation.deleted_at.is_not(None),
+        )
+    )
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/{gen_id}", response_model=GenerationOut)
 async def get_generation(
     gen_id: str,
@@ -504,10 +543,16 @@ async def toggle_radio(
 @router.delete("/{gen_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_generation(
     gen_id: str,
+    track_index: int | None = None,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(db_session),
 ) -> Response:
-    """Move a generation to the trash (soft-delete).  Auto-purged after 7 days."""
+    """Move a generation to the trash (soft-delete).  Auto-purged after 7 days.
+
+    When ``track_index`` is supplied and the generation has multiple tracks,
+    only that track is removed from the result JSON.  The generation itself
+    is soft-deleted only when all tracks have been removed.
+    """
     try:
         gid = uuid.UUID(gen_id)
     except ValueError as exc:
@@ -522,6 +567,33 @@ async def delete_generation(
     if gen is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
 
+    # Per-track deletion: remove a single track from multi-variant generations.
+    result_data = gen.result if isinstance(gen.result, dict) else {}
+    tracks = result_data.get("tracks") if isinstance(result_data, dict) else None
+    if (
+        track_index is not None
+        and isinstance(tracks, list)
+        and len(tracks) > 1
+        and 0 <= track_index < len(tracks)
+    ):
+        # Remove the specific track.
+        tracks.pop(track_index)
+        result_data["tracks"] = tracks
+        gen.result = result_data
+        # Un-publish the deleted track from Radio if it was published.
+        current_indices: list[int] = list(gen.published_track_indices or [])
+        current_indices = [i for i in current_indices if i != track_index]
+        # Shift remaining indices down for tracks after the removed one.
+        current_indices = [i - 1 if i > track_index else i for i in current_indices]
+        gen.published_track_indices = current_indices if current_indices else None
+        gen.published_track_index = current_indices[0] if current_indices else None
+        gen.is_public = bool(current_indices)
+        if not gen.is_public:
+            gen.published_at = None
+        await session.commit()
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    # Full generation soft-delete.
     gen.deleted_at = datetime.now(UTC)
     # Un-publish from Radio when trashed.
     if gen.is_public:
@@ -531,27 +603,6 @@ async def delete_generation(
         gen.published_at = None
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.get("/trash", response_model=HistoryPage)
-async def list_trash(
-    page: int = Query(default=1, ge=1),
-    limit: int = Query(default=20, ge=1, le=100),
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(db_session),
-) -> HistoryPage:
-    """List generations the user has moved to trash (not yet purged)."""
-    from sqlalchemy import func
-
-    stmt = (
-        select(Generation)
-        .where(Generation.user_id == user.id, Generation.deleted_at.is_not(None))
-    )
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await session.execute(count_stmt)).scalar_one()
-    stmt = stmt.order_by(desc(Generation.deleted_at)).offset((page - 1) * limit).limit(limit)
-    rows = (await session.execute(stmt)).scalars().all()
-    return HistoryPage(items=[_to_out(g) for g in rows], total=total, page=page, limit=limit)
 
 
 @router.post("/{gen_id}/restore", status_code=status.HTTP_204_NO_CONTENT)
@@ -576,23 +627,5 @@ async def restore_generation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
 
     gen.deleted_at = None
-    await session.commit()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.delete("/trash/purge", status_code=status.HTTP_204_NO_CONTENT)
-async def purge_trash(
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(db_session),
-) -> Response:
-    """Permanently delete all trashed items for this user (manual purge — no age limit)."""
-    from sqlalchemy import delete as sql_delete
-
-    await session.execute(
-        sql_delete(Generation).where(
-            Generation.user_id == user.id,
-            Generation.deleted_at.is_not(None),
-        )
-    )
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

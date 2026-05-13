@@ -56,7 +56,7 @@ select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "TID", "RUF"]
 # Russian-language user-facing strings (incl. EN DASH typography) — every
 # such file would otherwise need a blanket `noqa`. Keep the ambiguous-char
 # check off; the rest of the RUF rule-set stays on.
-ignore = ["E501", "RUF001", "RUF003"]
+ignore = ["E501", "RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = [

@@ -67,36 +67,24 @@ interface GenStats {
   color: string;
 }
 
-const MOCK_STATS: readonly GenStats[] = [
-  { type: "song", label: "Песни", count: 42, color: "var(--accent)" },
-  { type: "instrumental", label: "Инструменталы", count: 17, color: "var(--accent-2)" },
-  { type: "cover", label: "Каверы", count: 8, color: "var(--accent-3)" },
-  { type: "sfx", label: "Звук. эффекты", count: 23, color: "#37bbfe" },
-  { type: "cover_art", label: "Обложки", count: 14, color: "#ffd166" },
+const STAT_META: readonly { type: string; label: string; color: string }[] = [
+  { type: "song", label: "Песни", color: "var(--accent)" },
+  { type: "instrumental", label: "Инструменталы", color: "var(--accent-2)" },
+  { type: "cover", label: "Каверы", color: "var(--accent-3)" },
+  { type: "sfx", label: "Звук. эффекты", color: "#37bbfe" },
+  { type: "cover_art", label: "Обложки", color: "#ffd166" },
 ];
 
-const MOCK_GENRES: readonly { name: string; count: number }[] = [
-  { name: "Synthwave", count: 14 },
-  { name: "Lofi", count: 11 },
-  { name: "Cinematic", count: 9 },
-  { name: "Trap", count: 7 },
-  { name: "Indie", count: 5 },
-];
-
-const MOCK_MOODS: readonly { name: string; count: number }[] = [
-  { name: "Энергичное", count: 22 },
-  { name: "Мечтательное", count: 16 },
-  { name: "Драматичное", count: 11 },
-  { name: "Спокойное", count: 9 },
-];
-
-const MOCK_BPM: readonly { range: string; count: number }[] = [
-  { range: "60–80", count: 8 },
-  { range: "80–100", count: 14 },
-  { range: "100–120", count: 29 },
-  { range: "120–140", count: 17 },
-  { range: "140–180", count: 6 },
-];
+function countBy<T>(items: readonly T[], key: (item: T) => string): { name: string; count: number }[] {
+  const map = new Map<string, number>();
+  for (const it of items) {
+    const k = key(it);
+    if (k) map.set(k, (map.get(k) ?? 0) + 1);
+  }
+  return Array.from(map.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+}
 
 // «Мои файлы» получает данные из того же источника, что и «Мои генерации» (StudioPage),
 // через useLibraryItems(). Разные фильтры — один и тот же файл видимый в обоих
@@ -110,22 +98,7 @@ interface Review {
   date: string;
 }
 
-const SEED_REVIEWS: readonly Review[] = [
-  {
-    id: "r1",
-    author: "Алексей",
-    rating: 5,
-    text: "Кавер моей старой песни в стиле synthwave — ровно то что нужно было. Без студии за 2 минуты.",
-    date: "2026-04-20",
-  },
-  {
-    id: "r2",
-    author: "Мария",
-    rating: 4,
-    text: "Агент неплохо собирает промпт, но иногда теряется на настроении. Звук хороший.",
-    date: "2026-04-15",
-  },
-];
+const SEED_REVIEWS: readonly Review[] = [];
 
 const MOCK_DOCS: readonly { id: string; title: string; hint: string; href: string }[] = [
   { id: "terms", title: "Пользовательское соглашение", hint: "Версия от 01.04.2026", href: "#" },
@@ -241,9 +214,9 @@ export function ProfilePage() {
 
   const displayName = user?.display_name ?? "Гость";
   const userEmail = user?.email ?? "demo@riffa.studio";
-  const userBalance = user?.balance_tokens ?? 340;
+  const userBalance = user?.balance_tokens ?? 0;
   const userInitial = displayName.slice(0, 1).toUpperCase();
-  const joinDate = "С нами с апреля 2026";
+  const joinDate = "";
 
   // ── Nickname editing ──
   const [editingName, setEditingName] = useState(false);
@@ -259,6 +232,7 @@ export function ProfilePage() {
     try {
       await updateDisplayName(trimmed);
       setEditingName(false);
+      await refreshAuth();
     } catch { /* keep editing open */ }
     finally { setNameSaving(false); }
   };
@@ -567,9 +541,18 @@ export function ProfilePage() {
     }
   };
 
-  // ── Stats ──
-  const totalGens = MOCK_STATS.reduce((acc, s) => acc + s.count, 0);
-  const maxStat = Math.max(...MOCK_STATS.map((s) => s.count));
+  // ── Stats (computed from real library data) ──
+  const genStats: GenStats[] = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const it of libraryItems) counts.set(it.type, (counts.get(it.type) ?? 0) + 1);
+    return STAT_META.map((m) => ({ ...m, count: counts.get(m.type) ?? 0 }));
+  }, [libraryItems]);
+
+  const genreStats = useMemo(() => countBy(libraryItems, (i) => i.genre), [libraryItems]);
+  const moodStats = useMemo(() => countBy(libraryItems, (i) => i.mood), [libraryItems]);
+
+  const totalGens = genStats.reduce((acc, s) => acc + s.count, 0);
+  const maxStat = Math.max(1, ...genStats.map((s) => s.count));
 
   return (
     <div className="profile-container">
@@ -800,8 +783,9 @@ export function ProfilePage() {
             </p>
             <div className="balance-display__label">доступно к использованию</div>
             <div className="balance-display__conversions">
-              <span>≈ {Math.round(userBalance / 10)} песен</span>
-              <span>≈ {Math.round(userBalance / 3)} SFX</span>
+              <span>≈ {Math.floor(userBalance / 2)} песен</span>
+              <span>≈ {Math.floor(userBalance / 0.5)} SFX</span>
+              <span>≈ {Math.floor(userBalance / 1)} обложек</span>
             </div>
           </div>
 
@@ -821,7 +805,7 @@ export function ProfilePage() {
                   {p.tokens}
                   <Coin size={18} className="riffa-coin--after" />
                 </strong>
-                <span className="token-pack__gens">{p.gens} генераций</span>
+                <span className="token-pack__gens">{Math.floor(p.tokens / 2)} песен · {Math.floor(p.tokens / 0.5)} SFX · {p.tokens} обложек</span>
                 <div className="token-pack__price">
                   <span className="token-pack__price-label">Цена:</span>
                   <span className="token-pack__price-value">{p.priceRub}₽</span>
@@ -1055,7 +1039,7 @@ export function ProfilePage() {
                 <span>генераций всего</span>
               </div>
               <div className="stat-bars">
-                {MOCK_STATS.map((s) => (
+                {genStats.map((s) => (
                   <div key={s.type} className="stat-bar">
                     <div className="stat-bar__head">
                       <span>{s.label}</span>
@@ -1084,7 +1068,7 @@ export function ProfilePage() {
               <div className="taste-group">
                 <h3 className="taste-group__title">Жанры</h3>
                 <div className="taste-chips">
-                  {MOCK_GENRES.map((g) => (
+                  {genreStats.map((g) => (
                     <span key={g.name} className="taste-chip">
                       {g.name}
                       <small>{g.count}</small>
@@ -1096,7 +1080,7 @@ export function ProfilePage() {
               <div className="taste-group">
                 <h3 className="taste-group__title">Настроение</h3>
                 <div className="taste-chips">
-                  {MOCK_MOODS.map((m) => (
+                  {moodStats.map((m) => (
                     <span key={m.name} className="taste-chip">
                       {m.name}
                       <small>{m.count}</small>
@@ -1105,20 +1089,7 @@ export function ProfilePage() {
                 </div>
               </div>
 
-              <div className="taste-group">
-                <h3 className="taste-group__title">BPM</h3>
-                <div className="bpm-bars">
-                  {MOCK_BPM.map((b) => (
-                    <div key={b.range} className="bpm-bar">
-                      <div
-                        className="bpm-bar__fill"
-                        style={{ height: `${(b.count / 30) * 100}%` }}
-                      />
-                      <span>{b.range}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+
             </div>
           </div>
         </section>
@@ -1207,12 +1178,12 @@ export function ProfilePage() {
 
           <div className="referral-stats">
             <div className="referral-stat">
-              <strong>7</strong>
+              <strong>0</strong>
               <span>приглашено</span>
             </div>
             <div className="referral-stat">
               <strong className="referral-stat__amount">
-                420
+                0
                 <Coin size={18} className="riffa-coin--after" />
               </strong>
               <span>бонусных на баланс</span>

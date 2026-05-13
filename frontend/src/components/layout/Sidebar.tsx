@@ -1,7 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 
 import { ActiveGenerations } from "@/components/layout/ActiveGenerations";
-import { UserMenu } from "@/components/layout/UserMenu";
 import { Coin } from "@/components/ui/Coin";
 import { useAuth } from "@/lib/auth";
 
@@ -58,9 +57,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     <aside className={`sidebar${open ? " sidebar--open" : ""}`}>
       <NavLink to="/studio" className="brand" onClick={onClose}>
         <img src="/riffa-logo.png" alt="RIFFA" className="brand-mark" />
-        <div>
-          <strong className="brand-name">RIFFA<span className="brand-name__sub">Studio</span></strong>
-        </div>
+        <strong className="brand-name">RIFFA<span className="brand-name__sub">Studio</span></strong>
       </NavLink>
 
       <nav className="nav">
@@ -75,6 +72,16 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             <span className="nav-text">{item.label}</span>
           </NavLink>
         ))}
+        {user?.is_admin && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) => `nav-item${isActive ? " nav-item--active" : ""}`}
+            onClick={onClose}
+          >
+            <span className="nav-icon">🛡</span>
+            <span className="nav-text">Админ панель</span>
+          </NavLink>
+        )}
       </nav>
 
       <ActiveGenerations />
@@ -88,7 +95,18 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </>
         ) : user ? (
           <>
-            <UserMenu user={user} onSignOut={handleSignOut} onItemPicked={onClose} />
+            <div className="sidebar-user">
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt={user.display_name} className="sidebar-avatar" />
+              ) : (
+                <div className="sidebar-avatar sidebar-avatar--placeholder">
+                  {user.display_name.slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              <div className="sidebar-user__info">
+                <strong>{user.display_name}</strong>
+              </div>
+            </div>
             <div className="sidebar-card__balance-row">
               <span>Баланс</span>
               <strong className="sidebar-balance">
@@ -97,8 +115,15 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               </strong>
             </div>
             <div className="sidebar-actions">
+              <button
+                type="button"
+                className="sidebar-link"
+                onClick={handleSignOut}
+              >
+                Выйти
+              </button>
               <a
-                className="sidebar-tg sidebar-tg--wide"
+                className="sidebar-tg"
                 href={TELEGRAM_BOT_URL}
                 target="_blank"
                 rel="noreferrer"
@@ -106,7 +131,6 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 aria-label="Открыть Telegram-версию"
               >
                 <TelegramIcon />
-                <span className="sidebar-tg__label">Telegram-бот</span>
               </a>
             </div>
           </>

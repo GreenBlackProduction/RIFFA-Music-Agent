@@ -47,9 +47,9 @@ export function SharePage() {
   return (
     <div className="share-page">
       <header className="share-header">
-        <a href="/" className="share-brand">
+        <a href="/studio" className="share-brand">
           <img src="/riffa-logo.png" alt="RIFFA" className="share-brand__logo" />
-          <strong>RIFFA</strong>
+          <strong className="brand-name">RIFFA<span className="brand-name__sub">Studio</span></strong>
         </a>
       </header>
 

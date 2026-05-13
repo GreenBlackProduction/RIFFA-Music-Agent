@@ -18,7 +18,7 @@ function playCompletionChime() {
 }
 
 import type { ProgressEvent } from "@/lib/api/client";
-import { openGenerationSocket } from "@/lib/api/client";
+import { openGenerationSocket, pollGenerationStatus } from "@/lib/api/client";
 
 export type GenStatus = "queued" | "processing" | "completed" | "failed";
 
@@ -80,29 +80,52 @@ function estimateProgress(event: ProgressEvent): number {
   return 40;
 }
 
+function handleProgressEvent(
+  id: string,
+  event: ProgressEvent,
+  get: () => GenerationStore,
+) {
+  const progress = estimateProgress(event);
+  if (event.status === "completed") {
+    get()._update(id, {
+      status: "completed",
+      progress: 100,
+      step: null,
+      result: (event.result as CompletedGenerationResult) ?? null,
+    });
+    playCompletionChime();
+  } else if (event.status === "failed") {
+    get()._update(id, { status: "failed", progress: 0, error: event.error });
+  } else {
+    get()._update(id, { status: "processing", step: event.step ?? null, progress });
+  }
+}
+
 function openWs(id: string, wsUrl: string, get: () => GenerationStore) {
+  // Start polling fallback alongside WebSocket
+  const poller = pollGenerationStatus(id, (event) => {
+    const cur = get().active[id];
+    if (cur && cur.status !== "completed" && cur.status !== "failed") {
+      handleProgressEvent(id, event, get);
+      if (event.status === "completed" || event.status === "failed") {
+        poller.stop();
+      }
+    }
+  }, 4000);
+
   return openGenerationSocket(
     wsUrl,
     (event) => {
-      const progress = estimateProgress(event);
-      if (event.status === "completed") {
-        get()._update(id, {
-          status: "completed",
-          progress: 100,
-          step: null,
-          result: (event.result as CompletedGenerationResult) ?? null,
-        });
-        playCompletionChime();
-      } else if (event.status === "failed") {
-        get()._update(id, { status: "failed", progress: 0, error: event.error });
-      } else {
-        get()._update(id, { status: "processing", step: event.step ?? null, progress });
+      handleProgressEvent(id, event, get);
+      if (event.status === "completed" || event.status === "failed") {
+        poller.stop();
       }
     },
     () => {
+      // WS closed — poller continues as fallback, don't mark as failed
       const cur = get().active[id];
       if (cur && cur.status !== "completed" && cur.status !== "failed") {
-        get()._update(id, { status: "failed", error: "Соединение прервано" });
+        get()._update(id, { step: "generating" });
       }
     },
   );

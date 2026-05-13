@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./VoiceRecorder.css";
 
 interface VoiceRecorderProps {
@@ -13,19 +13,21 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  // Hold the AudioContext in a ref instead of state — the cleanup needs the
-  // exact instance created during this effect run, and storing it in state
-  // would race with React batching (the previous render's `audioContext`
-  // could be `null` when cleanup fires).
   const audioContextRef = useRef<AudioContext | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [analyserReady, setAnalyserReady] = useState(false);
 
   useEffect(() => {
-    if (!isRecording) return;
+    if (!isRecording) {
+      setAnalyserReady(false);
+      return;
+    }
 
-    // Initialize audio context and analyser
+    let cancelled = false;
     const initAudio = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
         const ctx = new AudioContext();
         const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
@@ -34,6 +36,8 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
 
         analyserRef.current = analyser;
         audioContextRef.current = ctx;
+        streamRef.current = stream;
+        setAnalyserReady(true);
       } catch (err) {
         console.error("Failed to initialize audio:", err);
       }
@@ -42,16 +46,24 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
     initAudio();
 
     return () => {
+      cancelled = true;
       const ctx = audioContextRef.current;
       if (ctx) {
         ctx.close().catch(() => undefined);
         audioContextRef.current = null;
       }
+      const stream = streamRef.current;
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      analyserRef.current = null;
+      setAnalyserReady(false);
     };
   }, [isRecording]);
 
   useEffect(() => {
-    if (!isRecording || !analyserRef.current || !canvasRef.current) return;
+    if (!isRecording || !analyserReady || !analyserRef.current || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -94,7 +106,7 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isRecording]);
+  }, [isRecording, analyserReady]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);

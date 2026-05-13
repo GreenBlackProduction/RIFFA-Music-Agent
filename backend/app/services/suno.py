@@ -430,10 +430,14 @@ class SunoClient:
             progress_cb({"step": "submitting"})
 
         result = await self._post("/generate/upload-cover", payload)
+        code = result.get("code")
+        msg = result.get("msg", "")
         data = result.get("data")
+        if code and code != 200:
+            raise SunoError(f"Suno cover error (code {code}): {msg}")
         task_id = data.get("taskId") if isinstance(data, dict) else str(data or "")
         if not task_id:
-            raise SunoError(f"no taskId for cover: {result.get('msg')}")
+            raise SunoError(f"no taskId for cover: {msg}")
 
         if progress_cb:
             progress_cb({"step": "queued", "task_id": task_id})
