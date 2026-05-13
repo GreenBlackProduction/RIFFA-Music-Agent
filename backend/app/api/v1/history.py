@@ -579,7 +579,7 @@ async def delete_generation(
         # Remove the specific track.
         tracks.pop(track_index)
         result_data["tracks"] = tracks
-        gen.result = result_data  # type: ignore[assignment]
+        gen.result = result_data
         # Un-publish the deleted track from Radio if it was published.
         current_indices: list[int] = list(gen.published_track_indices or [])
         current_indices = [i for i in current_indices if i != track_index]
