@@ -138,9 +138,16 @@ def _to_out(
     my_vote: str | None,
     is_own: bool,
 ) -> RadioTrackOut | None:
-    audio_url, image_url, duration = _first_track(gen)
-    if not audio_url:
+    raw_audio_url, image_url, duration = _first_track(gen)
+    if not raw_audio_url:
         return None
+    # Determine which track index is published for the public-stream proxy URL
+    result: dict[str, Any] = gen.result or {}
+    raw_tracks = result.get("tracks", []) or []
+    pub_idx = gen.published_track_index
+    if not (isinstance(pub_idx, int) and 0 <= pub_idx < len(raw_tracks) and raw_tracks[pub_idx].get("audio_url")):
+        pub_idx = next((i for i, t in enumerate(raw_tracks) if t.get("audio_url")), 0)
+    audio_url = f"/api/v1/tracks/{gen.id}/{pub_idx}/public-stream"
     kind = _TYPE_TO_KIND.get(gen.type, "song")
     return RadioTrackOut(
         id=str(gen.id),

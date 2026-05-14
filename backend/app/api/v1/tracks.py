@@ -339,3 +339,53 @@ async def stream_track(
         media_type="audio/mpeg",
         headers={"Cache-Control": "private, max-age=3600"},
     )
+
+
+@router.get("/{generation_id}/{track_index}/public-stream")
+async def stream_public_track(
+    generation_id: str,
+    track_index: int,
+    session: AsyncSession = Depends(db_session),
+) -> Response:
+    """Public audio proxy for Radio and shared tracks (no auth required).
+
+    Only serves tracks that are published to Radio (is_public=True).
+    Same CORS workaround as stream_track — proxies Suno CDN through backend.
+    """
+    try:
+        gen_uuid = uuid.UUID(generation_id)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found") from exc
+
+    gen = (
+        await session.execute(
+            select(Generation).where(
+                Generation.id == gen_uuid,
+                Generation.is_public == True,  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+    if gen is None or not gen.result:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "not found")
+
+    raw_tracks: list[dict[str, Any]] = (gen.result or {}).get("tracks") or []
+    if not 0 <= track_index < len(raw_tracks):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "track index out of range")
+
+    audio_url = raw_tracks[track_index].get("audio_url")
+    if not audio_url:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "audio missing")
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
+        try:
+            resp = await client.get(audio_url)
+            resp.raise_for_status()
+        except Exception as exc:
+            logger.error("public stream fetch failed for {}: {}", audio_url, exc)
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream fetch failed") from exc
+
+    return Response(
+        content=resp.content,
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
