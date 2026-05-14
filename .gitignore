@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.eggs/
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+.next/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.local
+.env.dev
+.env.*.local
+*.pem
+*.key
+secrets/
+
+# Magic-link dev outbox
+.dev_emails/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local DB / media
+*.sqlite
+*.sqlite3
+*.db
+backend/media/
+backend/storage/
+
+# Logs
+*.log
+logs/
+
+# Build artefacts
+build/
+out/
+
+# Free Claude Code proxy (local tool, not project code)
+free-claude-code/
+
+# Old / archived dirs
+RiffaBot/
+Ikons/
+obsidian/
+
+# Backups and archives
+*.gz
+*.tar
+*.bak
+*.tmp
+nohup.out
+
+# ops secrets (только пример разрешён)
+ops/.env
+!ops/.env.example

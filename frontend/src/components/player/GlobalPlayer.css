@@ -1,0 +1,445 @@
+/* ═══════════════════════════════════════════════════════════════
+   Global Player — compact fixed bottom bar
+   Layout: [track-info] [controls] [actions]
+   ═══════════════════════════════════════════════════════════════ */
+
+.global-player {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: var(--z-modal);
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 20px;
+  border: none;
+  background:
+    radial-gradient(120% 100% at 0% 0%, rgba(124, 255, 31, 0.10), transparent 60%),
+    linear-gradient(180deg, rgba(18, 16, 28, 0.96), rgba(10, 10, 18, 0.99));
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 0 12px rgba(124, 255, 31, 0.18),
+    0 0 1.5px rgba(124, 255, 31, 0.35);
+  max-width: calc(100vw - 24px);
+  width: min(780px, calc(100vw - 24px));
+  backdrop-filter: blur(var(--blur-md));
+  overflow: visible;
+  isolation: isolate;
+}
+
+/* Content above aura canvas */
+.global-player > *:not(.player-aura) {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Left: track info ─────────────────────────────────────────── */
+
+.gp-track {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  width: clamp(120px, 18vw, 180px);
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 3px 6px 3px 3px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  text-align: left;
+}
+.gp-track:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+.gp-track--open {
+  border-color: rgba(124, 255, 31, 0.35);
+  background: rgba(124, 255, 31, 0.06);
+}
+
+.gp-cover {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(124, 255, 31, 0.3), rgba(214, 0, 255, 0.3));
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: box-shadow 0.15s ease;
+}
+.gp-track:hover .gp-cover { box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.25); }
+.gp-cover img { width: 100%; height: 100%; object-fit: cover; }
+.gp-cover-fallback { font-size: 18px; color: #fff; opacity: 0.9; }
+
+.gp-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+
+.gp-title {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gp-sub {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gp-track-chevron {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+}
+.gp-track:hover .gp-track-chevron { color: rgba(255, 255, 255, 0.65); }
+
+/* ── Center: controls + progress ─────────────────────────────── */
+
+.gp-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.gp-ctrl-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+/* Base control button */
+.gp-ctrl {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(246, 244, 255, 0.7);
+  font-size: 12px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, transform 110ms ease;
+  flex-shrink: 0;
+  /* Each button lives in its own stacking context so scale/transform
+     never visually overlaps adjacent buttons' hit areas. */
+  isolation: isolate;
+  position: relative;
+  touch-action: manipulation; /* prevent double-tap zoom on mobile */
+}
+.gp-ctrl:hover { background: rgba(255, 255, 255, 0.11); color: #fff; }
+.gp-ctrl:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* Play button — slightly larger */
+.gp-ctrl--play {
+  width: 36px;
+  height: 36px;
+  border-color: rgba(124, 255, 31, 0.5);
+  background: linear-gradient(135deg, rgba(124, 255, 31, 0.22), rgba(214, 0, 255, 0.18));
+  color: #fff;
+  font-size: 13px;
+  z-index: 1; /* stay on top when adjacent buttons scale */
+}
+.gp-ctrl--play:hover {
+  transform: scale(1.07);
+  box-shadow: 0 5px 18px rgba(124, 255, 31, 0.28);
+}
+
+.gp-ctrl--active {
+  background: rgba(124, 255, 31, 0.14);
+  border-color: rgba(124, 255, 31, 0.4);
+  color: var(--accent);
+}
+.gp-ctrl--shuffle { font-size: 14px; }
+
+/* Progress */
+.gp-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  overflow: hidden;
+  width: 100%;
+  max-width: 360px;
+}
+.gp-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-3));
+  transition: width 120ms linear;
+}
+
+.gp-time {
+  font-family: var(--font-mono);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ── Right: actions — flat single row ────────────────────────── */
+
+.gp-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+/* ── Uniform icon button base ─────────────────────────────────── */
+/* All action buttons share the same size and circular shape.     */
+/* Text-only buttons (radio) override to pill shape below.        */
+
+.gp-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(246, 244, 255, 0.65);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.gp-act:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Download */
+.gp-act--dl:hover { border-color: rgba(124, 255, 31, 0.5); color: var(--accent); }
+
+/* Bolt */
+.gp-act--bolt { color: rgba(255, 180, 0, 0.75); }
+.gp-act--bolt:hover, .gp-act--open {
+  border-color: rgba(255, 180, 0, 0.5);
+  background: rgba(255, 180, 0, 0.08);
+  color: rgba(255, 200, 50, 1);
+}
+
+/* Rating — fixed width to prevent jumping when count appears */
+.gp-act--rate {
+  font-size: 14px;
+  min-width: 52px;
+  width: 52px;
+  padding: 0 5px;
+  border-radius: 999px;
+}
+.gp-act--like-on,
+.gp-act--like-on:hover {
+  background: rgba(124, 255, 31, 0.18);
+  border-color: rgba(124, 255, 31, 0.6);
+  color: var(--accent-light);
+}
+.gp-act--dis-on,
+.gp-act--dis-on:hover {
+  background: rgba(255, 90, 0, 0.18);
+  border-color: rgba(255, 90, 0, 0.6);
+  color: var(--accent-light-2);
+}
+
+.gp-act-count {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+/* Radio — fixed width pill to prevent jumping when toggling */
+.gp-act--radio {
+  font-family: var(--font-ui);
+  border-radius: 999px;
+  width: 72px;
+  min-width: 72px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.gp-act--radio-on,
+.gp-act--radio-on:hover {
+  border-color: rgba(124, 255, 31, 0.55);
+  background: linear-gradient(135deg, rgba(124, 255, 31, 0.22), rgba(255, 90, 0, 0.16), rgba(214, 0, 255, 0.18));
+  color: #fff;
+  box-shadow: 0 0 14px rgba(124, 255, 31, 0.22);
+}
+
+/* Close — bigger, truly circular, fully transparent */
+.gp-act--close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+}
+.gp-act--close:hover {
+  border-color: rgba(255, 90, 0, 0.45);
+  background: rgba(255, 90, 0, 0.08);
+  color: #ff8b6b;
+}
+
+/* ── Queue dropdown ───────────────────────────────────────────── */
+
+.gp-queue {
+  position: fixed;
+  z-index: calc(var(--z-modal) + 1);
+  background: rgba(12, 10, 24, 0.96);
+  border: 1px solid rgba(124, 255, 31, 0.3);
+  border-radius: 14px;
+  padding: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gp-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease, color 0.12s ease;
+  width: 100%;
+}
+.gp-queue-item:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+.gp-queue-item--current {
+  background: rgba(124, 255, 31, 0.12);
+  border-color: rgba(124, 255, 31, 0.28);
+  color: #fff;
+}
+
+.gp-queue-num {
+  font-size: 10px;
+  opacity: 0.4;
+  font-variant-numeric: tabular-nums;
+  min-width: 14px;
+  flex-shrink: 0;
+}
+.gp-queue-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.gp-queue-meta { font-size: 10px; opacity: 0.45; flex-shrink: 0; }
+.gp-queue-playing { font-size: 11px; color: var(--accent); flex-shrink: 0; }
+
+/* ── Bolt menu ────────────────────────────────────────────────── */
+/* Styles live in global.css */
+
+/* ── Responsive ───────────────────────────────────────────────── */
+
+@media (max-width: 740px) {
+  .global-player { gap: 8px; padding: 6px 10px; }
+  .gp-track { width: clamp(110px, 28vw, 160px); }
+  .gp-act--radio { display: none; }
+}
+
+/* ── Мобильный: трек-строка переезжает НАВЕРХ, плеер растёт вертикально ──
+ *
+ *  Десктоп:  [track-info] [center: controls+progress] [actions]  — горизонталь
+ *  Мобайл:
+ *    row 1:  [track-info — вся ширина, полное название]
+ *    row 2:  [controls + progress — центр]
+ *    row 3:  [actions — правый край]
+ */
+@media (max-width: 560px) {
+  .global-player {
+    /* Переключаемся на flex-column → гридоподобный вертикальный стек */
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px 12px;
+    bottom: 6px;
+    border-radius: 18px;
+    /* Полная ширина экрана с 8px просветами по бокам */
+    left: 8px !important;
+    right: 8px;
+    width: auto;
+    max-width: none;
+    transform: none !important;  /* переопределяет translateX(-50%) с десктопа */
+  }
+
+  /* Трек-строка: полная ширина, скрытые части раскрываются */
+  .gp-track {
+    width: 100%;
+    max-width: 100%;
+    flex: none;
+    padding: 4px 8px 4px 4px;
+    border-radius: 10px;
+  }
+
+  /* Название трека — чуть крупнее для читаемости */
+  .gp-title {
+    font-size: 13.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Мета-строка снова видна */
+  .gp-sub { display: block; }
+
+  /* Центр: controls + прогресс — горизонтально, по центру */
+  .gp-center {
+    width: 100%;
+    flex: none;
+  }
+
+  .gp-progress { max-width: 100%; }
+
+  /* Время показываем снова, но мелким */
+  .gp-time { display: block; font-size: 10px; }
+
+  /* Действия: строка с кнопками, выравниваем вправо */
+  .gp-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  /* На мобайле показываем Radio-кнопку, убираем только bolt */
+  .gp-act--radio { display: inline-flex; font-size: 10px; padding: 0 8px; }
+  .gp-act--bolt  { display: none; }
+}

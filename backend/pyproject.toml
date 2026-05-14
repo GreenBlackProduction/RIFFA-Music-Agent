@@ -1,0 +1,106 @@
+[project]
+name = "riffa-backend"
+version = "0.1.0"
+description = "RIFFA Web backend (FastAPI + SQLAlchemy + Arq)"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.115.12",
+    "uvicorn[standard]==0.34.2",
+    "pydantic[email]==2.11.3",
+    "pydantic-settings==2.6.1",
+    "sqlalchemy[asyncio]==2.0.36",
+    "asyncpg==0.30.0",
+    "alembic==1.14.0",
+    "httpx==0.28.1",
+    "redis==5.2.0",
+    "arq==0.26.1",
+    "python-jose[cryptography]==3.3.0",
+    "passlib[bcrypt]==1.7.4",
+    "python-multipart==0.0.18",
+    "openai==1.61.0",
+    "loguru==0.7.2",
+    "sentry-sdk[fastapi]==2.18.0",
+    "boto3==1.35.69",
+    "mutagen==1.47.0",
+    "aiofiles==24.1.0",
+    "tenacity==9.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==8.3.4",
+    "pytest-asyncio==0.24.0",
+    "pytest-cov==6.0.0",
+    "httpx==0.28.1",
+    "aiosqlite==0.20.0",
+    "ruff==0.8.4",
+    "mypy==1.13.0",
+    "types-redis==4.6.0.20241004",
+    "pre-commit==4.0.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "TID", "RUF"]
+# RUF001/RUF003: the codebase intentionally uses Cyrillic identifiers and
+# Russian-language user-facing strings (incl. EN DASH typography) — every
+# such file would otherwise need a blanket `noqa`. Keep the ambiguous-char
+# check off; the rest of the RUF rule-set stays on.
+ignore = ["E501", "RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Query",
+    "fastapi.Cookie",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Form",
+    "fastapi.File",
+]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+strict = true
+
+# Third-party libraries without bundled type information.
+# Installing stubs (boto3-stubs, types-python-jose) would bloat the dev env;
+# we use these libraries through narrow surface areas and the runtime
+# behaviour is well-understood — silencing import-untyped is the pragmatic
+# trade-off and matches what the rest of the codebase already assumes.
+[[tool.mypy.overrides]]
+module = [
+    "boto3",
+    "boto3.*",
+    "botocore",
+    "botocore.*",
+    "jose",
+    "jose.*",
+    "mutagen",
+    "mutagen.*",
+]
+ignore_missing_imports = true
+
+# Alembic auto-generated migrations are infrastructure code — they call
+# `op.add_column(...)` etc. through Alembic's untyped helpers, which has
+# no equivalent typed surface. Excluding the directory is the standard
+# pattern for Alembic + strict mypy.
+[[tool.mypy.overrides]]
+module = "app.db.migrations.*"
+ignore_errors = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

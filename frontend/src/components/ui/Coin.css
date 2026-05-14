@@ -1,0 +1,35 @@
+.riffa-coin {
+  display: inline-block;
+  vertical-align: -0.2em;
+  flex-shrink: 0;
+  object-fit: contain;
+  /* Убираем белый фон GIF */
+  mix-blend-mode: screen;
+  transition: transform 220ms ease, filter 220ms ease;
+  animation: coin-idle 3s ease-in-out infinite;
+}
+
+@keyframes coin-idle {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(245, 190, 0, 0.35)); }
+  50%       { filter: drop-shadow(0 0 8px rgba(245, 190, 0, 0.65)); }
+}
+
+a:hover .riffa-coin,
+button:hover .riffa-coin,
+.riffa-coin--spin:hover {
+  animation: coin-flip 0.55s ease-in-out forwards;
+}
+
+@keyframes coin-flip {
+  0%   { transform: rotateY(0deg)   scale(1);    }
+  40%  { transform: rotateY(180deg) scale(1.1);  }
+  100% { transform: rotateY(360deg) scale(1);    }
+}
+
+.riffa-coin--lg {
+  filter: drop-shadow(0 0 10px rgba(245, 190, 0, 0.5));
+}
+
+.amount .riffa-coin,
+.riffa-coin--after { margin-left: 0.25em; }
+.riffa-coin--before { margin-right: 0.25em; }

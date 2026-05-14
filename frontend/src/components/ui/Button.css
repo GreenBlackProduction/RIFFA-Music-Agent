@@ -1,0 +1,59 @@
+.btn {
+  padding: 12px 20px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.005em; /* Manrope читается чуть свободнее в кнопках */
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+              box-shadow 200ms ease,
+              background 160ms ease,
+              border-color 160ms ease;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.btn:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.btn--primary {
+  color: var(--text-on-accent);
+  background: linear-gradient(120deg, var(--accent), var(--accent-2) 55%, var(--accent-3));
+  background-size: 200% 100%;
+  background-position: 0% 50%;
+  box-shadow: 0 14px 40px rgba(124, 255, 31, 0.28);
+}
+
+.btn--primary:not(:disabled):hover {
+  background-position: 100% 50%;
+  box-shadow: 0 18px 50px rgba(214, 0, 255, 0.35);
+}
+
+.btn--secondary {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn--secondary:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.btn--ghost {
+  color: var(--text);
+  border-color: transparent;
+  background: transparent;
+}
+
+.btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
