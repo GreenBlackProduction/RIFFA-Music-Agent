@@ -78,13 +78,15 @@ def _to_out(gen: Generation) -> GenerationOut:
     raw_tracks = result.get("tracks", [])
     tracks = [
         TrackOut(
-            audio_url=t.get("audio_url", ""),
+            # Route audio through our backend so crossOrigin="anonymous" works
+            # in the player (Suno CDN doesn't send Access-Control-Allow-Origin).
+            audio_url=f"/api/v1/tracks/{gen.id}/{i}/stream",
             audio_id=t.get("audio_id", ""),
             image_url=t.get("image_url"),
             duration=int(t.get("duration", 0)),
             title=t.get("title", gen.title),
         )
-        for t in raw_tracks
+        for i, t in enumerate(raw_tracks)
         if t.get("audio_url")
     ]
     return GenerationOut(
