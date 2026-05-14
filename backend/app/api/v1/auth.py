@@ -13,6 +13,7 @@ from app.auth.telegram import (
 )
 from app.core.config import Settings, get_settings
 from app.core.deps import SESSION_COOKIE, db_session
+from app.core.limiter import limiter
 from app.core.security import (
     TokenError,
     make_email_token,
@@ -51,7 +52,9 @@ def _set_session_cookie(response: Response, settings: Settings, token: str) -> N
 
 
 @router.post("/telegram/widget", status_code=status.HTTP_200_OK)
+@limiter.limit("20/minute")
 async def telegram_widget_login(
+    request: Request,
     payload: TelegramLoginPayload,
     response: Response,
     settings: Settings = Depends(get_settings),
@@ -75,7 +78,9 @@ async def telegram_widget_login(
 
 
 @router.post("/telegram/initdata", status_code=status.HTTP_200_OK)
+@limiter.limit("20/minute")
 async def telegram_initdata_login(
+    request: Request,
     payload: TelegramInitDataPayload,
     response: Response,
     settings: Settings = Depends(get_settings),
@@ -99,6 +104,7 @@ async def telegram_initdata_login(
 
 
 @router.post("/email/request", status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("5/minute")
 async def email_request_login(
     payload: EmailLoginRequest,
     request: Request,

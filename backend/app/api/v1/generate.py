@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
 from app.core.deps import current_user, db_session
+from app.core.limiter import limiter
 from app.db.models import Generation, GenerationStatus, GenerationType, User
 
 router = APIRouter(prefix="/generate", tags=["generate"])
@@ -194,6 +195,7 @@ async def _create_generation(
 
 
 @router.post("/song", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("10/minute;50/hour")
 async def generate_song(
     body: SongRequest,
     request: Request,
@@ -220,6 +222,7 @@ async def generate_song(
 @router.post(
     "/instrumental", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED
 )
+@limiter.limit("10/minute;50/hour")
 async def generate_instrumental(
     body: InstrumentalRequest,
     request: Request,
@@ -245,6 +248,7 @@ async def generate_instrumental(
 @router.post(
     "/sound_effect", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED
 )
+@limiter.limit("10/minute;50/hour")
 async def generate_sound_effect(
     body: SoundEffectRequest,
     request: Request,

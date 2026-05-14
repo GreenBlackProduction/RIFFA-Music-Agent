@@ -6,15 +6,18 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import sentry_sdk
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
 from app.api.v1.router import api_router
 from app.core.config import get_settings
+from app.core.limiter import limiter
 
 
 @asynccontextmanager
@@ -53,6 +56,14 @@ def create_app() -> FastAPI:
         version=__version__,
         lifespan=lifespan,
     )
+
+    # Rate limiting
+    app.state.limiter = limiter
+    app.add_exception_handler(
+        RateLimitExceeded,
+        _rate_limit_exceeded_handler,  # type: ignore[arg-type]
+    )
+
     if settings.cors_origins:
         app.add_middleware(
             CORSMiddleware,
