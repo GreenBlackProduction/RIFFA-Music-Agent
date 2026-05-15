@@ -579,3 +579,16 @@
   font-size: 13px;
   line-height: 1.5;
 }
+
+.tg-fallback-btn {
+  display: block;
+  text-align: center;
+  margin-top: 8px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: rgba(124, 255, 31, 0.12);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}

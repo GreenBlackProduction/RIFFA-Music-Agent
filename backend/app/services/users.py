@@ -13,6 +13,7 @@ from app.auth.email import hash_password, verify_password
 from app.auth.telegram import TelegramAccount
 from app.core.config import get_settings
 from app.db.models import Referral, User, WalletTransaction
+from app.services.telegram_sync import sync_bot_user_on_first_login
 
 _NEW_USER_BONUS = 5  # free tokens on first registration
 _REFERRAL_BONUS_REFERRER = 60
@@ -136,6 +137,11 @@ async def get_or_create_user_by_telegram(
     )
 
     await _apply_referral(session, user, referral_code)
+    await session.flush()
+
+    # Pull existing bot-side data so the web profile is immediately up-to-date.
+    await sync_bot_user_on_first_login(session, user, account.id)
+
     return user, True
 
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/Button";
@@ -17,18 +17,11 @@ import "./LoginPage.css";
 
 const TG_BOT = (import.meta.env.VITE_TG_BOT_USERNAME as string | undefined) ?? "The_Riffa_bot";
 
-declare global {
-  interface Window {
-    onTelegramWidgetAuth?: (user: TelegramWidgetPayload) => void;
-  }
-}
-
 export function LoginPage() {
   const t = useT();
   const { user, isLoading, refresh } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const [emailMode, setEmailMode] = useState<"login" | "register">("login");
   const [emailValue, setEmailValue] = useState("");
   const [passwordValue, setPasswordValue] = useState("");
@@ -52,33 +45,23 @@ export function LoginPage() {
   }, [refresh]);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    container.innerHTML = "";
-
-    window.onTelegramWidgetAuth = async (payload) => {
-      try {
-        await loginWithTelegramWidget(payload);
-        await refresh();
-      } catch (err) {
-        setTgError(toMessage(err));
-      }
-    };
-
-    const script = document.createElement("script");
-    script.async = true;
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
-    script.dataset.telegramLogin = TG_BOT;
-    script.dataset.size = "large";
-    script.dataset.requestAccess = "write";
-    script.dataset.userpic = "false";
-    script.dataset.onauth = "onTelegramWidgetAuth(user)";
-    container.appendChild(script);
-
-    return () => {
-      delete window.onTelegramWidgetAuth;
-      container.innerHTML = "";
-    };
+    // Listen for postMessage from the Telegram OAuth iframe.
+    function handleMessage(event: MessageEvent) {
+      if (event.origin !== "https://oauth.telegram.org") return;
+      if (!event.data || typeof event.data !== "object") return;
+      const payload = event.data as Record<string, unknown>;
+      if (!payload.id || !payload.hash) return;
+      void (async () => {
+        try {
+          await loginWithTelegramWidget(payload as unknown as TelegramWidgetPayload);
+          await refresh();
+        } catch (err) {
+          setTgError(toMessage(err));
+        }
+      })();
+    }
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, [refresh]);
 
   if (isLoading) {
@@ -144,7 +127,20 @@ export function LoginPage() {
               <span className="login-block__badge">{t.telegram.badge}</span>
             </div>
             <p className="muted">{t.telegram.explainer}</p>
-            <div ref={containerRef} className="login-tg-widget" />
+            <iframe
+              id="telegram-login-widget"
+              src={`https://oauth.telegram.org/embed/${TG_BOT}?origin=${encodeURIComponent(window.location.origin)}&size=large&request_access=write`}
+              style={{ border: "none", width: "100%", height: 56, overflow: "hidden", borderRadius: 8 }}
+              title="Login with Telegram"
+            />
+            <a
+              href={`https://t.me/${TG_BOT}?start=weblogin`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="tg-fallback-btn"
+            >
+              Открыть @{TG_BOT} в Telegram
+            </a>
             {tgError && <div className="login-error">{tgError}</div>}
             <p className="muted login-hint">{t.telegram.miniHint}</p>
           </section>

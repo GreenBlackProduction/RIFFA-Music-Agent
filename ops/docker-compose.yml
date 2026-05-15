@@ -74,6 +74,7 @@ services:
       - "127.0.0.1:8001:8000"
     volumes:
       - backend_media:/app/media
+      - ../RiffaBot/test_bot.db:/app/sync/bot.db:ro
     deploy:
       resources:
         limits:
@@ -110,6 +111,7 @@ services:
     command: sh -c "npm install --silent && npm run dev -- --host 0.0.0.0 --port 5173"
     environment:
       VITE_API_PROXY: http://backend:8000
+      VITE_TG_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-The_Riffa_bot}
     volumes:
       - ../frontend:/app
       - frontend_node_modules:/app/node_modules

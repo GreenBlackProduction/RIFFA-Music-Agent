@@ -4,26 +4,19 @@
  * endpoint accepts (mp3 / wav / m4a / ogg).
  *
  * MediaRecorder cannot emit WAV directly, so we decode the recording with
- * the WebAudio API and write a 16-bit PCM RIFF/WAV container ourselves.
+ * OfflineAudioContext (no user-gesture requirement, no output stream) and
+ * write a 16-bit PCM RIFF/WAV container ourselves.
  */
 
 export async function blobToWav(blob: Blob, fileName: string): Promise<File> {
   const arrayBuffer = await blob.arrayBuffer();
-  // Use OfflineAudioContext for decoding; some browsers also accept it on
-  // the regular AudioContext but Offline avoids spawning an output stream.
-  const AudioContextCtor =
-    window.AudioContext ??
-    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextCtor) {
-    throw new Error("Браузер не поддерживает Web Audio API — запись не получится конвертировать.");
-  }
-  const ctx = new AudioContextCtor();
-  let audioBuffer: AudioBuffer;
-  try {
-    audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
-  } finally {
-    void ctx.close();
-  }
+
+  // OfflineAudioContext – no autoplay-policy lock, no output audio device,
+  // never suspended. Perfect for offline blob → buffer decoding.
+  // We create a temporary 1-channel context just for decodeAudioData.
+  // OfflineAudioContext rejects on decode failure — no null return path.
+  const offlineCtx = new OfflineAudioContext(1, 1, 48000);
+  const audioBuffer = await offlineCtx.decodeAudioData(arrayBuffer);
   const wavBlob = encodeWav(audioBuffer);
   return new File([wavBlob], fileName, { type: "audio/wav" });
 }
@@ -48,12 +41,12 @@ function encodeWav(buffer: AudioBuffer): Blob {
   // fmt chunk
   writeString(view, 12, "fmt ");
   view.setUint32(16, 16, true); // PCM chunk size
-  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(20, 1, true);  // PCM format
   view.setUint16(22, numChannels, true);
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, sampleRate * numChannels * bytesPerSample, true); // byte rate
-  view.setUint16(32, numChannels * bytesPerSample, true); // block align
-  view.setUint16(34, bytesPerSample * 8, true); // bits per sample
+  view.setUint16(32, numChannels * bytesPerSample, true);             // block align
+  view.setUint16(34, bytesPerSample * 8, true);                       // bits per sample
 
   // data chunk
   writeString(view, 36, "data");

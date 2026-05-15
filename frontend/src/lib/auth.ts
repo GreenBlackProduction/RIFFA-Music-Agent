@@ -3,6 +3,7 @@
  * useAuth() возвращает { user, isLoading, refresh, signOut }.
  */
 
+import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { type CurrentUser, fetchCurrentUser, logout as apiLogout } from "@/lib/api/client";
@@ -34,17 +35,21 @@ export function useAuth(): UseAuthResult {
     retry: false,
   });
 
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  }, [queryClient]);
+
+  const signOut = useCallback(async () => {
+    await apiLogout();
+    queryClient.setQueryData(QUERY_KEY, null);
+    await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  }, [queryClient]);
+
   return {
     user: query.data ?? null,
     isLoading: query.isLoading,
-    async refresh() {
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-    },
-    async signOut() {
-      await apiLogout();
-      queryClient.setQueryData(QUERY_KEY, null);
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-    },
+    refresh,
+    signOut,
   };
 }
 

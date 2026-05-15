@@ -599,8 +599,10 @@ export function StudioPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordingTimerRef = useRef<number | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  // Ref so cleanup (which runs with stale closure) can read current recording state.
+  const isRecordingRef = useRef(false);
 
   useEffect(() => {
     if (activeModule) return;
@@ -608,21 +610,19 @@ export function StudioPage() {
     return () => document.body.classList.remove("studio-landing");
   }, [activeModule]);
 
-  // Cleanup recording on unmount. Inline the stop() call instead of
-  // referencing the local `stopRecording` so the effect's deps list stays
-  // honest (otherwise react-hooks/exhaustive-deps wants every render-fresh
-  // closure listed, even though we only need teardown on unmount).
+  // Cleanup recording on unmount – uses ref so it never sees a stale value.
   useEffect(() => {
     return () => {
       const recorder = mediaRecorderRef.current;
-      if (recorder && isRecording) {
+      if (recorder && isRecordingRef.current) {
         recorder.stop();
       }
-      if (recordingTimerRef.current) {
+      if (recordingTimerRef.current !== null) {
         clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
       }
     };
-  }, [isRecording]);
+  }, []);
 
   const moduleMeta = activeModule ? MODULES.find((m) => m.id === activeModule)! : null;
   const prompt = useMemo(
@@ -942,9 +942,6 @@ export function StudioPage() {
       };
 
       mediaRecorder.onstop = async () => {
-        // MediaRecorder always produces webm/opus on Chrome (and mp4/aac on
-        // Safari) — neither is in Suno's allow-list (mp3/wav/m4a/ogg). Decode
-        // via WebAudio and re-encode to 16-bit PCM WAV before upload.
         const mimeType = mediaRecorder.mimeType || "audio/webm";
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         stream.getTracks().forEach((track) => track.stop());
@@ -956,19 +953,22 @@ export function StudioPage() {
             err instanceof Error ? err.message : "Не удалось сконвертировать запись в WAV.";
           alert(`Не удалось обработать запись: ${msg}`);
           setState((prev) => ({ ...prev, coverFileName: "", coverUrl: "" }));
-        }
-        setIsRecording(false);
-        if (recordingTimerRef.current) {
-          clearInterval(recordingTimerRef.current);
-          recordingTimerRef.current = null;
+        } finally {
+          isRecordingRef.current = false;
+          setIsRecording(false);
+          if (recordingTimerRef.current !== null) {
+            clearInterval(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+          }
         }
       };
 
       mediaRecorder.start(250);
+      isRecordingRef.current = true;
       setIsRecording(true);
       setRecordingTime(0);
 
-      // Start timer
+      // Start timer — use setInterval via window for correct browser return type.
       recordingTimerRef.current = window.setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
@@ -979,16 +979,17 @@ export function StudioPage() {
   }
 
   function stopRecording() {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && isRecordingRef.current) {
       mediaRecorderRef.current.stop();
     }
   }
 
   function cancelRecording() {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && isRecordingRef.current) {
       mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+      isRecordingRef.current = false;
       setIsRecording(false);
-      if (recordingTimerRef.current) {
+      if (recordingTimerRef.current !== null) {
         clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = null;
       }
