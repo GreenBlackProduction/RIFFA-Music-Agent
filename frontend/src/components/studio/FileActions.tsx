@@ -56,7 +56,6 @@ export function FileActions({
   onPlayPause,
   onDelete,
   isImageType,
-  imageUrl,
 }: Props) {
   const dlHref = downloadUrl || audioUrl;
   const [menuOpen, setMenuOpen] = useState(false);

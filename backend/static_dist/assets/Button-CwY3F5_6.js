@@ -1,0 +1,1 @@
+import{j as e}from"./query-CfgXmKDZ.js";import{a as i}from"./vendor-b5vsENL2.js";const p=i.forwardRef(function({variant:t="primary",className:o="",children:r,...s},n){const a=["btn",`btn--${t}`,o].filter(Boolean).join(" ");return e.jsx("button",{ref:n,className:a,...s,children:r})});export{p as B};

@@ -14,6 +14,8 @@ from app.core.config import Settings, get_settings
 from app.core.deps import current_user
 from app.db.models import User
 
+_INTERNAL_S3_HOST = "http://minio:9000"
+
 router = APIRouter(prefix="/upload-new", tags=["upload-new"])
 
 # Allowed audio formats for cover song uploads
@@ -90,8 +92,15 @@ async def get_cover_upload_url(
     # Public URL for accessing the file after upload
     public_url = f"{settings.s3_public_base_url}/{filename}"
 
+    # Replace the internal Docker hostname in the presigned URL with the public
+    # nginx proxy path so browsers can reach MinIO via the public domain.
+    # Nginx is configured to forward Host: minio:9000 so the S3 signature
+    # (computed for minio:9000) validates correctly at MinIO.
+    s3_base = settings.s3_public_base_url.rstrip("/").rsplit("/", 1)[0]  # strip bucket name
+    public_upload_url = upload_url.replace(_INTERNAL_S3_HOST, s3_base)
+
     return PresignedUploadResponse(
-        upload_url=upload_url,
+        upload_url=public_upload_url,
         public_url=public_url,
         expires_in=expires_in,
     )

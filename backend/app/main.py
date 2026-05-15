@@ -80,9 +80,8 @@ def create_app() -> FastAPI:
     (media_root / "avatars").mkdir(parents=True, exist_ok=True)
     app.mount("/media", StaticFiles(directory=media_root), name="media")
 
-    # IMPORTANT: Do NOT serve static frontend files in development.
-    # The Vite dev server handles this. Only serve in production.
-    static_dir = None  # Force disable static serving
+    # Serve pre-built frontend static files in production.
+    static_dir = _resolve_static_dir()
     if static_dir is not None:
         index_html = static_dir / "index.html"
 

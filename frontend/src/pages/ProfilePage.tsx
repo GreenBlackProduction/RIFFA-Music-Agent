@@ -283,9 +283,11 @@ export function ProfilePage() {
   const [payError, setPayError] = useState<string | null>(null);
 
   const handleBuyPack = async () => {
-    const pack = selectedPack as PackageCode;
-    // Align frontend pack ids with backend (ProfilePage uses "pro", backend uses "advanced")
-    const backendPack: PackageCode = pack === "pro" ? "advanced" : pack;
+    // Align frontend pack ids with backend ("pro" on frontend → "advanced" on backend)
+    const packMap: Record<string, PackageCode> = {
+      starter: "starter", basic: "basic", pro: "advanced", premium: "premium",
+    };
+    const backendPack: PackageCode = packMap[selectedPack] ?? "basic";
     setPayStatus("loading");
     setPayError(null);
     try {
@@ -608,7 +610,7 @@ export function ProfilePage() {
       .filter((t) => counts[t] > 0)
       .map((t) => ({
         type: t,
-        label: TYPE_LABELS[t],
+        label: TYPE_LABELS[t as import("@/lib/library").LibraryItemType],
         count: counts[t],
         color: STAT_COLORS[t] ?? "var(--muted)",
       }));

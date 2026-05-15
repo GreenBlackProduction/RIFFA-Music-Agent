@@ -6,25 +6,33 @@
     <title>RIFFA — AI Music Studio</title>
     <meta name="description" content="Создавай песни, инструменталы, обложки и звуковые эффекты с помощью ИИ. Веб-версия RIFFA Music Bot." />
     <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preload" href="/favicon.png" as="image" />
+    <link rel="preload" href="/sounds/notification.mp3" as="audio" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Non-blocking font load: текст сразу рендерится с fallback, шрифт подгружается асинхронно -->
+    <!--
+      Шрифты RIFFA:
+      • Sora 600/700/800 — заголовки, лого, hero-секции (геометрика с характером)
+      • Manrope 400/500/600/700 — body + UI: отличная читаемость при 11-12px
+      • JetBrains Mono — пресеты, промт-превью, mono-код
+    -->
     <link
       rel="preload"
       as="style"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       onload="this.onload=null;this.rel='stylesheet'"
     />
     <noscript>
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       />
     </noscript>
-    <script type="module" crossorigin src="/assets/index-0Tp7TbPU.js"></script>
-    <link rel="modulepreload" crossorigin href="/assets/vendor-Ccj2W8FH.js">
-    <link rel="modulepreload" crossorigin href="/assets/query-Bj0IszaH.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-Dx1t1HdG.css">
+    <script type="module" crossorigin src="/assets/index-BYUV3rAj.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/vendor-b5vsENL2.js">
+    <link rel="modulepreload" crossorigin href="/assets/query-CfgXmKDZ.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-BBgvgFaD.css">
   </head>
   <body>
     <div id="root"></div>

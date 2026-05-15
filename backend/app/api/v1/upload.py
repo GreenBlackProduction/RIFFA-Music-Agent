@@ -16,6 +16,8 @@ from app.db.models import User
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
+_INTERNAL_S3_HOST = "http://minio:9000"
+
 # Allowed audio formats for cover song uploads
 _COVER_AUDIO_EXTENSIONS = ["mp3", "m4a", "wav", "ogg"]
 _COVER_AUDIO_MAX_MB = 50  # 50 MB limit
@@ -90,8 +92,11 @@ async def get_cover_upload_url(
     # Public URL for accessing the file after upload
     public_url = f"{settings.s3_public_base_url}/{filename}"
 
+    s3_base = settings.s3_public_base_url.rstrip("/").rsplit("/", 1)[0]
+    public_upload_url = upload_url.replace(_INTERNAL_S3_HOST, s3_base)
+
     return PresignedUploadResponse(
-        upload_url=upload_url,
+        upload_url=public_upload_url,
         public_url=public_url,
         expires_in=expires_in,
     )
