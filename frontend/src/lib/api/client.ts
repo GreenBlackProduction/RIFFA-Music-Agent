@@ -157,6 +157,36 @@ export function logout(): Promise<{ ok: boolean }> {
   return apiFetch("/api/v1/auth/logout", { method: "POST" });
 }
 
+export type PackageCode = "starter" | "basic" | "advanced" | "premium";
+
+export interface StarsInvoiceResponse {
+  bot_url: string;
+  package_code: string;
+  tokens: number;
+  stars: number;
+}
+
+export function createStarsInvoice(package_code: PackageCode): Promise<StarsInvoiceResponse> {
+  return apiFetch("/api/v1/payments/stars/invoice", {
+    method: "POST",
+    body: JSON.stringify({ package_code }),
+  });
+}
+
+export interface RobokassaLinkResponse {
+  url: string;
+  package_code: string;
+  tokens: number;
+  rub: number;
+}
+
+export function createRobokassaLink(package_code: PackageCode): Promise<RobokassaLinkResponse> {
+  return apiFetch("/api/v1/payments/robokassa/link", {
+    method: "POST",
+    body: JSON.stringify({ package_code }),
+  });
+}
+
 export function retryGeneration(genId: string): Promise<GenerateResponse> {
   return apiFetch(`/api/v1/history/${genId}/retry`, { method: "POST" });
 }

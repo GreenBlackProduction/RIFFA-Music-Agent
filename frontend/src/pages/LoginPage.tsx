@@ -29,6 +29,7 @@ export function LoginPage() {
   const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "error">("idle");
   const [emailError, setEmailError] = useState<string | null>(null);
   const [tgError, setTgError] = useState<string | null>(null);
+  const [botNotStarted, setBotNotStarted] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   useEffect(() => {
@@ -39,7 +40,8 @@ export function LoginPage() {
         await loginWithTelegramInitData(initData);
         await refresh();
       } catch (err) {
-        setTgError(toMessage(err));
+        const botUrl = extractBotUrl(err);
+        if (botUrl) { setBotNotStarted(botUrl); } else { setTgError(toMessage(err)); }
       }
     })();
   }, [refresh]);
@@ -56,7 +58,8 @@ export function LoginPage() {
           await loginWithTelegramWidget(payload as unknown as TelegramWidgetPayload);
           await refresh();
         } catch (err) {
-          setTgError(toMessage(err));
+          const botUrl = extractBotUrl(err);
+          if (botUrl) { setBotNotStarted(botUrl); } else { setTgError(toMessage(err)); }
         }
       })();
     }
@@ -141,6 +144,22 @@ export function LoginPage() {
             >
               Открыть @{TG_BOT} в Telegram
             </a>
+            {botNotStarted && (
+              <div className="login-bot-gate">
+                <p className="login-bot-gate__text">
+                  Чтобы войти через Telegram, сначала запустите бота — нажмите <strong>/start</strong>, затем вернитесь и войдите снова.
+                </p>
+                <a
+                  href={botNotStarted}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="login-bot-gate__btn"
+                  onClick={() => setBotNotStarted(null)}
+                >
+                  Открыть @{TG_BOT} в Telegram
+                </a>
+              </div>
+            )}
             {tgError && <div className="login-error">{tgError}</div>}
             <p className="muted login-hint">{t.telegram.miniHint}</p>
           </section>
@@ -357,4 +376,14 @@ function toMessage(err: unknown): string {
   }
   if (err instanceof Error) return err.message;
   return "";
+}
+
+function extractBotUrl(err: unknown): string | null {
+  if (err && typeof err === "object" && "detail" in err) {
+    const detail = (err as Record<string, unknown>).detail;
+    if (detail && typeof detail === "object" && "code" in detail && (detail as Record<string, unknown>).code === "bot_not_started") {
+      return (detail as Record<string, unknown>).bot_url as string ?? null;
+    }
+  }
+  return null;
 }

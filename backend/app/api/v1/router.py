@@ -11,6 +11,7 @@ from app.api.v1 import (
     history,
     lyrics,
     models,
+    payments,
     radio,
     share,
     tracks,
@@ -32,6 +33,7 @@ api_router.include_router(generate.router)
 api_router.include_router(lyrics.router)
 api_router.include_router(agent.router)
 api_router.include_router(history.router)
+api_router.include_router(payments.router)
 api_router.include_router(radio.router)
 api_router.include_router(share.router)
 api_router.include_router(tracks.router)

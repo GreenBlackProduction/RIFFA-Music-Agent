@@ -73,6 +73,16 @@ async def telegram_widget_login(
 
     user, created = await get_or_create_user_by_telegram(session, account, referral_code=payload.referral_code)
     await session.commit()
+
+    if not user.bot_started_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "bot_not_started",
+                "bot_url": f"https://t.me/{settings.telegram_bot_username}?start=weblogin",
+            },
+        )
+
     _set_session_cookie(response, settings, make_session_token(user.id))
     return {"user_id": user.id, "created": created}
 
@@ -99,6 +109,16 @@ async def telegram_initdata_login(
 
     user, created = await get_or_create_user_by_telegram(session, account, referral_code=payload.referral_code)
     await session.commit()
+
+    if not user.bot_started_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "bot_not_started",
+                "bot_url": f"https://t.me/{settings.telegram_bot_username}?start=weblogin",
+            },
+        )
+
     _set_session_cookie(response, settings, make_session_token(user.id))
     return {"user_id": user.id, "created": created}
 

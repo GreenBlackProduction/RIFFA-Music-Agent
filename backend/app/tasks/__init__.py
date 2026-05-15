@@ -17,8 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import get_settings
 from app.db.models import Generation, GenerationStatus, GenerationType
+from app.db.models.user import User
 from app.services.lyrics import make_lyrics_client
 from app.services.nanobanana import NanoBananaError, make_nanobanana_client
+from app.services.notifications import notify_generation_done
 from app.services.prompt_engineering import SongParams, build_suno_style, vocal_gender
 from app.services.suno import SunoError, make_suno_client
 from app.services.wallet import InsufficientBalance, credit_tokens, deduct_tokens
@@ -560,6 +562,24 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
         await _publish(ctx, gen_id, {"status": "failed", "error": error_msg})
     else:
         await _publish(ctx, gen_id, {"status": "completed", "result": result})
+        # Send Telegram notification (best-effort, never block the task)
+        try:
+            async with session_factory() as _ns:
+                _gen = (await _ns.execute(
+                    select(Generation).where(Generation.id == uuid.UUID(gen_id))
+                )).scalar_one_or_none()
+                _user = (await _ns.execute(
+                    select(User).where(User.id == _gen.user_id)
+                )).scalar_one_or_none() if _gen else None
+            if _gen and _user:
+                await notify_generation_done(
+                    settings.telegram_bot_token,
+                    settings.telegram_bot_username,
+                    _user,
+                    _gen,
+                )
+        except Exception as _notify_err:
+            logger.warning("notify_generation_done failed: {}", _notify_err)
 
 
 # ---------------------------------------------------------------------------

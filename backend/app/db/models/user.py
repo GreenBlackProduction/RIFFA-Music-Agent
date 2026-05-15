@@ -41,6 +41,7 @@ class User(Base, TimestampMixin):
     notice_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
     morning_messages_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    bot_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     referral_code: Mapped[str | None] = mapped_column(

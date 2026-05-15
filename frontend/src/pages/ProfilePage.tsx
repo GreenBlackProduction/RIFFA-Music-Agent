@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   changePassword,
+  createRobokassaLink,
+  createStarsInvoice,
   deleteGeneration,
   fetchTrash,
   purgeTrash,
@@ -12,6 +14,7 @@ import {
   uploadAvatar,
   type GenerationOut,
   type HistoryPage,
+  type PackageCode,
 } from "@/lib/api/client";
 import { useShallow } from "zustand/react/shallow";
 
@@ -276,6 +279,40 @@ export function ProfilePage() {
   // ── Tokens ──
   const [selectedPack, setSelectedPack] = useState<string>("basic");
   const [payMethod, setPayMethod] = useState<string>("card");
+  const [payStatus, setPayStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [payError, setPayError] = useState<string | null>(null);
+
+  const handleBuyPack = async () => {
+    const pack = selectedPack as PackageCode;
+    // Align frontend pack ids with backend (ProfilePage uses "pro", backend uses "advanced")
+    const backendPack: PackageCode = pack === "pro" ? "advanced" : pack;
+    setPayStatus("loading");
+    setPayError(null);
+    try {
+      if (payMethod === "stars") {
+        const res = await createStarsInvoice(backendPack);
+        // Open bot deep link — works both in browser and Mini App
+        if (window.Telegram?.WebApp?.openTelegramLink) {
+          window.Telegram.WebApp.openTelegramLink(res.bot_url);
+        } else {
+          window.open(res.bot_url, "_blank");
+        }
+      } else if (payMethod === "card") {
+        const res = await createRobokassaLink(backendPack);
+        // In Mini App — open in external browser so Robokassa works
+        if (window.Telegram?.WebApp?.openLink) {
+          window.Telegram.WebApp.openLink(res.url, { try_instant_view: false });
+        } else {
+          window.open(res.url, "_blank");
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : (err as { detail?: string })?.detail ?? "Ошибка";
+      setPayError(msg);
+    } finally {
+      setPayStatus("idle");
+    }
+  };
 
   // ── Promo code redeem ─────────────────────────────────────────────────
   // Тестовый код пользователя — RIFFA2026. По умолчанию подставлен в инпут,
@@ -881,9 +918,19 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <button type="button" className="btn btn--primary btn--wide">
-            Купить пакет
+          <button
+            type="button"
+            className="btn btn--primary btn--wide"
+            onClick={handleBuyPack}
+            disabled={payStatus === "loading" || payMethod === "crypto"}
+          >
+            {payStatus === "loading" ? "Открываем..." : "Купить пакет"}
           </button>
+          {payError && (
+            <p style={{ color: "var(--error, #ff6b6b)", fontSize: 13, margin: "4px 0 0" }}>
+              {payError}
+            </p>
+          )}
 
           {/* ─── Промокод ─── */}
           <div className="promo-redeem">
