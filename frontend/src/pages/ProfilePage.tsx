@@ -325,9 +325,7 @@ export function ProfilePage() {
     "idle" | "saving" | "ok" | "error"
   >("idle");
   const [promoMessage, setPromoMessage] = useState<string | null>(null);
-  const [promoTokensGranted, setPromoTokensGranted] = useState<number | null>(
-    null,
-  );
+  const [, setPromoTokensGranted] = useState<number | null>(null);
   const handleRedeemPromo = async () => {
     const value = promoCode.trim().toUpperCase();
     if (!value) {
@@ -939,34 +937,32 @@ export function ProfilePage() {
             <label className="promo-redeem__label" htmlFor="promo-input">
               Есть промокод?
             </label>
-            <div className="promo-redeem__row">
-              <input
-                id="promo-input"
-                type="text"
-                className="promo-redeem__input"
-                placeholder="RIFFA2026"
-                value={promoCode}
-                onChange={(e) => {
-                  setPromoCode(e.target.value.toUpperCase());
-                  if (promoStatus !== "idle") {
-                    setPromoStatus("idle");
-                    setPromoMessage(null);
-                  }
-                }}
-                maxLength={32}
-                spellCheck={false}
-                autoCapitalize="characters"
-                disabled={promoStatus === "saving"}
-              />
-              <button
-                type="button"
-                className="btn btn--secondary promo-redeem__btn"
-                onClick={handleRedeemPromo}
-                disabled={promoStatus === "saving" || !promoCode.trim()}
-              >
-                {promoStatus === "saving" ? "..." : "Активировать"}
-              </button>
-            </div>
+            <input
+              id="promo-input"
+              type="text"
+              className="promo-redeem__input"
+              placeholder="Ввести промокод"
+              value={promoCode}
+              onChange={(e) => {
+                setPromoCode(e.target.value.toUpperCase());
+                if (promoStatus !== "idle") {
+                  setPromoStatus("idle");
+                  setPromoMessage(null);
+                }
+              }}
+              maxLength={32}
+              spellCheck={false}
+              autoCapitalize="characters"
+              disabled={promoStatus === "saving"}
+            />
+            <button
+              type="button"
+              className="btn btn--secondary btn--wide"
+              onClick={handleRedeemPromo}
+              disabled={promoStatus === "saving" || !promoCode.trim()}
+            >
+              {promoStatus === "saving" ? "..." : "Активировать"}
+            </button>
             {promoMessage && (
               <div
                 className={`promo-redeem__msg promo-redeem__msg--${
@@ -975,9 +971,6 @@ export function ProfilePage() {
                 role={promoStatus === "ok" ? "status" : "alert"}
               >
                 {promoMessage}
-                {promoStatus === "ok" && promoTokensGranted != null
-                  ? ""
-                  : null}
               </div>
             )}
           </div>
@@ -1304,9 +1297,8 @@ export function ProfilePage() {
           <div className="referral-perks">
             <h3>Как работает</h3>
             <ul>
-              <li>60 <Coin /> другу — 60 <Coin /> тебе при первой его оплате.</li>
-              <li>+15% от каждой его покупки пакета <Coin />.</li>
-              <li>Если друг оформит подписку — 300 <Coin /> в подарок.</li>
+              <li><strong>4 <Coin /></strong> другу — сразу при регистрации по твоей ссылке.</li>
+              <li><strong>10 <Coin /></strong> тебе — когда друг зарегистрировался.</li>
             </ul>
           </div>
 

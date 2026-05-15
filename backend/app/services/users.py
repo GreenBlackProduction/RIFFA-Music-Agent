@@ -15,9 +15,9 @@ from app.core.config import get_settings
 from app.db.models import Referral, User, WalletTransaction
 from app.services.telegram_sync import sync_bot_user_on_first_login
 
-_NEW_USER_BONUS = 5  # free tokens on first registration
-_REFERRAL_BONUS_REFERRER = 60
-_REFERRAL_BONUS_REFERRED = 60
+_NEW_USER_BONUS = 5          # free tokens on first registration
+_REFERRAL_BONUS_REFERRER = 10  # tokens for the person who shared the link
+_REFERRAL_BONUS_REFERRED = 4   # tokens for the new user who joined via link
 
 
 async def _generate_referral_code(session: AsyncSession) -> str:
@@ -59,7 +59,7 @@ async def _apply_referral(
     )
     session.add(referral)
 
-    # Credit referrer
+    # Credit referrer (+10 tokens)
     referrer.balance_tokens += _REFERRAL_BONUS_REFERRER
     session.add(
         WalletTransaction(
@@ -70,7 +70,7 @@ async def _apply_referral(
         )
     )
 
-    # Credit new user
+    # Credit new user (+4 tokens)
     new_user.balance_tokens += _REFERRAL_BONUS_REFERRED
     session.add(
         WalletTransaction(
@@ -83,8 +83,9 @@ async def _apply_referral(
 
     await session.flush()
     logger.info(
-        "Referral applied: referrer={} referred={} each got {} tokens",
-        referrer.id, new_user.id, _REFERRAL_BONUS_REFERRER,
+        "Referral applied: referrer={} +{} tokens, referred={} +{} tokens",
+        referrer.id, _REFERRAL_BONUS_REFERRER,
+        new_user.id, _REFERRAL_BONUS_REFERRED,
     )
 
 

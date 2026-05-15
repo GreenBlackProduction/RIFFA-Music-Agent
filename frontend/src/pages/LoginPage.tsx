@@ -104,6 +104,7 @@ export function LoginPage() {
           </header>
 
           <section className="login-block login-block--telegram">
+            <span className="login-block__badge login-block__badge--corner">{t.telegram.badge}</span>
             <div className="login-block__head">
               <span className="login-block__icon" aria-hidden="true">
                 <TelegramIcon />
@@ -112,7 +113,6 @@ export function LoginPage() {
                 <h3>{t.telegram.section}</h3>
                 <p className="login-block__perk">{t.telegram.perk}</p>
               </div>
-              <span className="login-block__badge">{t.telegram.badge}</span>
             </div>
             <p className="muted">{t.telegram.explainer}</p>
             <iframe

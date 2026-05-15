@@ -710,12 +710,6 @@
   text-transform: uppercase;
 }
 
-.promo-redeem__row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-}
-
 .promo-redeem__input {
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.04);
@@ -726,16 +720,13 @@
   font-family: var(--font-mono, ui-monospace, monospace);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  width: 100%;
+  box-sizing: border-box;
 }
 .promo-redeem__input:focus {
   outline: none;
   border-color: rgba(124, 255, 31, 0.45);
   background: rgba(255, 255, 255, 0.06);
-}
-
-.promo-redeem__btn {
-  padding: 0 14px;
-  white-space: nowrap;
 }
 
 .promo-redeem__msg {
