@@ -1,12 +1,21 @@
 /**
  * Авторизация: TanStack Query поверх /users/me.
  * useAuth() возвращает { user, isLoading, refresh, signOut }.
+ *
+ * Если сайт открыт как Telegram Mini App (window.Telegram.WebApp.initData присутствует),
+ * выполняет автологин через initData прямо внутри queryFn — страница входа
+ * пользователю не показывается вообще.
  */
 
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { type CurrentUser, fetchCurrentUser, logout as apiLogout } from "@/lib/api/client";
+import {
+  type CurrentUser,
+  fetchCurrentUser,
+  loginWithTelegramInitData,
+  logout as apiLogout,
+} from "@/lib/api/client";
 
 const QUERY_KEY = ["auth", "me"] as const;
 
@@ -26,6 +35,17 @@ export function useAuth(): UseAuthResult {
         return await fetchCurrentUser();
       } catch (err) {
         if (err && typeof err === "object" && "status" in err && err.status === 401) {
+          // Если открыто как Mini App — пробуем автологин через initData.
+          // isLoading остаётся true всё это время, страница входа не мелькает.
+          const initData = getTelegramInitData();
+          if (initData) {
+            try {
+              await loginWithTelegramInitData(initData);
+              return await fetchCurrentUser();
+            } catch {
+              // initData невалидна или сервер недоступен — идём на страницу входа
+            }
+          }
           return null;
         }
         throw err;

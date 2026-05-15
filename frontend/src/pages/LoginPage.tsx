@@ -6,12 +6,11 @@ import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { Panel } from "@/components/ui/Panel";
 import {
   loginWithEmail,
-  loginWithTelegramInitData,
   loginWithTelegramWidget,
   registerWithEmail,
   type TelegramWidgetPayload,
 } from "@/lib/api/client";
-import { getTelegramInitData, useAuth } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import "./LoginPage.css";
 
@@ -31,20 +30,6 @@ export function LoginPage() {
   const [tgError, setTgError] = useState<string | null>(null);
   const [botNotStarted, setBotNotStarted] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-
-  useEffect(() => {
-    const initData = getTelegramInitData();
-    if (!initData) return;
-    void (async () => {
-      try {
-        await loginWithTelegramInitData(initData);
-        await refresh();
-      } catch (err) {
-        const botUrl = extractBotUrl(err);
-        if (botUrl) { setBotNotStarted(botUrl); } else { setTgError(toMessage(err)); }
-      }
-    })();
-  }, [refresh]);
 
   useEffect(() => {
     // Listen for postMessage from the Telegram OAuth iframe.

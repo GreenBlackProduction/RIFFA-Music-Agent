@@ -108,17 +108,14 @@ async def telegram_initdata_login(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     user, created = await get_or_create_user_by_telegram(session, account, referral_code=payload.referral_code)
-    await session.commit()
 
+    # initData proves the user is inside Telegram — set bot_started_at automatically
+    # so they can use the site without needing to send /start to the bot separately.
     if not user.bot_started_at:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={
-                "code": "bot_not_started",
-                "bot_url": f"https://t.me/{settings.telegram_bot_username}?start=weblogin",
-            },
-        )
+        from datetime import datetime, timezone
+        user.bot_started_at = datetime.now(timezone.utc)
 
+    await session.commit()
     _set_session_cookie(response, settings, make_session_token(user.id))
     return {"user_id": user.id, "created": created}
 
