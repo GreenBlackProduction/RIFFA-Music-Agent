@@ -54,6 +54,7 @@
     }
     </script>
 
+    <link rel="icon" type="image/svg+xml" href="/brand/04-applications/riffa-favicon-32.svg" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="manifest" href="/manifest.json" />
 
@@ -66,6 +67,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="RIFFA" />
     <meta name="application-name" content="RIFFA Studio" />
+    <link rel="apple-touch-icon" href="/brand/04-applications/riffa-app-icon.svg" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />
@@ -123,8 +125,7 @@
         z-index: 9999;
       }
       .riffa-splash__logo {
-        width: 72px; height: 72px; border-radius: 16px;
-        object-fit: cover; background: #161413;
+        width: 72px; height: 72px;
         animation: riffa-pulse 1.6s ease-in-out infinite;
       }
       .riffa-splash__brand {
@@ -152,10 +153,7 @@
     <div id="root">
       <!-- Splash для пользователя (исчезает когда React смонтируется) -->
       <div class="riffa-splash" aria-hidden="true">
-        <picture>
-          <source srcset="/riffa-logo.webp" type="image/webp" />
-          <img src="/riffa-logo.png" alt="" class="riffa-splash__logo" width="88" height="88" />
-        </picture>
+        <img src="/brand/01-mark/riffa-mark.svg" alt="" class="riffa-splash__logo" width="72" height="72" />
         <div class="riffa-splash__brand">RIFFA<small>Studio</small></div>
         <div class="riffa-splash__sub">Загружаем студию…</div>
       </div>

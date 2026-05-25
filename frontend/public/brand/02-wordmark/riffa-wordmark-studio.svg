@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" width="1000" height="500">
+  
+  <text x="108" y="320" font-family="&#39;Archivo Black&#39;, &#39;Inter&#39;, sans-serif" font-weight="900" font-size="260" letter-spacing="-13" fill="#161413">riffa</text>
+  <polygon points="758,124 758,318 892,221" fill="#FF3B1F"></polygon>
+  <line x1="408" y1="380" x2="592" y2="380" stroke="#0F5D47" stroke-width="1" opacity="0.25"></line>
+  <text x="512" y="430" font-family="&#39;JetBrains Mono&#39;, ui-monospace, monospace" font-weight="500" font-size="40" letter-spacing="24" fill="#0F5D47" text-anchor="middle">STUDIO</text>
+</svg>

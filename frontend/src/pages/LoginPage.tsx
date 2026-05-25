@@ -4,7 +4,6 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from "react-route
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import { RiffaMark } from "@/components/brand/RiffaMark";
-import { RiffaWordmark } from "@/components/brand/RiffaWordmark";
 import {
   loginWithEmail,
   loginWithTelegramInitData,
@@ -249,7 +248,11 @@ export function LoginPage() {
           </aside>
           <div className="login-hero__inner">
             <div className="login-hero__wordmark" aria-hidden="true">
-              <RiffaWordmark size={96} />
+              <img
+                src="/brand/03-lockup/riffa-lockup-horizontal-on-dark.svg"
+                alt="RIFFA Studio"
+                style={{ height: 52, width: "auto" }}
+              />
             </div>
             <h1>{t.hero.title}</h1>
             <p className="login-hero__lead">{t.hero_lead}</p>

@@ -1,24 +1,28 @@
 interface RiffaMarkProps {
   size?: number;
-  variant?: "paper" | "ink" | "white";
+  /** "light" = mark on dark bg (orange play, paper circle), "dark" = mark on light bg (ink bg), "inverted" = white version */
+  variant?: "light" | "dark" | "inverted" | "on-white";
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export function RiffaMark({ size = 32, variant = "paper", className }: RiffaMarkProps) {
-  if (variant === "ink") {
-    return (
-      <svg width={size} height={size} viewBox="0 0 100 100" className={className} aria-label="RIFFA">
-        <circle cx="50" cy="50" r="48" stroke="#E9E5DA" strokeWidth="3" fill="none" />
-        <polygon points="40,32 40,68 72,50" fill="#FF3B1F" />
-      </svg>
-    );
-  }
-  const inner = variant === "white" ? "#FAFAFA" : "#E9E5DA";
+export function RiffaMark({ size = 32, variant = "dark", className, style }: RiffaMarkProps) {
+  const srcMap: Record<string, string> = {
+    "light": "/brand/01-mark/riffa-mark-on-dark.svg",
+    "dark": "/brand/01-mark/riffa-mark.svg",
+    "inverted": "/brand/01-mark/riffa-mark-inverted.svg",
+    "on-white": "/brand/01-mark/riffa-mark-on-white.svg",
+  };
+  const src = srcMap[variant] ?? srcMap["dark"];
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" className={className} aria-label="RIFFA">
-      <circle cx="50" cy="50" r="50" fill="#161413" />
-      <circle cx="50" cy="50" r="38" fill={inner} />
-      <polygon points="40,32 40,68 72,50" fill="#FF3B1F" />
-    </svg>
+    <img
+      src={src}
+      width={size}
+      height={size}
+      alt="RIFFA"
+      className={className}
+      style={style}
+      draggable={false}
+    />
   );
 }
