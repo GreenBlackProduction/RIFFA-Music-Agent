@@ -16,30 +16,27 @@ interface SidebarProps {
 const TELEGRAM_BOT_URL = "https://t.me/The_Riffa_bot";
 
 const IconStudio = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <rect x="2" y="2" width="8" height="8" rx="2" />
-    <rect x="14" y="2" width="8" height="8" rx="2" />
-    <rect x="2" y="14" width="8" height="8" rx="2" />
-    <circle cx="18" cy="18" r="4" />
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2" y="3" width="12" height="10" rx="1.5" />
+    <path d="M5 7l3 2 3-2M5 10l3 2 3-2" />
   </svg>
 );
 const IconRadio = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M5 12.5a7 7 0 0 1 14 0" />
-    <path d="M1.5 9a11.5 11.5 0 0 1 21 0" />
-    <circle cx="12" cy="17" r="2" />
-    <line x1="12" y1="19" x2="12" y2="22" />
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="8" cy="8" r="2" />
+    <path d="M4.5 4.5a5 5 0 0 0 0 7M11.5 4.5a5 5 0 0 1 0 7M2 2a8 8 0 0 0 0 12M14 2a8 8 0 0 1 0 12" />
   </svg>
 );
 const IconProfile = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <circle cx="12" cy="8" r="4" />
-    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <circle cx="8" cy="5.5" r="2.5" />
+    <path d="M3 13c0-2.8 2.2-5 5-5s5 2.2 5 5" />
   </svg>
 );
 const IconAdmin = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="2" y="3" width="12" height="10" rx="1" />
+    <path d="M5 6h6M5 8h4M5 10h6" />
   </svg>
 );
 
