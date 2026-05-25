@@ -63,6 +63,11 @@ const MOODS: ReadonlyArray<{
 
 type Mood = typeof MOODS[number]["key"] | "collection";
 
+const GENRES = [
+  "Pop", "Rock", "Electronic", "Hip-Hop", "Jazz", "Classical",
+  "Lofi", "Ambient", "R&B", "Country", "Metal", "Folk",
+] as const;
+
 function MoodIcon({ moodKey, size = 18 }: { moodKey: string; size?: number }) {
   const visible = usePageVisible();
   const mood = MOODS.find((m) => m.key === moodKey);
@@ -93,6 +98,7 @@ export function RadioPage() {
     return typeof v === "string" && v ? v : "";
   };
   const [mood, setMood] = useState<Mood>("all");
+  const [activeGenre, setActiveGenre] = useState<string | null>(null);
   const [range, setRange] = useState<RadioPeriod>("today");
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -244,11 +250,12 @@ export function RadioPage() {
   const moodFilter = isCollection || isVocalFilter || mood === "all" ? undefined : mood;
 
   const playlistQuery = useQuery({
-    queryKey: [...RADIO_QUERY_KEY, "playlist", { mood: moodFilter ?? null, vocal: isVocalFilter }],
+    queryKey: [...RADIO_QUERY_KEY, "playlist", { mood: moodFilter ?? null, vocal: isVocalFilter, genre: activeGenre }],
     queryFn: () =>
       fetchRadio({
         mood: moodFilter,
         vocal: isVocalFilter ? "vocal" : undefined,
+        genre: activeGenre ?? undefined,
         sort: "recent",
         limit: 100,
       }),
@@ -414,6 +421,34 @@ export function RadioPage() {
               </button>
             );
           })}
+        </div>
+      </Panel>
+
+      {/* ── Genre playlists ── */}
+      <Panel className="radio-panel radio-panel--compact">
+        <header className="radio-section-head radio-section-head--compact">
+          <h3 className="radio-section-head__title">{t("radio.filterGenre")}</h3>
+        </header>
+        <div className="genre-chips">
+          <button
+            type="button"
+            className={`genre-chip${activeGenre === null ? " genre-chip--active" : ""}`}
+            onClick={() => setActiveGenre(null)}
+            aria-pressed={activeGenre === null}
+          >
+            {t("radio.allGenres")}
+          </button>
+          {GENRES.map((g) => (
+            <button
+              key={g}
+              type="button"
+              className={`genre-chip${activeGenre === g ? " genre-chip--active" : ""}`}
+              onClick={() => setActiveGenre(activeGenre === g ? null : g)}
+              aria-pressed={activeGenre === g}
+            >
+              {g}
+            </button>
+          ))}
         </div>
       </Panel>
 

@@ -484,6 +484,8 @@ export const ru: LocaleTree = {
     likes: "лайков",
     newToday: "новых сегодня",
     filterMood: "По настроению",
+    filterGenre: "По жанрам",
+    allGenres: "Все жанры",
     filterAll: "Все треки",
     filterWithText: "С текстом",
     filterCollection: "Моя коллекция",

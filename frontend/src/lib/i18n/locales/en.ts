@@ -479,6 +479,8 @@ export const en: TranslationKeys = {
     likes: "likes",
     newToday: "new today",
     filterMood: "By mood",
+    filterGenre: "By genre",
+    allGenres: "All genres",
     filterAll: "All tracks",
     filterWithText: "Vocal",
     filterCollection: "My collection",
