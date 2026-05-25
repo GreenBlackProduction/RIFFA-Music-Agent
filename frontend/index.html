@@ -76,20 +76,21 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Non-blocking font load: текст сразу рендерится с fallback, шрифт подгружается асинхронно -->
     <!--
-      Шрифты RIFFA v3:
-      • Geist 300/400/500/600/700 — body + UI: чистый геометрический гротеск
-      • Geist Mono 400/500/600 — метки, монотипные секции, промт-код
+      Шрифты RIFFA v1.0 (финальная идентичность):
+      • Archivo Black 900 — wordmark, display-заголовки
+      • Inter 400/500/600/700 — body + UI
+      • JetBrains Mono 400/500/600 — подписи, мета, цифры, чипы
     -->
     <link
       rel="preload"
       as="style"
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Archivo+Black&display=swap"
       onload="this.onload=null;this.rel='stylesheet'"
     />
     <noscript>
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Archivo+Black&display=swap"
       />
     </noscript>
     <!-- Telegram Mini App SDK — must load before React so initData is available -->
@@ -118,7 +119,7 @@
         display: flex; flex-direction: column;
         align-items: center; justify-content: center;
         background: #E9E5DA;
-        color: #161413; font-family: system-ui, -apple-system, "Geist", "Helvetica Neue", Arial, sans-serif;
+        color: #161413; font-family: system-ui, -apple-system, "Inter", "Helvetica Neue", Arial, sans-serif;
         z-index: 9999;
       }
       .riffa-splash__logo {

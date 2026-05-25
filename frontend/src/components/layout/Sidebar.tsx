@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { ActiveGenerations } from "@/components/layout/ActiveGenerations";
 import { Coin } from "@/components/ui/Coin";
+import { RiffaMark } from "@/components/brand/RiffaMark";
 import { useAuth } from "@/lib/auth";
 
 import "./Sidebar.css";
@@ -90,10 +91,12 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   return (
     <aside className={`sidebar${open ? " sidebar--open" : ""}`}>
       <NavLink to="/studio" className="brand" onClick={onClose}>
-        <img src="/riffa-logo.png" alt="RIFFA" className="brand-mark" />
-        <strong className="brand-name">RIFFA<span className="brand-name__sub">Studio</span></strong>
+        <RiffaMark size={26} />
+        <strong className="brand-name">RIFFA</strong>
+        <span className="brand-name__sub">studio</span>
       </NavLink>
 
+      <div className="nav-section">секции</div>
       <nav className="nav">
         {navItems.map((item) => (
           <NavLink

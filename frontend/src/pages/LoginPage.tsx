@@ -3,6 +3,8 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from "react-route
 
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
+import { RiffaMark } from "@/components/brand/RiffaMark";
+import { RiffaWordmark } from "@/components/brand/RiffaWordmark";
 import {
   loginWithEmail,
   loginWithTelegramInitData,
@@ -221,15 +223,34 @@ export function LoginPage() {
     <div className="login-page">
       <header className="login-topbar">
         <div className="login-topbar__brand">
-          <img src="/riffa-logo.png" alt="" className="login-brand__logo" />
-          <strong className="brand-name">RIFFA<span className="brand-name__sub">Studio</span></strong>
+          <RiffaMark size={22} />
+          <strong className="brand-name">RIFFA</strong>
+          <span className="brand-name__sub">studio</span>
         </div>
         <LoginLangSwitch />
       </header>
 
+      <div className="login-meta-ruler">
+        <span>вход · v1</span>
+        <span>выпуск 2026.05</span>
+        <span>riffastudio.site</span>
+      </div>
+
       <main className="login-grid">
         <section className="login-hero">
+          <aside className="login-hero__side">
+            <div className="login-kv">
+              <div>тип</div><div className="login-kv__v">веб + tg-бот</div>
+              <div>движок</div><div className="login-kv__v">нейросеть</div>
+              <div>трек</div><div className="login-kv__v">≈1–2 мин</div>
+              <div>формат</div><div className="login-kv__v">mp3 · wav</div>
+              <div>язык</div><div className="login-kv__v">русский</div>
+            </div>
+          </aside>
           <div className="login-hero__inner">
+            <div className="login-hero__wordmark" aria-hidden="true">
+              <RiffaWordmark size={96} />
+            </div>
             <h1>{t.hero.title}</h1>
             <p className="login-hero__lead">{t.hero_lead}</p>
             <ul className="login-hero__features">

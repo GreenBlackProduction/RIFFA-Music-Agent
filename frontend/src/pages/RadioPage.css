@@ -14,25 +14,15 @@
 
 .radio-hero {
   position: relative;
-  border-radius: var(--radius-xl);
-  border: 1px solid rgba(255, 59, 31, 0.20);
+  border-radius: 14px;
+  border: 1px solid var(--ink);
   padding: var(--space-6);
   overflow: hidden;
-  background-color: var(--bg-card);
-  background-image:
-    radial-gradient(120% 120% at 0% 0%, rgba(255, 59, 31, 0.20), transparent 60%),
-    radial-gradient(120% 100% at 100% 0%, rgba(214, 0, 255, 0.28), transparent 60%),
-    radial-gradient(100% 120% at 50% 100%, rgba(255, 90, 0, 0.25), transparent 60%),
-    linear-gradient(135deg, var(--paper-3), var(--paper-4));
-  background-size: 220% 220%, 220% 220%, 220% 220%, 100% 100%;
-  animation: radio-hero-drift 18s ease-in-out infinite;
+  background: var(--ink);
+  color: var(--paper);
 }
-
-@keyframes radio-hero-drift {
-  0%   { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
-  50%  { background-position: 50% 40%, 40% 60%, 70% 50%, 0 0; }
-  100% { background-position: 0% 0%, 100% 0%, 50% 100%, 0 0; }
-}
+.radio-hero h1, .radio-hero h2, .radio-hero p, .radio-hero strong { color: var(--paper); }
+.radio-hero .muted { color: rgba(233, 229, 218, 0.7); }
 
 .radio-hero__body { display: grid; gap: var(--space-3); max-width: 720px; }
 
@@ -390,10 +380,10 @@
   gap: 12px;
   align-items: start;
   padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.025);
-  color: var(--text);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
   text-align: left;
   cursor: pointer;
   width: 100%;
@@ -401,34 +391,34 @@
   transition: border-color 160ms ease, background 160ms ease;
 }
 .r-track:hover {
-  border-color: rgba(255, 59, 31, 0.20);
-  background: rgba(255, 255, 255, 0.045);
+  border-color: var(--ink);
+  background: var(--paper-3);
 }
 .r-track--active {
-  border-color: var(--accent);
-  background: rgba(124, 255, 31, 0.08);
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
 }
+.r-track--active * { color: var(--paper); }
 .r-track:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--hi);
   outline-offset: 2px;
 }
 
-/* Chart variant — +28px колонка под номер позиции */
 .r-track--chart {
   grid-template-columns: 28px 44px minmax(0, 1fr);
 }
 
 .r-track__pos {
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--hi), #d600ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
   text-align: center;
   align-self: center;
 }
+.r-track--active .r-track__pos { color: rgba(233, 229, 218, 0.6); }
 
 .r-track__cover {
   width: 44px;
