@@ -4,6 +4,8 @@
  * Куки сессии передаются автоматически (credentials: "include").
  */
 
+import i18next from "i18next";
+
 export interface ApiError {
   status: number;
   detail: string;
@@ -75,10 +77,44 @@ export interface CurrentUser {
   notice_kind: "ban" | "warning" | null;
   referral_code: string | null;
   created_at: string | null;
+  terms_accepted_at: string | null;
+  terms_version: string | null;
+  legal_version: string | null;
 }
 
 export function fetchCurrentUser(): Promise<CurrentUser> {
   return apiFetch<CurrentUser>("/api/v1/users/me");
+}
+
+export interface LegalDocument {
+  slug: string;
+  title: string;
+  version: string;
+  body: string;
+}
+
+export interface LegalIndex {
+  version: string;
+  documents: { slug: string; title: string }[];
+}
+
+export function fetchLegalIndex(): Promise<LegalIndex> {
+  return apiFetch<LegalIndex>("/api/v1/legal");
+}
+
+export function fetchLegalDocument(slug: string): Promise<LegalDocument> {
+  return apiFetch<LegalDocument>(`/api/v1/legal/${encodeURIComponent(slug)}`);
+}
+
+export interface AcceptTermsResponse {
+  terms_accepted_at: string;
+  terms_version: string;
+}
+
+export function acceptTerms(): Promise<AcceptTermsResponse> {
+  return apiFetch<AcceptTermsResponse>("/api/v1/users/accept-terms", {
+    method: "POST",
+  });
 }
 
 export interface RedeemPromoResponse {
@@ -120,6 +156,20 @@ export function loginWithTelegramInitData(
     method: "POST",
     body: JSON.stringify({ init_data: initData }),
   });
+}
+
+/** Start a bot-link login session — returns a nonce + bot deep-link URL. */
+export function startBotLinkLogin(): Promise<{ nonce: string; bot_url: string }> {
+  return apiFetch("/api/v1/auth/telegram/bot-link/start", { method: "POST" });
+}
+
+/** Poll the backend with the nonce until the bot approves the login. */
+export function pollBotLinkLogin(
+  nonce: string,
+): Promise<{ approved: boolean; user_id?: number }> {
+  return apiFetch(
+    `/api/v1/auth/telegram/bot-link/poll?nonce=${encodeURIComponent(nonce)}`,
+  );
 }
 
 export function registerWithEmail(
@@ -220,11 +270,37 @@ export async function uploadAvatar(file: File): Promise<{ avatar_url: string }> 
     body: fd,
   });
   const text = await response.text();
-  const data = text ? (JSON.parse(text) as { detail?: string; avatar_url?: string }) : undefined;
+  // Backend всегда отвечает JSON, но между нами и им nginx — он может
+  // вернуть HTML-страницу для 413 / 502 / других ошибок прокси. Парсим
+  // защищённо: если JSON битый — даём осмысленный fallback по статусу.
+  let data: { detail?: string; avatar_url?: string } | undefined;
+  if (text) {
+    try {
+      data = JSON.parse(text) as typeof data;
+    } catch {
+      data = undefined;
+    }
+  }
   if (!response.ok) {
-    const detail = (data && data.detail) || `Request failed with status ${response.status}`;
+    let detail = data?.detail;
+    if (!detail) {
+      const isEn = (i18next.resolvedLanguage ?? "ru").startsWith("en");
+      if (response.status === 413) {
+        detail = isEn ? "File too large. Use an image up to 4 MB." : "Файл слишком большой. Используйте изображение до 4 МБ.";
+      } else if (response.status === 415) {
+        detail = isEn ? "Unsupported format. PNG, JPEG or WebP." : "Неподдерживаемый формат. PNG, JPEG или WebP.";
+      } else if (response.status === 401) {
+        detail = isEn ? "Session expired, please sign in again." : "Сессия истекла, перезайдите.";
+      } else {
+        detail = isEn ? `Avatar upload error (HTTP ${response.status}).` : `Ошибка загрузки аватара (HTTP ${response.status}).`;
+      }
+    }
     const err: ApiError = { status: response.status, detail };
     throw err;
+  }
+  if (!data || !data.avatar_url) {
+    const isEn = (i18next.resolvedLanguage ?? "ru").startsWith("en");
+    throw { status: 500, detail: isEn ? "Server returned an invalid response." : "Сервер вернул некорректный ответ." } as ApiError;
   }
   return data as { avatar_url: string };
 }
@@ -367,6 +443,8 @@ export interface CoverSongParams {
   style_weight?: number | null;
   /** Suno weirdnessConstraint (0..1) — creative deviation from the original. */
   weirdness_constraint?: number | null;
+  /** ISO code: ru/en/es/fr/de/it/pt/ja/ko/zh. Empty = Suno auto. */
+  lyrics_language?: string;
   track_name?: string;
 }
 
@@ -441,6 +519,30 @@ export async function uploadCoverFile(file: File): Promise<string> {
     method: "PUT",
     body: file,
   });
+  if (!uploadResponse.ok) {
+    const errorText = await uploadResponse.text().catch(() => "");
+    throw new Error(
+      `Upload failed (${uploadResponse.status}): ${errorText || uploadResponse.statusText}`,
+    );
+  }
+  return public_url;
+}
+
+// Reference image upload for cover_art (image-to-image flow).
+const _COVER_REF_EXTS: ReadonlySet<string> = new Set(["jpg", "jpeg", "png", "webp"]);
+
+export function getCoverRefUploadUrl(extension = "jpg"): Promise<PresignedUploadResponse> {
+  return apiFetch("/api/v1/generate/upload-cover-ref-url", {
+    method: "POST",
+    body: JSON.stringify({ extension }),
+  });
+}
+
+export async function uploadCoverRefImage(file: File): Promise<string> {
+  let ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  if (!_COVER_REF_EXTS.has(ext)) ext = "jpg";
+  const { upload_url, public_url } = await getCoverRefUploadUrl(ext);
+  const uploadResponse = await fetch(upload_url, { method: "PUT", body: file });
   if (!uploadResponse.ok) {
     const errorText = await uploadResponse.text().catch(() => "");
     throw new Error(
@@ -533,6 +635,7 @@ export interface AgentChatRequest {
   selected_mood?: string;
   selected_tempo?: string;
   selected_vocal?: string;
+  lang?: "ru" | "en";
 }
 
 export interface AgentChatResponse {
@@ -545,9 +648,16 @@ export interface AgentChatResponse {
 }
 
 export function agentChat(req: AgentChatRequest): Promise<AgentChatResponse> {
+  // Auto-attach UI lang so the agent answers in the right language.
+  const lang = req.lang ?? (() => {
+    try {
+      const stored = localStorage.getItem("riffa_lang");
+      return stored && stored.startsWith("en") ? "en" : "ru";
+    } catch { return "ru"; }
+  })();
   return apiFetch("/api/v1/agent/chat", {
     method: "POST",
-    body: JSON.stringify(req),
+    body: JSON.stringify({ ...req, lang }),
   });
 }
 
@@ -746,6 +856,22 @@ export function recordRadioPlay(id: string): Promise<void> {
   return apiFetch(`/api/v1/radio/${id}/play`, { method: "POST" });
 }
 
+/** Admin-only: remove a track from public Radio. */
+export function adminUnpublishRadioTrack(id: string): Promise<void> {
+  return apiFetch(`/api/v1/radio/${id}/admin`, { method: "DELETE" });
+}
+
+/** Admin-only: manually reassign mood and/or vocal flag for a Radio track. */
+export function adminClassifyRadioTrack(
+  id: string,
+  body: { mood?: string | null; has_vocals?: boolean | null },
+): Promise<{ id: string; mood: string | null; vocal: string | null }> {
+  return apiFetch(`/api/v1/radio/${id}/admin/classify`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Public share
 // ---------------------------------------------------------------------------
@@ -762,8 +888,12 @@ export interface PublicGenerationOut {
   created_at: string;
 }
 
-export function fetchSharedGeneration(shareId: string): Promise<PublicGenerationOut> {
-  return apiFetch(`/api/v1/share/${shareId}`);
+export function fetchSharedGeneration(
+  shareId: string,
+  variant?: number | null,
+): Promise<PublicGenerationOut> {
+  const qs = variant !== undefined && variant !== null ? `?v=${variant}` : "";
+  return apiFetch(`/api/v1/share/${shareId}${qs}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -846,6 +976,36 @@ export function openGenerationSocket(
   return connect();
 }
 
+/** Fetch active and recently completed generations from the server.
+ *  Used on app startup to sync sidebar state across devices/sessions. */
+export async function fetchActiveGenerations(): Promise<
+  Array<{
+    id: string;
+    type: string;
+    title: string;
+    status: string;
+    progress: number;
+    step: string | null;
+    error: string | null;
+    result: Record<string, unknown> | null;
+  }>
+> {
+  const list = await apiFetch<
+    Array<{
+      id: string;
+      type: string;
+      title: string;
+      status: string;
+      progress: number;
+      step: string | null;
+      error: string | null;
+      result: Record<string, unknown> | null;
+    }>
+  >("/api/v1/generate/active");
+  return list ?? [];
+}
+
+
 /** Poll generation status via HTTP (fallback when WS is unreliable). */
 export function pollGenerationStatus(
   generationId: string,
@@ -869,7 +1029,7 @@ export function pollGenerationStatus(
         return;
       }
       if (gen.status === "failed") {
-        onUpdate({ status: "failed", error: gen.error_message ?? "Ошибка генерации" });
+        onUpdate({ status: "failed", error: gen.error_message ?? ((i18next.resolvedLanguage ?? "ru").startsWith("en") ? "Generation failed" : "Ошибка генерации") });
         active = false;
         return;
       }

@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   convertToWav,
@@ -87,7 +88,24 @@ async function downloadBlob(url: string, filename: string) {
 }
 
 export function GlobalPlayer() {
-  const current = usePlayer((s) => s.current);
+  const { t } = useTranslation();
+  // Узкие selectors через примитивы — useEffect-ы не пересчитываются
+  // когда меняются другие поля current (ratings, isPublic и т.п.).
+  // Это критично: при тоггле радио / изменении лайков current-объект
+  // мог пересоздаваться, что приводило к повторным вызовам el.play()
+  // во время буферизации → заикания и обрыв воспроизведения.
+  const currentId = usePlayer((s) => (s.current ? String(s.current.id) : null));
+  const currentUrl = usePlayer((s) => s.current?.url ?? null);
+  const currentTitle = usePlayer((s) => s.current?.title ?? "");
+  const currentAuthor = usePlayer((s) => s.current?.author ?? "");
+  const currentMeta = usePlayer((s) => s.current?.meta ?? "");
+  const currentCover = usePlayer((s) => s.current?.cover ?? null);
+  const currentCanRadio = usePlayer((s) => s.current?.canRadio ?? false);
+  const currentIsMusicType = usePlayer((s) => s.current?.isMusicType ?? false);
+  const currentAudioId = usePlayer((s) => s.current?.audioId ?? null);
+  const currentIsOwn = usePlayer((s) => s.current?.isOwn);
+  const currentLikes = usePlayer((s) => s.current?.likes ?? 0);
+  const currentDislikes = usePlayer((s) => s.current?.dislikes ?? 0);
   const isPlaying = usePlayer((s) => s.isPlaying);
   const setPlaying = usePlayer((s) => s.setPlaying);
   const stop = usePlayer((s) => s.stop);
@@ -111,8 +129,25 @@ export function GlobalPlayer() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playerRef = useRef<HTMLDivElement>(null);
+  const progressRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  // Track what URL we've set so we compare against our value, not the
+  // browser-normalised el.src (relative vs absolute causes false reloads).
+  const currentSrcRef = useRef<string>("");
+  // Suppress the onPause event fired by some browsers during a seek gesture.
+  const seekingRef = useRef(false);
+  // Track active drag for the progress bar.
+  const draggingRef = useRef(false);
+  // Last setPositionState update — throttle to ~1Hz to keep MediaSession
+  // happy without flooding it from every timeupdate (4 Hz × N hooks).
+  const lastPosUpdateRef = useRef(0);
+  // Last time we attempted onError-driven recovery — debounce so a broken
+  // URL doesn't pin us in an infinite reload loop.
+  const lastErrorRecoveryRef = useRef(0);
+  // Если URL обложки не загрузился — переключаемся на ♪
+  const [coverFailed, setCoverFailed] = useState(false);
+  useEffect(() => { setCoverFailed(false); }, [currentCover]);
 
   // Queue dropdown
   const [queueOpen, setQueueOpen] = useState(false);
@@ -126,25 +161,199 @@ export function GlobalPlayer() {
   const boltBtnRef = useRef<HTMLButtonElement>(null);
   const boltMenuRef = useRef<HTMLDivElement>(null);
 
+  // Collapsed mode — компактная плашка только с обложкой, названием и
+  // play/pause. На мобильном плеер занимает 3 ряда (track-info / controls
+  // / actions), это много места. Юзер может свернуть его до одной строки.
+  const [collapsed, setCollapsed] = useState(false);
+
+  // URL changes + play/pause — единый эффект, чтобы избежать гонок.
+  // Раньше src ставился в одном useEffect, а el.play() — в другом. Они
+  // запускались в одном React commit, и play() звался ДО того как audio
+  // успевал загрузить хоть один байт. На медленных мобильных сетях это
+  // приводило к заиканиям и иногда к полному обрыву воспроизведения.
+  //
+  // Теперь: при смене URL ждём `canplay` и только тогда играем.
+  // Если play/pause тоггл без смены URL — просто переключаем состояние.
   useEffect(() => {
     const el = audioRef.current;
-    if (!el || !current) return;
-    if (el.src !== current.url) {
-      el.src = current.url;
+    if (!el || !currentUrl) return;
+    if (draggingRef.current) return;
+
+    // URL сменился — перезагружаем src и ждём готовности.
+    if (currentSrcRef.current !== currentUrl) {
+      currentSrcRef.current = currentUrl;
+      el.src = currentUrl;
       el.currentTime = 0;
+      setProgress(0);
+      // Явный load() — на Android Chrome без него audio иногда
+      // «застревает» на старом источнике, особенно в фоне.
+      el.load();
+      if (isPlaying) {
+        // Ждём первого `canplay` — означает, что есть достаточно
+        // данных, чтобы начать воспроизведение без немедленного обрыва.
+        const onCanPlay = () => {
+          el.removeEventListener("canplay", onCanPlay);
+          if (!isPlaying) return;
+          el.play().catch(() => setPlaying(false));
+        };
+        el.addEventListener("canplay", onCanPlay, { once: true });
+        return () => {
+          el.removeEventListener("canplay", onCanPlay);
+        };
+      }
+      return;
     }
-    if (isPlaying) {
+
+    // URL тот же — просто тоггл play/pause.
+    if (isPlaying && el.paused) {
       el.play().catch(() => setPlaying(false));
-    } else {
+    } else if (!isPlaying && !el.paused) {
       el.pause();
     }
-  }, [current, isPlaying, setPlaying]);
+  }, [currentUrl, isPlaying, setPlaying]);
+
+  // Восстановление воспроизведения после возврата вкладки из фона.
+  // На Android Chrome агрессивно «замораживает» вкладки в фоне:
+  // событий `pagehide` + `freeze` (Page Lifecycle API), а при возврате —
+  // `resume` или `pageshow` (если возвращение из bfcache). В этих сценариях
+  // браузер мог:
+  //   • поставить аудио на паузу (нормально для мобильных в фоне);
+  //   • вытолкнуть аудио из памяти и потерять `src` (редко, но бывает).
+  // Поэтому при возврате вкладки в активное состояние мы:
+  //   1) если потерян src — переустанавливаем его и currentTime;
+  //   2) если предполагалось играть — продолжаем воспроизведение.
+  useEffect(() => {
+    function resumePlaybackIfNeeded() {
+      const el = audioRef.current;
+      if (!el || !currentUrl || !isPlaying) return;
+      // Браузер мог потерять src при «freeze» вкладки.
+      if (!el.src || el.src === window.location.href) {
+        el.src = currentUrl;
+        el.load();
+      }
+      if (el.paused) {
+        el.play().catch(() => undefined);
+      }
+    }
+    function onVisible() {
+      if (document.hidden) return;
+      resumePlaybackIfNeeded();
+    }
+    function onPageShow() {
+      // bfcache restore — вкладка вернулась из стека истории.
+      resumePlaybackIfNeeded();
+    }
+    function onResume() {
+      // Page Lifecycle API resume — вкладка вышла из frozen state.
+      resumePlaybackIfNeeded();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("resume", onResume);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("resume", onResume);
+    };
+  }, [isPlaying, currentUrl]);
+
+  // Media Session API — lock screen / notification centre controls.
+  // Lets the OS know audio is playing so it doesn't kill the tab on screen lock.
+  // ВАЖНО для iOS: правильно настроенный MediaSession (с metadata,
+  // playbackState и positionState) удерживает «Now Playing» в Control
+  // Center и привязывает его к нашему PWA. Без этого iOS может выгрузить
+  // вкладку из памяти и перенаправить контролы на другой app.
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !currentUrl) return;
+    const cover = currentCover;
+    const artwork = cover
+      ? [
+          { src: cover, sizes: "96x96", type: "image/webp" },
+          { src: cover, sizes: "192x192", type: "image/webp" },
+          { src: cover, sizes: "256x256", type: "image/webp" },
+          { src: cover, sizes: "384x384", type: "image/webp" },
+          { src: cover, sizes: "512x512", type: "image/webp" },
+        ]
+      : [
+          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+        ];
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: currentTitle || "RIFFA",
+      artist: currentAuthor || "RIFFA Music",
+      album: currentMeta || "",
+      artwork,
+    });
+  }, [currentUrl, currentTitle, currentAuthor, currentMeta, currentCover]);
+
+  // playbackState ↔ isPlaying — даём системе чёткий сигнал.
+  // На iOS это критически важно: без правильного state lock-screen
+  // плеер может «забыть» о нас при долгом фоновом воспроизведении.
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !currentUrl) return;
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+  }, [isPlaying, currentUrl]);
 
   useEffect(() => {
-    if (current) document.body.classList.add("has-global-player");
+    if (!("mediaSession" in navigator)) return;
+    const el = audioRef.current;
+    navigator.mediaSession.setActionHandler("play", () => setPlaying(true));
+    navigator.mediaSession.setActionHandler("pause", () => setPlaying(false));
+    navigator.mediaSession.setActionHandler("previoustrack", () => hasQueue && prev());
+    navigator.mediaSession.setActionHandler("nexttrack", () => hasQueue && next());
+    // Перемотка из lock-screen / Control Center на 10 секунд.
+    const skip = (delta: number) => () => {
+      if (!el || !isFinite(el.duration)) return;
+      el.currentTime = Math.max(0, Math.min(el.duration, el.currentTime + delta));
+      setProgress(el.currentTime);
+    };
+    try { navigator.mediaSession.setActionHandler("seekbackward", skip(-10)); } catch { /* unsupported */ }
+    try { navigator.mediaSession.setActionHandler("seekforward",  skip(+10)); } catch { /* unsupported */ }
+    try {
+      navigator.mediaSession.setActionHandler("seekto", (details) => {
+        if (!el || details.seekTime == null) return;
+        el.currentTime = details.seekTime;
+        setProgress(details.seekTime);
+      });
+    } catch { /* unsupported */ }
+    return () => {
+      navigator.mediaSession.setActionHandler("play", null);
+      navigator.mediaSession.setActionHandler("pause", null);
+      navigator.mediaSession.setActionHandler("previoustrack", null);
+      navigator.mediaSession.setActionHandler("nexttrack", null);
+      try { navigator.mediaSession.setActionHandler("seekbackward", null); } catch { /* ignore */ }
+      try { navigator.mediaSession.setActionHandler("seekforward",  null); } catch { /* ignore */ }
+      try { navigator.mediaSession.setActionHandler("seekto",       null); } catch { /* ignore */ }
+    };
+  }, [setPlaying, hasQueue, prev, next]);
+
+  // Положение в треке — без этого iOS постепенно «забывает» о нашей
+  // сессии и закрывает плашку в Control Center. Throttle до 1 Hz —
+  // ниже стандартного timeupdate (~4 Hz), но достаточно для прогресса
+  // на lock-screen. Без throttle на слабых Android устройствах вызов
+  // setPositionState 4 раза в секунду заметно ест CPU и вызывает
+  // микро-заикания.
+  useEffect(() => {
+    if (!("mediaSession" in navigator) || !currentUrl) return;
+    if (typeof navigator.mediaSession.setPositionState !== "function") return;
+    if (!duration || !isFinite(duration) || duration <= 0) return;
+    const now = Date.now();
+    if (now - lastPosUpdateRef.current < 950) return;
+    lastPosUpdateRef.current = now;
+    try {
+      navigator.mediaSession.setPositionState({
+        duration,
+        playbackRate: 1.0,
+        position: Math.max(0, Math.min(progress, duration)),
+      });
+    } catch { /* invalid state — ignore */ }
+  }, [currentUrl, duration, progress]);
+
+  useEffect(() => {
+    if (currentUrl) document.body.classList.add("has-global-player");
     else document.body.classList.remove("has-global-player");
     return () => document.body.classList.remove("has-global-player");
-  }, [current]);
+  }, [currentUrl]);
 
   // Close queue on outside click
   useEffect(() => {
@@ -170,23 +379,27 @@ export function GlobalPlayer() {
     return () => document.removeEventListener("click", onOutside, true);
   }, [boltOpen]);
 
-  if (!current) return null;
+  if (!currentId || !currentUrl) return null;
 
-  const rating = ratings[String(current.id)] ?? null;
-  const genId = extractGenId(current.id);
-  const onRadio = current.isPublic !== undefined ? current.isPublic : radioSet.has(String(current.id));
-  const likes = (current.likes ?? 0) + (rating === "like" ? 1 : 0);
-  const dislikes = (current.dislikes ?? 0) + (rating === "dislike" ? 1 : 0);
+  const rating = ratings[currentId] ?? null;
+  const genId = extractGenId(currentId);
+  // radioSet синхронизируется при play(), так что является источником
+  // истины для текущего состояния. Если current.isPublic явно задан и
+  // отличается от radioSet — отдаём приоритет radioSet (он отражает
+  // последний явный toggle пользователя).
+  const onRadio = radioSet.has(currentId);
+  const likes = currentLikes + (rating === "like" ? 1 : 0);
+  const dislikes = currentDislikes + (rating === "dislike" ? 1 : 0);
 
   async function handleRadioToggle() {
-    if (!current || radioPending) return;
-    if (!genId) { toggleRadio(current.id); return; }
+    if (!currentId || radioPending) return;
+    if (!genId) { toggleRadio(currentId); return; }
     const nextVal = !onRadio;
-    const trackIndex = extractTrackIndex(current.id);
+    const trackIndex = extractTrackIndex(currentId);
     setRadioPending(true);
     try {
       await toggleHistoryRadio(genId, nextVal, trackIndex);
-      setRadioState(current.id, nextVal);
+      setRadioState(currentId, nextVal);
       await queryClient.invalidateQueries({ queryKey: ["history"] });
       await queryClient.invalidateQueries({ queryKey: ["radio"] });
     } catch { /* ignore */ } finally {
@@ -194,28 +407,56 @@ export function GlobalPlayer() {
     }
   }
 
-  /** Toggle like / dislike. For own tracks → /history/{id}/rating
-   *  (which auto-publishes to "Моя коллекция" when liking); for community
-   *  tracks → /radio/{id}/vote. Cached locally so the icon flips instantly. */
+  /** Toggle like / dislike. Try the «own track» endpoint first, fall back
+   *  to the radio-vote endpoint when the server says «not your track». This
+   *  removes the previous flaky behaviour where the like would briefly
+   *  light up and immediately reset on tracks whose `isOwn` flag came from
+   *  cache and didn't match the server (e.g. tracks copied into the user's
+   *  collection from someone else's radio publish).
+   *  We keep the optimistic local UI even on errors — the user clearly
+   *  meant to vote, and the worst case is a quiet log entry. */
   async function handleRate(kind: "like" | "dislike") {
-    if (!current) return;
+    if (!currentId) return;
     const previous = rating;
     const nextLocal: "like" | "dislike" | null = previous === kind ? null : kind;
-    setRating(current.id, nextLocal);
+    setRating(currentId, nextLocal);
     if (!genId) return; // mock track / no backend id
     const apiRating: "like" | "dislike" | "remove" =
       nextLocal === null ? "remove" : nextLocal;
+
+    const tryOwn = currentIsOwn !== false;
+    let succeeded = false;
     try {
-      if (current.isOwn) {
+      if (tryOwn) {
         await rateGeneration(genId, apiRating);
       } else {
         await voteRadioTrack(genId, apiRating);
       }
+      succeeded = true;
+    } catch (err) {
+      // If the primary endpoint says 404 (not your track / not public),
+      // fall back to the other one. Covers the case where current.isOwn
+      // is stale or wrong.
+      const status = (err as { status?: number })?.status;
+      if (status === 404 || status === 403) {
+        try {
+          if (tryOwn) {
+            await voteRadioTrack(genId, apiRating);
+          } else {
+            await rateGeneration(genId, apiRating);
+          }
+          succeeded = true;
+        } catch (err2) {
+          // Both endpoints rejected — log and keep the optimistic UI.
+          console.warn("[player] rating failed on both endpoints", err2);
+        }
+      } else {
+        console.warn("[player] rating failed", err);
+      }
+    }
+    if (succeeded) {
       await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: ["radio"] });
-    } catch {
-      // Rollback the optimistic local rating on failure.
-      setRating(current.id, previous);
     }
   }
 
@@ -226,12 +467,54 @@ export function GlobalPlayer() {
     return `${m}:${s}`;
   }
 
-  function seekTo(e: React.MouseEvent<HTMLDivElement>) {
+  /** Compute target time from a pointer X position relative to the progress bar.
+   *  Used by both initial click and drag. */
+  function computeSeekTime(clientX: number): number | null {
+    const bar = progressRef.current;
     const el = audioRef.current;
-    if (!el || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    el.currentTime = Math.max(0, Math.min(duration, x * duration));
+    if (!bar || !el || !duration || !isFinite(duration)) return null;
+    const rect = bar.getBoundingClientRect();
+    if (rect.width <= 0) return null;
+    const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return x * duration;
+  }
+
+  /** Single-click or start of drag — capture the pointer so we keep getting
+   *  pointermove events even when the cursor leaves the bar. */
+  function handleSeekStart(e: React.PointerEvent<HTMLDivElement>) {
+    const el = audioRef.current;
+    if (!el) return;
+    const t = computeSeekTime(e.clientX);
+    if (t === null) return;
+    seekingRef.current = true;
+    draggingRef.current = true;
+    el.currentTime = t;
+    setProgress(t);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // setPointerCapture can fail in rare cases — fall back to global listeners
+    }
+  }
+
+  function handleSeekMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!draggingRef.current) return;
+    const el = audioRef.current;
+    if (!el) return;
+    const t = computeSeekTime(e.clientX);
+    if (t === null) return;
+    el.currentTime = t;
+    setProgress(t);
+  }
+
+  function handleSeekEnd(e: React.PointerEvent<HTMLDivElement>) {
+    draggingRef.current = false;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch { /* ignore */ }
+    // Allow pause/play events to fire normally again after a short delay
+    // so we don't reset playback state during the trailing seek event.
+    window.setTimeout(() => { seekingRef.current = false; }, 200);
   }
 
   function toggleQueueDropdown() {
@@ -250,14 +533,14 @@ export function GlobalPlayer() {
   }
 
   async function handleWavConvert() {
-    if (!current?.audioId || !current?.isMusicType || wavPending) return;
-    const gId = extractGenId(current.id);
+    if (!currentAudioId || !currentIsMusicType || wavPending || !currentId) return;
+    const gId = extractGenId(currentId);
     if (!gId) return;
     setBoltOpen(false);
     setWavPending(true);
     try {
-      const resp = await convertToWav({ generation_id: gId, audio_id: current.audioId });
-      trackGeneration(resp.generation_id, resp.ws_url, "wav_convert", `WAV: ${current.title}`);
+      const resp = await convertToWav({ generation_id: gId, audio_id: currentAudioId });
+      trackGeneration(resp.generation_id, resp.ws_url, "wav_convert", `WAV: ${currentTitle}`);
     } catch {
       // generation card in sidebar will show error state
     } finally {
@@ -267,6 +550,11 @@ export function GlobalPlayer() {
 
   function handleEnergy(energy: number) {
     if (!playerRef.current) return;
+    // When idle, keep the CSS baseline glow — don't overwrite with near-zero values
+    if (energy < 0.02) {
+      playerRef.current.style.boxShadow = "";
+      return;
+    }
     const size = Math.round(10 + energy * 56);
     const a1 = (0.18 + energy * 0.58).toFixed(2);
     const a2 = (Math.min((0.18 + energy * 0.58) * 1.8, 0.92)).toFixed(2);
@@ -275,13 +563,18 @@ export function GlobalPlayer() {
   }
 
   function handleDownload() {
-    if (!current?.url) return;
-    const filename = `RIFFA - ${sanitizeFilename(current.title ?? "Track")}.mp3`;
-    downloadBlob(current.url, filename);
+    if (!currentUrl) return;
+    const filename = `RIFFA - ${sanitizeFilename(currentTitle ?? "Track")}.mp3`;
+    downloadBlob(currentUrl, filename);
   }
 
   return (
-    <div className="global-player" ref={playerRef} role="region" aria-label="Плеер">
+    <div
+      className={`global-player${collapsed ? " global-player--collapsed" : ""}`}
+      ref={playerRef}
+      role="region"
+      aria-label={t("globalPlayer.regionLabel")}
+    >
       <PlayerAura audio={audioRef} active={isPlaying} onEnergy={handleEnergy} />
 
       {/* LEFT: track info — click opens queue list */}
@@ -290,21 +583,21 @@ export function GlobalPlayer() {
         type="button"
         className={`gp-track${queueOpen ? " gp-track--open" : ""}`}
         onClick={hasQueue ? toggleQueueDropdown : undefined}
-        aria-label={hasQueue ? "Список треков" : undefined}
+        aria-label={hasQueue ? t("globalPlayer.queueLabel") : undefined}
         aria-expanded={hasQueue ? queueOpen : undefined}
         style={hasQueue ? undefined : { cursor: "default", pointerEvents: "none" }}
       >
         <div className="gp-cover" aria-hidden="true">
-          {current.cover ? (
-            <img src={current.cover} alt="" />
+          {currentCover && !coverFailed ? (
+            <img src={currentCover} alt="" onError={() => setCoverFailed(true)} />
           ) : (
             <div className="gp-cover-fallback">♪</div>
           )}
         </div>
         <div className="gp-meta">
-          <span className="gp-title" title={current.title}>{current.title}</span>
+          <span className="gp-title" title={currentTitle}>{currentTitle}</span>
           <span className="gp-sub">
-            {[current.author, current.meta].filter(Boolean).join(" · ")}
+            {[currentAuthor, currentMeta].filter(Boolean).join(" · ")}
           </span>
         </div>
         {hasQueue && (
@@ -322,8 +615,8 @@ export function GlobalPlayer() {
             className="gp-ctrl"
             onClick={prev}
             disabled={!hasQueue}
-            aria-label="Предыдущий трек"
-            title="Назад"
+            aria-label={t("globalPlayer.prevAria")}
+            title={t("globalPlayer.prev")}
           >
             <IconPrev />
           </button>
@@ -331,7 +624,7 @@ export function GlobalPlayer() {
             type="button"
             className="gp-ctrl gp-ctrl--play"
             onClick={() => setPlaying(!isPlaying)}
-            aria-label={isPlaying ? "Пауза" : "Воспроизвести"}
+            aria-label={isPlaying ? t("globalPlayer.pauseAria") : t("globalPlayer.playAria")}
           >
             {isPlaying ? <IconPause /> : <IconPlay />}
           </button>
@@ -340,8 +633,8 @@ export function GlobalPlayer() {
             className="gp-ctrl"
             onClick={next}
             disabled={!hasQueue}
-            aria-label="Следующий трек"
-            title="Далее"
+            aria-label={t("globalPlayer.nextAria")}
+            title={t("globalPlayer.next")}
           >
             <IconNext />
           </button>
@@ -349,7 +642,7 @@ export function GlobalPlayer() {
             type="button"
             className={`gp-ctrl gp-ctrl--shuffle${shuffle ? " gp-ctrl--active" : ""}`}
             onClick={() => setShuffle(!shuffle)}
-            aria-label="Случайный порядок"
+            aria-label={t("globalPlayer.shuffleAria")}
             aria-pressed={shuffle}
             title="Shuffle"
           >
@@ -357,7 +650,19 @@ export function GlobalPlayer() {
           </button>
         </div>
 
-        <div className="gp-progress" onClick={seekTo} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={duration ? Math.round((progress / duration) * 100) : 0}>
+        <div
+          ref={progressRef}
+          className="gp-progress"
+          onPointerDown={handleSeekStart}
+          onPointerMove={handleSeekMove}
+          onPointerUp={handleSeekEnd}
+          onPointerCancel={handleSeekEnd}
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={duration ? Math.round((progress / duration) * 100) : 0}
+          style={{ touchAction: "none" }}
+        >
           <div
             className="gp-progress-fill"
             style={{ width: duration ? `${(progress / duration) * 100}%` : "0%" }}
@@ -375,21 +680,21 @@ export function GlobalPlayer() {
           type="button"
           className="gp-act gp-act--dl"
           onClick={handleDownload}
-          title="Скачать трек"
-          aria-label="Скачать трек"
+          title={t("globalPlayer.download")}
+          aria-label={t("globalPlayer.download")}
         >
           <svg viewBox="0 0 16 16" width="13" height="13" fill="none" aria-hidden>
             <path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
 
-        {current.isMusicType && (
+        {currentIsMusicType && (
           <button
             ref={boltBtnRef}
             type="button"
             className={`gp-act gp-act--bolt${boltOpen ? " gp-act--open" : ""}`}
             onClick={openBolt}
-            title="Действия с треком"
+            title={t("globalPlayer.trackActions")}
             aria-expanded={boltOpen}
             aria-haspopup="menu"
           >
@@ -403,7 +708,7 @@ export function GlobalPlayer() {
           type="button"
           className={`gp-act gp-act--rate${rating === "like" ? " gp-act--like-on" : ""}`}
           onClick={() => void handleRate("like")}
-          aria-label="Лайк"
+          aria-label={t("globalPlayer.likeAria")}
           aria-pressed={rating === "like"}
         >
           👍{likes > 0 ? <span className="gp-act-count">{likes}</span> : null}
@@ -413,49 +718,104 @@ export function GlobalPlayer() {
           type="button"
           className={`gp-act gp-act--rate${rating === "dislike" ? " gp-act--dis-on" : ""}`}
           onClick={() => void handleRate("dislike")}
-          aria-label="Дизлайк"
+          aria-label={t("globalPlayer.dislikeAria")}
           aria-pressed={rating === "dislike"}
         >
           👎{dislikes > 0 ? <span className="gp-act-count">{dislikes}</span> : null}
         </button>
 
-        {current.canRadio && (
+        {currentCanRadio && (
           <button
             type="button"
             className={`gp-act gp-act--radio${onRadio ? " gp-act--radio-on" : ""}`}
             onClick={handleRadioToggle}
             disabled={radioPending}
-            title={onRadio ? "Убрать с радио" : "Добавить на радио"}
+            title={onRadio ? t("fileActions.removeFromRadio") : t("fileActions.addToRadio")}
             aria-pressed={onRadio}
           >
-            {radioPending ? "…" : onRadio ? "✓ Эфир" : "В эфир"}
+            {radioPending ? "…" : onRadio ? t("globalPlayer.radioOn") : t("globalPlayer.radioOff")}
           </button>
         )}
 
         <button
           type="button"
+          className="gp-act gp-act--collapse"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-label={collapsed ? t("globalPlayer.expand") : t("globalPlayer.collapse")}
+          title={collapsed ? t("globalPlayer.expand") : t("globalPlayer.collapse")}
+          aria-pressed={collapsed}
+        >
+          <span aria-hidden style={{ display: "inline-block", lineHeight: 1 }}>
+            {collapsed ? "▲" : "▼"}
+          </span>
+        </button>
+
+        <button
+          type="button"
           className="gp-act gp-act--close"
           onClick={stop}
-          aria-label="Закрыть плеер"
-          title="Закрыть"
+          aria-label={t("globalPlayer.closeAria")}
+          title={t("globalPlayer.close")}
         >
           ×
         </button>
       </div>
 
       {/*
-        crossOrigin="anonymous" is required so PlayerAura's createMediaElementSource()
-        does not taint cross-origin Suno CDN audio.
+        Аудио играет напрямую через HTML5 — без Web Audio API. Это даёт
+        нативное фоновое воспроизведение при сворачивании браузера/Telegram.
+        playsInline нужен iOS чтобы не перехватывать audio в встроенный плеер.
       */}
       <audio
         ref={audioRef}
-        preload="metadata"
-        crossOrigin="anonymous"
+        preload="auto"
+        playsInline
         onLoadedMetadata={(e) => setDuration((e.target as HTMLAudioElement).duration)}
-        onTimeUpdate={(e) => setProgress((e.target as HTMLAudioElement).currentTime)}
+        onTimeUpdate={(e) => {
+          if (draggingRef.current) return; // don't fight user's drag
+          setProgress((e.target as HTMLAudioElement).currentTime);
+        }}
         onEnded={() => { if (hasQueue) next(); else setPlaying(false); }}
-        onPause={() => setPlaying(false)}
+        onPause={() => {
+          // Игнорируем pause-event когда вкладка скрыта — браузер может
+          // сам приостановить аудио. Не сбрасываем isPlaying, тогда при
+          // возврате на вкладку плеер автоматически продолжит.
+          if (document.hidden) return;
+          if (!seekingRef.current && !draggingRef.current) setPlaying(false);
+        }}
         onPlay={() => setPlaying(true)}
+        onError={(e) => {
+          // Android Chrome иногда выгружает audio из памяти после долгого
+          // фона и оставляет нас с MEDIA_ERR_NETWORK / MEDIA_ERR_SRC_NOT_SUPPORTED.
+          // Восстанавливаем источник и пробуем продолжить с текущей позиции.
+          const el = e.currentTarget as HTMLAudioElement;
+          const now = Date.now();
+          if (now - lastErrorRecoveryRef.current < 3000) return; // не зацикливаемся
+          lastErrorRecoveryRef.current = now;
+          const url = currentSrcRef.current;
+          if (!url) return;
+          const savedTime = el.currentTime;
+          try {
+            el.src = url;
+            el.load();
+            if (savedTime > 0 && isFinite(savedTime)) {
+              const onReady = () => {
+                el.removeEventListener("loadedmetadata", onReady);
+                try { el.currentTime = savedTime; } catch { /* ignore */ }
+                if (isPlaying) el.play().catch(() => undefined);
+              };
+              el.addEventListener("loadedmetadata", onReady, { once: true });
+            } else if (isPlaying) {
+              const onCanPlay = () => {
+                el.removeEventListener("canplay", onCanPlay);
+                el.play().catch(() => undefined);
+              };
+              el.addEventListener("canplay", onCanPlay, { once: true });
+            }
+          } catch {
+            /* nothing more we can do */
+          }
+        }}
       />
 
       {/* Queue dropdown portal */}
@@ -465,12 +825,12 @@ export function GlobalPlayer() {
             ref={queueRef}
             className="gp-queue"
             role="listbox"
-            aria-label="Список треков"
+            aria-label={t("globalPlayer.queueLabel")}
             style={{ bottom: queuePos.bottom, left: queuePos.left, minWidth: queuePos.width }}
           >
-            {queue.map((t, i) => (
+            {queue.map((qt, i) => (
               <button
-                key={String(t.id)}
+                key={String(qt.id)}
                 type="button"
                 role="option"
                 aria-selected={i === queueIndex}
@@ -478,8 +838,8 @@ export function GlobalPlayer() {
                 onClick={() => { playIndex(i); setQueueOpen(false); }}
               >
                 <span className="gp-queue-num">{i + 1}</span>
-                <span className="gp-queue-title">{t.title || "Трек"}</span>
-                {t.meta && <span className="gp-queue-meta">{t.meta}</span>}
+                <span className="gp-queue-title">{qt.title || t("globalPlayer.queueTrackFallback")}</span>
+                {qt.meta && <span className="gp-queue-meta">{qt.meta}</span>}
                 {i === queueIndex && <span className="gp-queue-playing" aria-hidden>♪</span>}
               </button>
             ))}
@@ -497,16 +857,16 @@ export function GlobalPlayer() {
             style={{ bottom: boltPos.bottom, right: boltPos.right }}
           >
             <button type="button" role="menuitem" onClick={() => setBoltOpen(false)}>
-              🔁&nbsp; Продлить трек
+              {t("globalPlayer.extendTrack")}
             </button>
             <button
               type="button"
               role="menuitem"
               onClick={() => void handleWavConvert()}
-              disabled={!current?.audioId || wavPending}
-              title={!current?.audioId ? "Нет audio_id — сначала воспроизведи трек из библиотеки" : undefined}
+              disabled={!currentAudioId || wavPending}
+              title={!currentAudioId ? t("globalPlayer.convertWavTooltip") : undefined}
             >
-              {wavPending ? "⏳  Запускаю…" : "💿  Конвертировать в WAV"}
+              {wavPending ? t("globalPlayer.convertWavRunning") : t("globalPlayer.convertWav")}
             </button>
           </div>,
           document.body,

@@ -1,40 +1,48 @@
 .sidebar {
-  position: sticky;
+  position: fixed;
   top: 0;
+  bottom: 0;
+  left: 0;
   flex-shrink: 0;
-  width: 264px;
-  height: 100dvh;
-  padding: var(--space-5) var(--space-4);
-  border-right: 1px solid var(--border);
-  background: rgba(8, 8, 14, 0.55);
-  backdrop-filter: blur(var(--blur-lg)) saturate(140%);
-  -webkit-backdrop-filter: blur(var(--blur-lg)) saturate(140%);
+  width: 240px;
+  padding: 22px 18px;
+  border-right: 1px solid var(--rule);
+  background: var(--paper);
   z-index: var(--z-sidebar);
   display: flex;
   flex-direction: column;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
 }
 
 /* ── Brand ─────────────────────────────────────────── */
 
 .brand {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
-  margin: var(--space-2) 0 var(--space-6);
-  padding: 0 var(--space-2);
+  margin-bottom: 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--rule);
   text-decoration: none;
   color: inherit;
 }
 
 .brand-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
   object-fit: cover;
-  background: #000;
-  box-shadow: 0 0 24px rgba(124, 255, 31, 0.18);
+  background: var(--ink);
+}
+
+/* ── Nav section label ──────────────────────────────── */
+
+.nav-section {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+  margin: 16px 0 8px 8px;
 }
 
 /* ── Nav ───────────────────────────────────────────── */
@@ -51,73 +59,66 @@
   gap: 12px;
   width: 100%;
   padding: 10px 12px;
-  color: var(--muted);
+  color: var(--ink-2);
   text-align: left;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border: none;
+  border-radius: var(--radius-pill);
   background: transparent;
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
-  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition: background 120ms, color 120ms;
 }
 
 .nav-item:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink);
+  background: var(--paper-2);
 }
 
 .nav-item--active {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--border);
+  color: var(--paper);
+  background: var(--ink);
 }
 
 .nav-icon {
-  font-size: 16px;
-  line-height: 1;
-  width: 20px;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
+  align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  color: currentColor;
 }
 
-/* ── Footer card ──────────────────────────────────── */
+/* ── Footer balance card ──────────────────────────── */
 
 .sidebar-card {
   margin-top: auto;
   flex-shrink: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background:
-    radial-gradient(120% 100% at 0% 0%, rgba(124, 255, 31, 0.1), transparent 60%),
-    radial-gradient(100% 100% at 100% 100%, rgba(214, 0, 255, 0.08), transparent 60%),
-    rgba(255, 255, 255, 0.03);
+  padding: 14px;
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  background: var(--paper-3);
 }
 
-.sidebar-card span,
-.sidebar-card small {
-  display: block;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+.sidebar-card .sidebar-card__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
   text-transform: uppercase;
-}
-
-.sidebar-card strong {
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
   display: block;
-  margin: 6px 0 var(--space-3);
-  font-family: var(--font-display);
-  font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
 }
 
 .sidebar-balance {
   display: inline-flex !important;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 4px 0 8px;
+  color: var(--ink);
 }
 
 .sidebar-user {
@@ -128,22 +129,28 @@
   min-width: 0;
 }
 
+.sidebar-lang-switch--inline {
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
 .sidebar-avatar {
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  min-height: 32px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
   border-radius: 50%;
   object-fit: cover;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.08);
-  font-weight: 700;
-  font-size: 13px;
+  background: linear-gradient(135deg, var(--emr) 0%, var(--ink) 100%);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 10px;
   line-height: 1;
-  color: var(--text);
+  color: var(--paper);
   overflow: hidden;
 }
 
@@ -159,18 +166,17 @@
 .sidebar-user__info strong {
   display: block;
   margin: 0;
-  font-size: 14px;
-  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--ink);
 }
 
 .sidebar-user__info small {
   display: block;
-  text-transform: none;
-  letter-spacing: 0;
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: 11px;
   white-space: nowrap;
   overflow: hidden;
@@ -184,93 +190,141 @@
   margin-top: 4px;
 }
 
-/* После замены кнопки «Выйти» на dropdown UserMenu, баланс и Telegram-кнопка
- * остаются ниже. .sidebar-card__balance-row задаёт отступы без необходимости
- * менять структуру карточки. */
-.sidebar-card__balance-row {
-  margin-top: var(--space-3);
+/* ── Lang switch ── */
+.sidebar-lang-switch {
+  display: inline-flex;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 2px;
 }
-
-.sidebar-tg--wide {
-  flex: 1;
-  width: auto;
-  gap: 8px;
-  padding: 0 12px;
-  justify-content: center;
-}
-
-.sidebar-tg__label {
-  font-size: 13px;
+.sidebar-lang-btn {
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0;
-  color: var(--text);
-  text-transform: none;
+  background: transparent;
+  border: none;
+  color: var(--ink-4);
+  cursor: pointer;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: background 120ms, color 120ms;
+}
+.sidebar-lang-btn:hover {
+  color: var(--ink);
+}
+.sidebar-lang-btn--on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.sidebar-card__balance-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.sidebar-card__balance-row > span {
+  display: inline-block;
+  margin-bottom: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
 }
 
 .sidebar-link {
   flex: 1;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border);
-  color: #ff6b6b;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--rule);
+  color: var(--hi);
+  padding: 7px 12px;
+  border-radius: var(--radius-pill);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  transition: background 160ms ease, color 160ms ease;
+  transition: background 120ms, border-color 120ms;
 }
 
 .sidebar-link:hover {
-  background: rgba(255, 80, 80, 0.12);
-  color: #ff8888;
+  background: var(--hi-soft);
+  border-color: var(--hi);
 }
 
 .sidebar-cta {
   flex: 1;
   display: block;
-  padding: 10px 14px;
-  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  border-radius: var(--radius-pill);
   text-align: center;
-  background: linear-gradient(120deg, var(--accent), var(--accent-3));
-  color: var(--text-on-accent);
+  background: var(--hi);
+  border: 1px solid var(--hi);
+  color: var(--paper);
   font-weight: 600;
   text-decoration: none;
-  font-size: 13px;
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  font-size: 12px;
+  transition: background 120ms;
 }
 
 .sidebar-cta:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 30px rgba(124, 255, 31, 0.25);
+  background: var(--hi-2);
+  border-color: var(--hi-2);
 }
 
 .sidebar-tg {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
-  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--rule);
+  background: transparent;
+  transition: background 120ms, border-color 120ms;
 }
 
 .sidebar-tg:hover {
   background: rgba(55, 187, 254, 0.12);
   border-color: rgba(55, 187, 254, 0.5);
-  transform: translateY(-1px);
 }
 
 .sidebar-tg svg {
   display: block;
 }
 
-@media (max-width: 1180px) {
+/* sidebar-card label + strong */
+.sidebar-card span,
+.sidebar-card small {
+  display: block;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sidebar-card strong {
+  display: block;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--ink);
+}
+
+@media (max-width: 1180px), (pointer: coarse) and (max-width: 1400px) {
   .sidebar {
     position: fixed;
     top: 0;
+    bottom: 0;
     left: 0;
     transform: translateX(-110%);
     transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -279,4 +333,29 @@
   .sidebar--open {
     transform: translateX(0);
   }
+}
+
+@media (max-width: 1180px), (pointer: coarse) and (max-width: 1400px) {
+  .sidebar-card {
+    padding: var(--space-3);
+  }
+  .sidebar-user {
+    gap: 8px;
+    margin-bottom: var(--space-2);
+  }
+  .sidebar-avatar {
+    width: 26px; height: 26px;
+    min-width: 26px; min-height: 26px;
+    font-size: 10px;
+  }
+  .sidebar-user__info strong { font-size: 12px; }
+  .sidebar-lang-btn { padding: 3px 8px; font-size: 10px; }
+  .sidebar-card span { font-size: 10px; }
+  .sidebar-card strong { font-size: 16px; }
+  .sidebar-card__balance-row {
+    margin-top: 4px;
+    margin-bottom: var(--space-2);
+  }
+  .sidebar-actions { gap: 6px; margin-top: 2px; }
+  .sidebar-actions .sidebar-link { padding: 6px 10px; font-size: 12px; }
 }

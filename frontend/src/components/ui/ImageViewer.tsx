@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import "./ImageViewer.css";
 
 interface ImageViewerProps {
@@ -9,6 +10,7 @@ interface ImageViewerProps {
 }
 
 export function ImageViewer({ imageUrl, title, onClose }: ImageViewerProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -28,12 +30,12 @@ export function ImageViewer({ imageUrl, title, onClose }: ImageViewerProps) {
           type="button"
           className="image-viewer-close"
           onClick={onClose}
-          aria-label="Закрыть"
+          aria-label={t("common.close")}
         >
           ×
         </button>
         {title && <div className="image-viewer-title">{title}</div>}
-        <img src={imageUrl} alt={title || "Полноэкранный просмотр"} className="image-viewer-img" />
+        <img src={imageUrl} alt={title || t("sharePage.cover")} className="image-viewer-img" />
       </div>
     </div>,
     document.body,

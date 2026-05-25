@@ -30,9 +30,9 @@
   flex-direction: column;
   gap: 20px;
   padding: 28px;
-  border: 1px solid rgba(124, 255, 31, 0.25);
+  border: 1px solid var(--hi-soft);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(20, 20, 32, 0.9), rgba(14, 14, 24, 0.96));
+  background: linear-gradient(180deg, var(--paper-3), var(--paper-4));
 }
 
 .agent-page-result__title {
@@ -52,7 +52,7 @@
   padding: 10px 14px;
   border-radius: 10px;
   background: rgba(124, 255, 31, 0.07);
-  border: 1px solid rgba(124, 255, 31, 0.2);
+  border: 1px solid var(--hi-soft);
 }
 
 .agent-page-result__section {

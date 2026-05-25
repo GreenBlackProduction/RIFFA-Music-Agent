@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -17,6 +18,7 @@ import {
   type PackageCode,
 } from "@/lib/api/client";
 import { useShallow } from "zustand/react/shallow";
+import { useTranslation } from "react-i18next";
 
 import { Coin } from "@/components/ui/Coin";
 import { useAuth } from "@/lib/auth";
@@ -91,7 +93,7 @@ interface Review {
   date: string;
 }
 
-const SEED_REVIEWS: readonly Review[] = [
+const SEED_REVIEWS_RU: readonly Review[] = [
   {
     id: "r1",
     author: "Алексей",
@@ -107,12 +109,28 @@ const SEED_REVIEWS: readonly Review[] = [
     date: "2026-04-15",
   },
 ];
+const SEED_REVIEWS_EN: readonly Review[] = [
+  {
+    id: "r1",
+    author: "Alex",
+    rating: 5,
+    text: "Cover of my old song in synthwave style — exactly what I needed. Done in 2 minutes without a studio.",
+    date: "2026-04-20",
+  },
+  {
+    id: "r2",
+    author: "Maria",
+    rating: 4,
+    text: "The agent builds the prompt well, but occasionally gets confused on mood. The sound quality is good.",
+    date: "2026-04-15",
+  },
+];
 
-const MOCK_DOCS: readonly { id: string; title: string; hint: string; href: string }[] = [
-  { id: "terms", title: "Пользовательское соглашение", hint: "Версия от 01.04.2026", href: "#" },
-  { id: "privacy", title: "Политика конфиденциальности", hint: "Как храним данные", href: "#" },
-  { id: "license", title: "Лицензия на треки", hint: "Коммерческое использование", href: "#" },
-  { id: "offer", title: "Оферта", hint: "Для оплат по карте", href: "#" },
+const PROFILE_DOCS: readonly { id: string; title: string; hint: string; href: string }[] = [
+  { id: "offer", title: "Пользовательское соглашение", hint: "Публичная оферта", href: "/docs/offer.txt" },
+  { id: "privacy", title: "Политика конфиденциальности", hint: "Как храним и обрабатываем данные", href: "/docs/privacy.txt" },
+  { id: "copyright", title: "Лицензия на треки", hint: "Авторские права и использование", href: "/docs/copyright.txt" },
+  { id: "refund", title: "Политика возврата", hint: "Условия возврата средств", href: "/docs/refund.txt" },
 ];
 
 // ─────────── Кастомный брендированный дропдаун ────────────
@@ -218,12 +236,33 @@ function Icon({ name }: { name: string }) {
 
 export function ProfilePage() {
   const { user, refresh: refreshAuth } = useAuth();
+  const { t, i18n: i18nClient } = useTranslation();
+  const i18nLang = i18nClient.resolvedLanguage || i18nClient.language || "ru";
+  const isEN = i18nLang.startsWith("en");
   const [viewerImage, setViewerImage] = useState<{ url: string; title: string } | null>(null);
+  // Если avatar_url битый — fallback на инициал, чтобы не показывать broken-image.
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  useEffect(() => { setAvatarFailed(false); }, [user?.avatar_url]);
 
-  const displayName = user?.display_name ?? "Гость";
+  const displayName = user?.display_name ?? t("sidebar.guest");
   const userEmail = user?.email ?? "";
   const userBalance = user?.balance_tokens ?? 0;
   const userInitial = displayName.slice(0, 1).toUpperCase();
+
+  // Локализованные метки типов файлов
+  const typeLabel = (type: string) =>
+    t(`library.types.${type}`, { defaultValue: TYPE_LABELS[type as import("@/lib/library").LibraryItemType] ?? type });
+
+  // Локализованные данные
+  const localPackages = TOKEN_PACKAGES.map((p) => ({
+    ...p,
+    name: t(`profile.packages.${p.id}`, { defaultValue: p.name }),
+  }));
+  const localLegalDocs = PROFILE_DOCS.map((doc) => ({
+    ...doc,
+    title: t(`profile.legalDocs.${doc.id}.title`, { defaultValue: doc.title }),
+    hint:  t(`profile.legalDocs.${doc.id}.hint`,  { defaultValue: doc.hint }),
+  }));
 
   // ── Nickname editing ──
   const [editingName, setEditingName] = useState(false);
@@ -259,8 +298,8 @@ export function ProfilePage() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setPwError(null);
-    if (pwNew.length < 6) { setPwError("Не менее 6 символов"); return; }
-    if (pwNew !== pwConfirm) { setPwError("Пароли не совпадают"); return; }
+    if (pwNew.length < 6) { setPwError(t("profile.pwError.short")); return; }
+    if (pwNew !== pwConfirm) { setPwError(t("profile.pwError.mismatch")); return; }
     setPwStatus("saving");
     try {
       await changePassword(pwCurrent, pwNew);
@@ -270,7 +309,7 @@ export function ProfilePage() {
     } catch (err) {
       const msg = err && typeof err === "object" && "detail" in err
         ? (err as { detail: string }).detail
-        : "Не удалось сменить пароль";
+        : t("profile.pwError.failed");
       setPwError(msg);
       setPwStatus("error");
     }
@@ -309,7 +348,7 @@ export function ProfilePage() {
         }
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : (err as { detail?: string })?.detail ?? "Ошибка";
+      const msg = err instanceof Error ? err.message : (err as { detail?: string })?.detail ?? t("common.error");
       setPayError(msg);
     } finally {
       setPayStatus("idle");
@@ -317,10 +356,7 @@ export function ProfilePage() {
   };
 
   // ── Promo code redeem ─────────────────────────────────────────────────
-  // Тестовый код пользователя — RIFFA2026. По умолчанию подставлен в инпут,
-  // активируется один раз на пользователя (бэк хранит PromocodeUsage и не
-  // даст повторно).
-  const [promoCode, setPromoCode] = useState<string>("RIFFA2026");
+  const [promoCode, setPromoCode] = useState<string>("");
   const [promoStatus, setPromoStatus] = useState<
     "idle" | "saving" | "ok" | "error"
   >("idle");
@@ -330,7 +366,7 @@ export function ProfilePage() {
     const value = promoCode.trim().toUpperCase();
     if (!value) {
       setPromoStatus("error");
-      setPromoMessage("Введите промокод");
+      setPromoMessage(t("profile.promoError"));
       return;
     }
     setPromoStatus("saving");
@@ -339,14 +375,14 @@ export function ProfilePage() {
       const resp = await redeemPromo(value);
       setPromoTokensGranted(resp.tokens_granted);
       setPromoStatus("ok");
-      setPromoMessage(`+${resp.tokens_granted} ⓡ начислено`);
+      setPromoMessage(t("profile.promoGranted", { count: resp.tokens_granted }));
       // Обновляем баланс везде, где он читается.
       await refreshAuth();
     } catch (err) {
       const detail =
         err && typeof err === "object" && "detail" in err
           ? (err as { detail: string }).detail
-          : "Не удалось активировать промокод";
+          : t("profile.errPromoActivate");
       setPromoStatus("error");
       setPromoMessage(detail);
     }
@@ -469,7 +505,7 @@ export function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 4 * 1024 * 1024) {
-      setAvatarError("Файл больше 4 МБ");
+      setAvatarError(t("profile.errAvatarSize"));
       return;
     }
     setAvatarError(null);
@@ -478,7 +514,7 @@ export function ProfilePage() {
       await uploadAvatar(file);
       await refreshUser();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Не удалось загрузить аватар";
+      const msg = err instanceof Error ? err.message : t("profile.errAvatarUpload");
       setAvatarError(msg);
     } finally {
       setAvatarUploading(false);
@@ -502,16 +538,16 @@ export function ProfilePage() {
   );
 
   const moodOptions = useMemo<SelectOption[]>(
-    () => [{ value: "all", label: "Любое" }, ...allMoods.map((m) => ({ value: m, label: m }))],
-    [allMoods],
+    () => [{ value: "all", label: t("profile.filterMoodAny") }, ...allMoods.map((m) => ({ value: m, label: m }))],
+    [allMoods, t],
   );
   const genreOptions = useMemo<SelectOption[]>(
-    () => [{ value: "all", label: "Любой" }, ...allGenres.map((g) => ({ value: g, label: g }))],
-    [allGenres],
+    () => [{ value: "all", label: t("profile.filterGenreAny") }, ...allGenres.map((g) => ({ value: g, label: g }))],
+    [allGenres, t],
   );
   const sortOptions: SelectOption[] = [
-    { value: "newest", label: "Сначала новые" },
-    { value: "oldest", label: "Сначала старые" },
+    { value: "newest", label: t("profile.sortNewest") },
+    { value: "oldest", label: t("profile.sortOldest") },
   ];
 
   const filteredFiles = useMemo<LibraryItem[]>(() => {
@@ -533,7 +569,7 @@ export function ProfilePage() {
       title: f.title,
       url: f.audioUrl,
       cover: f.coverUrl ?? undefined,
-      meta: `${TYPE_LABELS[f.type]} · ${f.genre} · ${f.mood}`,
+      meta: `${typeLabel(f.type)} · ${f.genre} · ${f.mood}`,
       isOwn: f.isOwn,
       canRadio: RADIO_TYPES.has(f.type) && f.isOwn,
       isMusicType: MUSIC_TYPES.has(f.type),
@@ -547,7 +583,7 @@ export function ProfilePage() {
   };
 
   // ── Reviews ──
-  const [reviews, setReviews] = useState<Review[]>([...SEED_REVIEWS]);
+  const [reviews, setReviews] = useState<Review[]>(() => [...(isEN ? SEED_REVIEWS_EN : SEED_REVIEWS_RU)]);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState("");
 
@@ -587,15 +623,13 @@ export function ProfilePage() {
     if (!user?.created_at) return "";
     try {
       const d = new Date(user.created_at);
-      const months = [
-        "января", "февраля", "марта", "апреля", "мая", "июня",
-        "июля", "августа", "сентября", "октября", "ноября", "декабря",
-      ];
-      return `С нами с ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+      const locale = isEN ? "en-US" : "ru-RU";
+      const dateStr = d.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric" });
+      return t("profile.memberSince", { date: dateStr });
     } catch {
       return "";
     }
-  }, [user]);
+  }, [user, isEN, t]);
 
   // ── Stats computed from real library items ──
   const genStats = useMemo<GenStats[]>(() => {
@@ -608,7 +642,7 @@ export function ProfilePage() {
       .filter((t) => counts[t] > 0)
       .map((t) => ({
         type: t,
-        label: TYPE_LABELS[t as import("@/lib/library").LibraryItemType],
+        label: typeLabel(t),
         count: counts[t],
         color: STAT_COLORS[t] ?? "var(--muted)",
       }));
@@ -651,12 +685,12 @@ export function ProfilePage() {
               avatarUploading ? " user-info__avatar--loading" : ""
             }`}
             onClick={() => avatarInputRef.current?.click()}
-            title="Загрузить аватар"
-            aria-label="Загрузить аватар"
+            title={t("profile.avatarAria")}
+            aria-label={t("profile.avatarAria")}
             disabled={avatarUploading}
           >
-            {user?.avatar_url ? (
-              <img src={user.avatar_url} alt="" />
+            {user?.avatar_url && !avatarFailed ? (
+              <img src={user.avatar_url} alt="" onError={() => setAvatarFailed(true)} />
             ) : (
               <span className="user-info__avatar-initial">{userInitial}</span>
             )}
@@ -688,8 +722,8 @@ export function ProfilePage() {
                   maxLength={64}
                   onKeyDown={(e) => e.key === "Escape" && setEditingName(false)}
                 />
-                <button type="submit" className="name-edit-btn name-edit-btn--ok" disabled={nameSaving} aria-label="Сохранить">✓</button>
-                <button type="button" className="name-edit-btn name-edit-btn--cancel" onClick={() => { setEditingName(false); setNameInput(displayName); }} aria-label="Отмена">✕</button>
+                <button type="submit" className="name-edit-btn name-edit-btn--ok" disabled={nameSaving} aria-label={t("common.save")}>✓</button>
+                <button type="button" className="name-edit-btn name-edit-btn--cancel" onClick={() => { setEditingName(false); setNameInput(displayName); }} aria-label={t("common.cancel")}>✕</button>
               </form>
             ) : (
               <h1 className="user-info__name user-info__name--editable" onClick={() => { setNameInput(displayName); setEditingName(true); }}>
@@ -699,7 +733,7 @@ export function ProfilePage() {
             )}
             <div className="user-info__meta">
               {userEmail} · {joinDate}
-              {!user && <span className="profile-hero__demo"> · демо-данные</span>}
+              {!user && <span className="profile-hero__demo">{t("profile.demoLabel")}</span>}
             </div>
           </div>
 
@@ -709,10 +743,10 @@ export function ProfilePage() {
               type="button"
               className={`pw-toggle pw-toggle--trash${trashOpen ? " pw-toggle--open" : ""}`}
               onClick={() => setTrashOpen(true)}
-              title="Корзина"
-              aria-label="Открыть корзину"
+              title={t("profile.trashTitle")}
+              aria-label={t("profile.trashOpenAria")}
             >
-              🗑 Корзина
+              {t("profile.trashOpenBtn")}
             </button>
           {user?.email && (
             <div className="user-info__pw-wrap">
@@ -721,14 +755,14 @@ export function ProfilePage() {
                 className={`pw-toggle${showPw ? " pw-toggle--open" : ""}`}
                 onClick={() => { setShowPw((v) => !v); setPwError(null); }}
               >
-                🔑 {showPw ? "Скрыть" : "Сменить пароль"}
+                🔑 {showPw ? t("profile.pwHide") : t("profile.pwToggle")}
               </button>
 
               {showPw && (
                 <form className="hero-pw-form" onSubmit={handleChangePassword}>
                   <input
                     type="password"
-                    placeholder="Текущий пароль"
+                    placeholder={t("profile.pwCurrentPlaceholder")}
                     value={pwCurrent}
                     onChange={(e) => setPwCurrent(e.target.value)}
                     disabled={pwStatus === "saving"}
@@ -737,7 +771,7 @@ export function ProfilePage() {
                   />
                   <input
                     type="password"
-                    placeholder="Новый пароль"
+                    placeholder={t("profile.pwNewPlaceholder")}
                     value={pwNew}
                     onChange={(e) => setPwNew(e.target.value)}
                     disabled={pwStatus === "saving"}
@@ -746,7 +780,7 @@ export function ProfilePage() {
                   />
                   <input
                     type="password"
-                    placeholder="Повторите пароль"
+                    placeholder={t("profile.pwConfirmPlaceholder")}
                     value={pwConfirm}
                     onChange={(e) => setPwConfirm(e.target.value)}
                     disabled={pwStatus === "saving"}
@@ -754,9 +788,9 @@ export function ProfilePage() {
                     autoComplete="new-password"
                   />
                   {pwError && <p className="hero-pw-form__msg hero-pw-form__msg--error">{pwError}</p>}
-                  {pwStatus === "ok" && <p className="hero-pw-form__msg hero-pw-form__msg--ok">✓ Пароль изменён</p>}
+                  {pwStatus === "ok" && <p className="hero-pw-form__msg hero-pw-form__msg--ok">{t("profile.pwChanged")}</p>}
                   <button type="submit" className="btn btn--primary" disabled={pwStatus === "saving" || !pwCurrent || !pwNew || !pwConfirm}>
-                    {pwStatus === "saving" ? "Сохраняем…" : "Сохранить"}
+                    {pwStatus === "saving" ? t("profile.pwSaving") : t("profile.pwSave")}
                   </button>
                 </form>
               )}
@@ -778,29 +812,24 @@ export function ProfilePage() {
             >
               <header className="trash-modal__head">
                 <div>
-                  <h3>🗑 Корзина</h3>
-                  <p className="muted">
-                    Файлы хранятся 7 дней и автоматически очищаются раз в неделю.
-                    Можно очистить корзину вручную.
-                  </p>
+                  <h3>{t("profile.trashTitle")}</h3>
+                  <p className="muted">{t("profile.trashDesc")}</p>
                 </div>
                 <button
                   type="button"
                   className="trash-modal__close"
                   onClick={() => setTrashOpen(false)}
-                  aria-label="Закрыть"
+                  aria-label={t("profile.trashCloseAria")}
                 >
                   ✕
                 </button>
               </header>
               <div className="trash-modal__list">
                 {trashQuery.isLoading && (
-                  <p className="muted">Загружаем корзину…</p>
+                  <p className="muted">{t("profile.trashLoading")}</p>
                 )}
                 {!trashQuery.isLoading && (trashQuery.data?.items ?? []).length === 0 && (
-                  <p className="muted">
-                    Корзина пуста — удалённые файлы появятся здесь.
-                  </p>
+                  <p className="muted">{t("profile.trashEmptyMsg")}</p>
                 )}
                 {(trashQuery.data?.items ?? []).map((it) => {
                   const restoring =
@@ -813,18 +842,18 @@ export function ProfilePage() {
                         <span className="muted">
                           {it.type}
                           {it.deleted_at
-                            ? ` · ${new Date(it.deleted_at).toLocaleDateString("ru")}`
+                            ? ` · ${new Date(it.deleted_at).toLocaleDateString(isEN ? "en-US" : "ru-RU")}`
                             : ""}
                         </span>
                       </div>
                       <button
                         type="button"
                         className="filter-chip"
-                        title="Восстановить"
+                        title={t("profile.trashRestoreBtn")}
                         onClick={() => restoreFileMutation.mutate(it.id)}
                         disabled={restoring}
                       >
-                        {restoring ? "…" : "↩ Восстановить"}
+                        {restoring ? "…" : t("profile.trashRestoreBtn")}
                       </button>
                     </div>
                   );
@@ -840,11 +869,9 @@ export function ProfilePage() {
                   }
                   onClick={() => purgeTrashMutation.mutate()}
                 >
-                  {purgeTrashMutation.isPending ? "Очищаю…" : "Очистить корзину"}
+                  {purgeTrashMutation.isPending ? t("profile.trashPurging") : t("profile.trashPurge")}
                 </button>
-                <span className="muted">
-                  Авто-очистка: раз в 7 дней
-                </span>
+                <span className="muted">{t("profile.trashAutoClear")}</span>
               </footer>
             </div>
           </div>,
@@ -860,61 +887,77 @@ export function ProfilePage() {
             <span className="profile-card__icon" aria-hidden>
               <Coin size={22} className="riffa-coin--lg" />
             </span>
-            <h2 className="profile-card__title">Баланс</h2>
+            <h2 className="profile-card__title">{t("profile.balanceHeader")}</h2>
           </div>
           <div className="balance-display">
             <p className="balance-display__amount">
               {userBalance}
               <Coin size={32} className="riffa-coin--lg riffa-coin--after" />
             </p>
-            <div className="balance-display__label">доступно к использованию</div>
+            <div className="balance-display__label">{t("profile.balanceAvail")}</div>
             <div className="balance-display__conversions">
-              <span>≈ {Math.floor(userBalance / 2)} песен</span>
+              <span>≈ {Math.floor(userBalance / 2)} {isEN ? "songs" : "песен"}</span>
               <span>≈ {Math.floor(userBalance / 0.5)} SFX</span>
-              <span>≈ {Math.floor(userBalance / 1)} обложек</span>
+              <span>≈ {Math.floor(userBalance / 1)} {isEN ? "covers" : "обложек"}</span>
+
             </div>
           </div>
 
           <div className="token-packages">
-            {TOKEN_PACKAGES.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={`token-pack${selectedPack === p.id ? " token-pack--active" : ""}`}
-                onClick={() => setSelectedPack(p.id)}
-              >
-                {p.discount !== undefined && (
-                  <span className="token-pack__badge">Выгода {p.discount}%</span>
-                )}
-                <span className="token-pack__name">{p.name}</span>
-                <strong className="token-pack__amount">
-                  {p.tokens}
-                  <Coin size={18} className="riffa-coin--after" />
-                </strong>
-                <span className="token-pack__gens">{Math.floor(p.tokens / 2)} песен · {Math.floor(p.tokens / 0.5)} SFX · {p.tokens} обложек</span>
-                <div className="token-pack__price">
-                  <span className="token-pack__price-label">Цена:</span>
-                  <span className="token-pack__price-value">{p.priceRub}₽</span>
-                </div>
-              </button>
-            ))}
+            {localPackages.map((p) => {
+              const packName = p.name;
+              const packCounts = isEN
+                ? `${Math.floor(p.tokens / 2)} songs · ${Math.floor(p.tokens / 0.5)} SFX · ${p.tokens} covers`
+                : `${Math.floor(p.tokens / 2)} песен · ${Math.floor(p.tokens / 0.5)} SFX · ${p.tokens} обложек`;
+
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={`token-pack${selectedPack === p.id ? " token-pack--active" : ""}`}
+                  onClick={() => setSelectedPack(p.id)}
+                >
+                  {p.discount !== undefined && (
+                    <span className="token-pack__badge">{t("profile.packDiscountBadge", { percent: p.discount })}</span>
+                  )}
+                  <span className="token-pack__name">{packName}</span>
+                  <strong className="token-pack__amount">
+                    {p.tokens}
+                    <Coin size={18} className="riffa-coin--after" />
+                  </strong>
+                  <span className="token-pack__gens">{packCounts}</span>
+                  <div className="token-pack__price">
+                    <span className="token-pack__price-label">{t("profile.packPriceLabel")}</span>
+                    <span className="token-pack__price-value">{isEN ? `₽${p.priceRub}` : `${p.priceRub}₽`}</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           <div className="payment-methods">
-            <span className="payment-methods__label">Способ оплаты</span>
+            <span className="payment-methods__label">{t("profile.paymentMethod")}</span>
             <div className="payment-methods__grid">
-              {PAYMENT_METHODS.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  className={`pay-method${payMethod === m.id ? " pay-method--active" : ""}`}
-                  onClick={() => setPayMethod(m.id)}
-                  disabled={m.id === "crypto"}
-                >
-                  <strong>{m.label}</strong>
-                  <small>{m.hint}</small>
-                </button>
-              ))}
+              {PAYMENT_METHODS.map((m) => {
+                const label = m.id === "card" ? t("profile.paymentCard")
+                            : m.id === "stars" ? t("profile.paymentStars")
+                            : t("profile.paymentCrypto");
+                const hint  = m.id === "card" ? t("profile.paymentCardHint")
+                            : m.id === "stars" ? t("profile.paymentStarsHint")
+                            : t("profile.paymentCryptoHint");
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className={`pay-method${payMethod === m.id ? " pay-method--active" : ""}`}
+                    onClick={() => setPayMethod(m.id)}
+                    disabled={m.id === "crypto"}
+                  >
+                    <strong>{label}</strong>
+                    <small>{hint}</small>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -924,7 +967,7 @@ export function ProfilePage() {
             onClick={handleBuyPack}
             disabled={payStatus === "loading" || payMethod === "crypto"}
           >
-            {payStatus === "loading" ? "Открываем..." : "Купить пакет"}
+            {payStatus === "loading" ? t("profile.paymentLoading") : t("profile.buyTokens")}
           </button>
           {payError && (
             <p style={{ color: "var(--error, #ff6b6b)", fontSize: 13, margin: "4px 0 0" }}>
@@ -935,13 +978,13 @@ export function ProfilePage() {
           {/* ─── Промокод ─── */}
           <div className="promo-redeem">
             <label className="promo-redeem__label" htmlFor="promo-input">
-              Есть промокод?
+              {t("profile.promoHave")}
             </label>
             <input
               id="promo-input"
               type="text"
               className="promo-redeem__input"
-              placeholder="Ввести промокод"
+              placeholder={t("profile.promoInputPlaceholder")}
               value={promoCode}
               onChange={(e) => {
                 setPromoCode(e.target.value.toUpperCase());
@@ -961,7 +1004,7 @@ export function ProfilePage() {
               onClick={handleRedeemPromo}
               disabled={promoStatus === "saving" || !promoCode.trim()}
             >
-              {promoStatus === "saving" ? "..." : "Активировать"}
+              {promoStatus === "saving" ? "..." : t("profile.promoActivate")}
             </button>
             {promoMessage && (
               <div
@@ -980,20 +1023,20 @@ export function ProfilePage() {
         <section className="profile-card profile-card--files">
           <div className="profile-card__header">
             <Icon name="📁" />
-            <h2 className="profile-card__title">Мои файлы</h2>
-            <span className="profile-card__meta">{filteredFiles.length} из {libraryItems.length}</span>
+            <h2 className="profile-card__title">{t("profile.myFiles")}</h2>
+            <span className="profile-card__meta">{filteredFiles.length} / {libraryItems.length}</span>
           </div>
 
           {/* Тип файла — чипы */}
           <div className="file-type-chips">
-            {(["all", "song", "instrumental", "cover", "sfx", "cover_art"] as Array<"all" | LibraryItemType>).map((t) => (
+            {(["all", "song", "instrumental", "cover", "sfx", "cover_art"] as Array<"all" | LibraryItemType>).map((ft) => (
               <button
-                key={t}
+                key={ft}
                 type="button"
-                className={`filter-chip${filterType === t ? " filter-chip--active" : ""}`}
-                onClick={() => setFilterType(t)}
+                className={`filter-chip${filterType === ft ? " filter-chip--active" : ""}`}
+                onClick={() => setFilterType(ft)}
               >
-                {t === "all" ? "Все" : TYPE_LABELS[t]}
+                {ft === "all" ? t("profile.filesAll") : typeLabel(ft)}
               </button>
             ))}
           </div>
@@ -1001,15 +1044,15 @@ export function ProfilePage() {
           {/* Настроение / Жанр / Сортировка — кастомный брендированный дропдаун */}
           <div className="file-filters">
             <div className="file-filters__label">
-              <span className="file-filters__label-text">Настроение</span>
+              <span className="file-filters__label-text">{t("profile.filterMoodLabel")}</span>
               <FilterSelect options={moodOptions} value={filterMood} onChange={setFilterMood} />
             </div>
             <div className="file-filters__label">
-              <span className="file-filters__label-text">Жанр</span>
+              <span className="file-filters__label-text">{t("profile.filterGenreLabel")}</span>
               <FilterSelect options={genreOptions} value={filterGenre} onChange={setFilterGenre} />
             </div>
             <div className="file-filters__label">
-              <span className="file-filters__label-text">Сортировка</span>
+              <span className="file-filters__label-text">{t("profile.filterSortLabel")}</span>
               <FilterSelect
                 options={sortOptions}
                 value={filterSort}
@@ -1022,97 +1065,108 @@ export function ProfilePage() {
             {filesAuthError ? (
               <div className="empty-state">
                 <div className="empty-state__icon">🔒</div>
-                <div className="empty-state__text">Войди в аккаунт, чтобы увидеть свои файлы.</div>
+                <div className="empty-state__text">{t("profile.filesNeedAuth")}</div>
               </div>
             ) : filesLoading ? (
-              <div className="empty-state">
-                <div className="empty-state__icon">⏳</div>
-                <div className="empty-state__text">Загружаем библиотеку…</div>
-              </div>
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={`skel-${i}`} className="file-skeleton" aria-hidden="true">
+                  <div className="file-skeleton__icon" />
+                  <div className="file-skeleton__lines">
+                    <div className="file-skeleton__line" style={{ width: `${60 + ((i * 17) % 40)}%` }} />
+                    <div className="file-skeleton__line file-skeleton__line--short" />
+                  </div>
+                  <div className="file-skeleton__action" />
+                </div>
+              ))
             ) : filteredFiles.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state__icon">📂</div>
                 <div className="empty-state__text">
                   {libraryItems.length === 0
-                    ? "Здесь появятся ваши генерации после первого запуска."
-                    : "Под фильтр ничего не попало"}
+                    ? t("profile.filesEmptyFirst")
+                    : t("profile.filesNoMatch")}
                 </div>
               </div>
             ) : (
-              filteredFiles.map((f) => {
-                const isActive = currentId === f.id;
-                const canRadio = RADIO_TYPES.has(f.type) && f.isOwn;
-                const canBolt = MUSIC_TYPES.has(f.type);
-                const radioPending =
-                  radioMutation.isPending && radioMutation.variables?.itemId === f.id;
-                return (
-                  <div
-                    key={f.id}
-                    role="button"
-                    tabIndex={0}
-                    className={`file-item${isActive ? " file-item--active" : ""}`}
-                    onClick={() => handlePlayItem(f)}
-                    onKeyDown={(e) => e.key === "Enter" && handlePlayItem(f)}
-                  >
-                    {f.coverUrl ? (
-                      <span
-                        className="file-item__icon file-item__icon--cover"
-                        aria-hidden
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setViewerImage({ url: f.coverUrl!, title: f.title });
+              <AnimatePresence initial={false}>
+                {filteredFiles.map((f) => {
+                  const isActive = currentId === f.id;
+                  const canRadio = RADIO_TYPES.has(f.type) && f.isOwn;
+                  const canBolt = MUSIC_TYPES.has(f.type);
+                  const radioPending =
+                    radioMutation.isPending && radioMutation.variables?.itemId === f.id;
+                  return (
+                    <motion.div
+                      key={f.id}
+                      role="button"
+                      tabIndex={0}
+                      className={`file-item${isActive ? " file-item--active" : ""}`}
+                      onClick={() => handlePlayItem(f)}
+                      onKeyDown={(e) => e.key === "Enter" && handlePlayItem(f)}
+                      initial={{ opacity: 0, x: -16 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.22, ease: "easeOut" }}
+                    >
+                      {f.coverUrl ? (
+                        <span
+                          className="file-item__icon file-item__icon--cover"
+                          aria-hidden
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewerImage({ url: f.coverUrl!, title: f.title });
+                          }}
+                          style={{ cursor: "zoom-in" }}
+                          title={t("profile.openFullscreen")}
+                        >
+                          <img src={f.coverUrl} alt="" loading="lazy" />
+                        </span>
+                      ) : (
+                        <span className="file-item__icon" aria-hidden>{TYPE_ICONS[f.type]}</span>
+                      )}
+                      <div className="file-item__info">
+                        <span className="file-item__title">{f.title}</span>
+                        <span className="file-item__meta">
+                          {typeLabel(f.type)} · {f.genre} · {f.mood} · {f.duration}
+                        </span>
+                      </div>
+                      <FileActions
+                        audioUrl={f.audioUrl}
+                        downloadUrl={
+                          f.trackIndex !== null
+                            ? trackDownloadUrl(f.generationId, f.trackIndex)
+                            : undefined
+                        }
+                        title={f.title}
+                        isMusicType={canBolt}
+                        canRadio={canRadio}
+                        fileId={f.id}
+                        isPublic={f.isPublic}
+                        generationId={f.generationId}
+                        audioId={f.audioId}
+                        onToggleRadio={
+                          canRadio
+                            ? (next) =>
+                                radioMutation.mutateAsync({
+                                  itemId: f.id,
+                                  generationId: f.generationId,
+                                  trackIndex: f.trackIndex,
+                                  isPublic: next,
+                                })
+                            : undefined
+                        }
+                        radioPending={radioPending}
+                        isActive={isActive}
+                        isPlaying={isPlaying}
+                        onPlayPause={f.audioUrl ? () => handlePlayItem(f) : undefined}
+                        onDelete={(rect) => {
+                          showFileGhost(f, rect);
+                          deleteFileMutation.mutate(f.generationId);
                         }}
-                        style={{ cursor: "zoom-in" }}
-                        title="Открыть в полноэкранном режиме"
-                      >
-                        <img src={f.coverUrl} alt="" loading="lazy" />
-                      </span>
-                    ) : (
-                      <span className="file-item__icon" aria-hidden>{TYPE_ICONS[f.type]}</span>
-                    )}
-                    <div className="file-item__info">
-                      <span className="file-item__title">{f.title}</span>
-                      <span className="file-item__meta">
-                        {TYPE_LABELS[f.type]} · {f.genre} · {f.mood} · {f.duration}
-                      </span>
-                    </div>
-                    <FileActions
-                      audioUrl={f.audioUrl}
-                      downloadUrl={
-                        f.trackIndex !== null
-                          ? trackDownloadUrl(f.generationId, f.trackIndex)
-                          : undefined
-                      }
-                      title={f.title}
-                      isMusicType={canBolt}
-                      canRadio={canRadio}
-                      fileId={f.id}
-                      isPublic={f.isPublic}
-                      generationId={f.generationId}
-                      audioId={f.audioId}
-                      onToggleRadio={
-                        canRadio
-                          ? (next) =>
-                              radioMutation.mutateAsync({
-                                itemId: f.id,
-                                generationId: f.generationId,
-                                trackIndex: f.trackIndex,
-                                isPublic: next,
-                              })
-                          : undefined
-                      }
-                      radioPending={radioPending}
-                      isActive={isActive}
-                      isPlaying={isPlaying}
-                      onPlayPause={f.audioUrl ? () => handlePlayItem(f) : undefined}
-                      onDelete={(rect) => {
-                        showFileGhost(f, rect);
-                        deleteFileMutation.mutate(f.generationId);
-                      }}
-                    />
-                  </div>
-                );
-              })
+                      />
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             )}
           </div>
         </section>
@@ -1123,11 +1177,11 @@ export function ProfilePage() {
             <div>
               <div className="profile-card__header">
                 <Icon name="📊" />
-                <h2 className="profile-card__title">Статистика</h2>
+                <h2 className="profile-card__title">{t("profile.statsHeader")}</h2>
               </div>
               <div className="stat-summary">
                 <strong>{totalGens}</strong>
-                <span>{totalGens === 0 ? "пока нет генераций" : totalGens === 1 ? "генерация" : totalGens < 5 ? "генерации" : "генераций"}</span>
+                <span>{totalGens === 0 ? t("profile.statsNone") : totalGens === 1 ? t("profile.statsOne") : totalGens < 5 ? t("profile.statsFew") : t("profile.statsMany")}</span>
               </div>
               <div className="stat-bars">
                 {genStats.map((s) => (
@@ -1148,7 +1202,7 @@ export function ProfilePage() {
                   </div>
                 ))}
                 {genStats.length === 0 && (
-                  <p className="muted">Здесь появится статистика после первых генераций.</p>
+                  <p className="muted">{t("profile.statsEmpty")}</p>
                 )}
               </div>
             </div>
@@ -1156,11 +1210,11 @@ export function ProfilePage() {
             <div>
               <div className="profile-card__header">
                 <Icon name="🎨" />
-                <h2 className="profile-card__title">Любимые стили</h2>
+                <h2 className="profile-card__title">{t("profile.tastesHeader")}</h2>
               </div>
 
               <div className="taste-group">
-                <h3 className="taste-group__title">Жанры</h3>
+                <h3 className="taste-group__title">{t("profile.tastesGenres")}</h3>
                 {favouriteGenres.length > 0 ? (
                   <div className="taste-chips">
                     {favouriteGenres.map((g) => (
@@ -1171,12 +1225,12 @@ export function ProfilePage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="muted">Пока нет данных по жанрам.</p>
+                  <p className="muted">{t("profile.tastesNoGenres")}</p>
                 )}
               </div>
 
               <div className="taste-group">
-                <h3 className="taste-group__title">Настроение</h3>
+                <h3 className="taste-group__title">{t("profile.tastesMoods")}</h3>
                 {favouriteMoods.length > 0 ? (
                   <div className="taste-chips">
                     {favouriteMoods.map((m) => (
@@ -1187,7 +1241,7 @@ export function ProfilePage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="muted">Пока нет данных по настроениям.</p>
+                  <p className="muted">{t("profile.tastesNoMoods")}</p>
                 )}
               </div>
             </div>
@@ -1198,12 +1252,12 @@ export function ProfilePage() {
         <section className="profile-card profile-card--docs">
           <div className="profile-card__header">
             <Icon name="📄" />
-            <h2 className="profile-card__title">Документы</h2>
+            <h2 className="profile-card__title">{t("profile.docsHeader")}</h2>
           </div>
           <ul className="docs-list">
-            {MOCK_DOCS.map((d) => (
+            {localLegalDocs.map((d) => (
               <li key={d.id}>
-                <a href={d.href} className="doc-row">
+                <a href={d.href} className="doc-row" target="_blank" rel="noopener noreferrer">
                   <div>
                     <strong>{d.title}</strong>
                     <small>{d.hint}</small>
@@ -1219,7 +1273,7 @@ export function ProfilePage() {
         <section className="profile-card profile-card--reviews">
           <div className="profile-card__header">
             <Icon name="💬" />
-            <h2 className="profile-card__title">Отзывы</h2>
+            <h2 className="profile-card__title">{t("profile.reviewsHeader")}</h2>
             <span className="profile-card__meta">{reviews.length}</span>
           </div>
 
@@ -1231,7 +1285,7 @@ export function ProfilePage() {
                   key={n}
                   className={`star${n <= reviewRating ? " star--on" : ""}`}
                   onClick={() => setReviewRating(n)}
-                  aria-label={`${n} звёзд`}
+                  aria-label={t("profile.reviewStarsAria", { n })}
                 >
                   ★
                 </button>
@@ -1241,14 +1295,14 @@ export function ProfilePage() {
               rows={3}
               value={reviewText}
               onChange={(e) => setReviewText(e.target.value)}
-              placeholder="Поделись впечатлением — что понравилось, что можно улучшить"
+              placeholder={t("profile.reviewPlaceholder")}
             />
             <button
               type="submit"
               className="btn btn--primary"
               disabled={!reviewText.trim()}
             >
-              Оставить отзыв
+              {t("profile.reviewSubmit")}
             </button>
           </form>
 
@@ -1273,39 +1327,39 @@ export function ProfilePage() {
         <section className="profile-card profile-card--referral">
           <div className="profile-card__header">
             <Icon name="🎁" />
-            <h2 className="profile-card__title">Реферальная программа</h2>
+            <h2 className="profile-card__title">{t("profile.referralHeader")}</h2>
           </div>
 
           <div className="referral-stats">
             <div className="referral-stat">
               <strong>0</strong>
-              <span>приглашено</span>
+              <span>{t("profile.referralInvited")}</span>
             </div>
             <div className="referral-stat">
               <strong className="referral-stat__amount">
                 0
                 <Coin size={18} className="riffa-coin--after" />
               </strong>
-              <span>бонусных на баланс</span>
+              <span>{t("profile.referralBonus")}</span>
             </div>
             <div className="referral-stat">
               <strong>—</strong>
-              <span>от оплат рефералов</span>
+              <span>{t("profile.referralFromRefs")}</span>
             </div>
           </div>
 
           <div className="referral-perks">
-            <h3>Как работает</h3>
+            <h3>{t("profile.referralHowTitle")}</h3>
             <ul>
-              <li><strong>4 <Coin /></strong> другу — сразу при регистрации по твоей ссылке.</li>
-              <li><strong>10 <Coin /></strong> тебе — когда друг зарегистрировался.</li>
+              <li><strong>4 <Coin /></strong> {t("profile.referralFriendGets")}</li>
+              <li><strong>10 <Coin /></strong> {t("profile.referralYouGet")}</li>
             </ul>
           </div>
 
           <div className="referral-link">
             <span className="referral-link__text">{referralLink}</span>
             <button type="button" className="referral-link__copy" onClick={copyReferral}>
-              {copied ? "Скопировано" : "Копировать"}
+              {copied ? t("common.copied") : t("common.copy")}
             </button>
           </div>
         </section>

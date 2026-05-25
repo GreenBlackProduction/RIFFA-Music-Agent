@@ -1,0 +1,25 @@
+# RIFFA Studio — robots.txt
+# Документация: https://www.robotstxt.org/
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /media/
+Disallow: /media-s3/
+Disallow: /tg-auth
+Disallow: /auth/
+
+# Шаринговые страницы треков — индексируем, у них есть OG-теги
+Allow: /s/
+
+Sitemap: https://riffastudio.site/sitemap.xml
+
+# Yandex-специфичные директивы
+User-agent: Yandex
+Allow: /
+Disallow: /api/
+Disallow: /media/
+Disallow: /media-s3/
+Disallow: /tg-auth
+Disallow: /auth/
+Clean-param: utm_source&utm_medium&utm_campaign&utm_term&utm_content

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import App from "./App";
 import "./styles/global.css";
+import "./lib/i18n"; // bootstrap i18n before App renders
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,6 +16,12 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Register Service Worker so the browser keeps the page alive in background
+// and doesn't kill audio playback when the screen locks on mobile.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+}
 
 document.addEventListener("visibilitychange", () => {
   const hidden = document.hidden;

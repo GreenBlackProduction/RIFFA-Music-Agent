@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 
 import { convertToWav, shareGeneration, generateCoverArt } from "@/lib/api/client";
@@ -16,27 +17,25 @@ interface Props {
   onToggleRadio?: (next: boolean) => void | Promise<unknown>;
   radioPending?: boolean;
   downloadUrl?: string;
-  /** Generation UUID — needed for WAV conversion and extend. */
   generationId?: string;
-  /** Suno audio_id for this specific track — needed for WAV conversion. */
   audioId?: string;
-
-  /** Whether this row is the currently playing track (for play/pause pill). */
+  /** Index of this variant within a multi-variant generation (Suno returns V1+V2).
+   *  Used by share to link to just this specific version. null = whole generation. */
+  trackIndex?: number | null;
   isActive?: boolean;
-  /** Whether the global player is currently playing. */
   isPlaying?: boolean;
-  /** Toggle play/pause for this row. If provided, render the oval pill button. */
   onPlayPause?: () => void;
-  /** Soft-delete this file. If provided, render the red round delete button.
-   *  Called IMMEDIATELY on click — the parent is responsible for capturing the
-   *  rect (passed as the first argument), filtering the item out of its
-   *  rendered list (so siblings magnetize up), and rendering a "ghost" at the
-   *  captured rect that plays the explosion animation for ~1s. */
   onDelete?: (rect: DOMRect | null) => void;
-  /** Whether this is an image (cover_art) file. */
   isImageType?: boolean;
-  /** Image URL for cover_art files (for download/enhance). */
   imageUrl?: string;
+  /** Hide "Extend track" in the bolt menu (e.g. on the Radio page). */
+  hideExtend?: boolean;
+  /** Where the share button should point. "library" (default) → /s/<share_id>;
+   *  "radio" → /radio?s=<share_id> so the link opens the radio player and
+   *  auto-plays this track. */
+  shareKind?: "library" | "radio";
+  /** Extra elements rendered inside the file-actions div (e.g. Radio vote buttons). */
+  children?: React.ReactNode;
 }
 
 export function FileActions({
@@ -51,20 +50,26 @@ export function FileActions({
   downloadUrl,
   generationId,
   audioId,
+  trackIndex,
   isActive,
   isPlaying,
   onPlayPause,
   onDelete,
   isImageType,
+  hideExtend,
+  shareKind = "library",
+  children,
 }: Props) {
   const dlHref = downloadUrl || audioUrl;
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ bottom: number; right: number } | null>(null);
   const [wavPending, setWavPending] = useState(false);
   const [sharePending, setSharePending] = useState(false);
+  const [shareToast, setShareToast] = useState<string | null>(null);
   const [enhancePending, setEnhancePending] = useState(false);
   const boltBtnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation();
 
   const { radioSet, toggleRadio } = usePlayer(
     useShallow((s) => ({ radioSet: s.radioSet, toggleRadio: s.toggleRadio })),
@@ -87,6 +92,13 @@ export function FileActions({
     return () => document.removeEventListener("click", onOutside, true);
   }, [menuOpen]);
 
+  // Auto-dismiss share toast
+  useEffect(() => {
+    if (!shareToast) return;
+    const timer = setTimeout(() => setShareToast(null), 2500);
+    return () => clearTimeout(timer);
+  }, [shareToast]);
+
   function openMenu() {
     if (boltBtnRef.current) {
       const r = boltBtnRef.current.getBoundingClientRect();
@@ -105,7 +117,7 @@ export function FileActions({
         resp.generation_id,
         resp.ws_url,
         "wav_convert",
-        `WAV: ${title || "Трек"}`,
+        `WAV: ${title || t("fileActions.fallbackTrack")}`,
       );
     } catch {
       // silently fail — the generation card will appear in the sidebar with an error if so
@@ -119,11 +131,36 @@ export function FileActions({
     setSharePending(true);
     try {
       const resp = await shareGeneration(generationId);
-      const shareUrl = `${window.location.origin}/s/${resp.share_id}`;
-      await navigator.clipboard.writeText(shareUrl);
+      const variantQuery = trackIndex !== null && trackIndex !== undefined
+        ? `v=${trackIndex}`
+        : "";
+      const shareUrl = shareKind === "radio"
+        ? `${window.location.origin}/radio?s=${resp.share_id}${variantQuery ? `&${variantQuery}` : ""}`
+        : `${window.location.origin}/s/${resp.share_id}${variantQuery ? `?${variantQuery}` : ""}`;
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareToast(t("fileActions.linkCopied"));
+      } catch {
+        // Clipboard может быть заблокирован в Mini App / без HTTPS-контекста —
+        // fallback: textarea select + execCommand
+        const ta = document.createElement("textarea");
+        ta.value = shareUrl;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand("copy");
+          setShareToast(t("fileActions.linkCopied"));
+        } catch {
+          setShareToast(t("fileActions.copyManually") + shareUrl);
+        } finally {
+          document.body.removeChild(ta);
+        }
+      }
       setMenuOpen(false);
     } catch {
-      // silent
+      setShareToast(t("fileActions.shareError"));
     } finally {
       setSharePending(false);
     }
@@ -137,13 +174,13 @@ export function FileActions({
       const resp = await generateCoverArt({
         prompt: `enhance and upscale: ${title || "cover art"}`,
         model: "nano-banana-pro",
-        title: `${title || "Обложка"} (HD)`,
+        title: `${title || t("fileActions.fallbackCover")} (HD)`,
       });
       trackGeneration(
         resp.generation_id,
         resp.ws_url,
         "cover_art",
-        `HD: ${title || "Обложка"}`,
+        `HD: ${title || t("fileActions.fallbackCover")}`,
       );
     } catch {
       // silent
@@ -168,8 +205,8 @@ export function FileActions({
           href={dlHref}
           download={title ?? true}
           className="file-dl"
-          title="Скачать"
-          aria-label="Скачать"
+          title={t("fileActions.download")}
+          aria-label={t("fileActions.download")}
         >
           <svg viewBox="0 0 16 16" width="13" height="13" fill="none" aria-hidden>
             <path
@@ -190,7 +227,7 @@ export function FileActions({
             type="button"
             className={`file-bolt${menuOpen ? " file-bolt--open" : ""}${wavPending || enhancePending ? " file-bolt--pending" : ""}`}
             onClick={openMenu}
-            title={isImageType ? "Действия с изображением" : "Действия с треком"}
+            title={isImageType ? t("fileActions.imageActions") : t("fileActions.trackActions")}
             disabled={wavPending || enhancePending}
             aria-expanded={menuOpen}
             aria-haspopup="menu"
@@ -211,10 +248,10 @@ export function FileActions({
             else toggleRadio(fileId);
           }}
           disabled={radioPending}
-          title={onRadio ? "Убрать с радио" : "Добавить на радио"}
+          title={onRadio ? t("fileActions.removeFromRadio") : t("fileActions.addToRadio")}
           aria-pressed={onRadio}
         >
-          {radioPending ? "…" : onRadio ? "В эфире" : "Radio"}
+          {radioPending ? "…" : onRadio ? t("fileActions.onAir") : t("fileActions.radio")}
         </button>
       )}
 
@@ -225,8 +262,8 @@ export function FileActions({
             isActive && isPlaying ? " file-play-pill--playing" : ""
           }`}
           onClick={() => onPlayPause()}
-          title={isActive && isPlaying ? "Пауза" : "Воспроизвести"}
-          aria-label={isActive && isPlaying ? "Пауза" : "Воспроизвести"}
+          title={isActive && isPlaying ? t("fileActions.pause") : t("fileActions.play")}
+          aria-label={isActive && isPlaying ? t("fileActions.pause") : t("fileActions.play")}
           aria-pressed={isActive && isPlaying}
         >
           <span className="file-play-pill__icon" aria-hidden>
@@ -240,8 +277,8 @@ export function FileActions({
           type="button"
           className="file-del"
           onClick={handleDeleteClick}
-          title="В корзину"
-          aria-label="Удалить в корзину"
+          title={t("fileActions.toTrash")}
+          aria-label={t("fileActions.deleteToTrash")}
         >
           <svg viewBox="0 0 16 16" width="12" height="12" fill="none" aria-hidden>
             <path
@@ -254,6 +291,16 @@ export function FileActions({
           </svg>
         </button>
       )}
+
+      {children}
+
+      {shareToast &&
+        createPortal(
+          <div className="share-toast" role="status" aria-live="polite">
+            {shareToast}
+          </div>,
+          document.body,
+        )}
 
       {menuOpen && menuPos &&
         createPortal(
@@ -271,7 +318,7 @@ export function FileActions({
                   onClick={() => void handleEnhanceImage()}
                   disabled={enhancePending}
                 >
-                  {enhancePending ? "⏳" : "✨"}&nbsp; Улучшить качество (Pro)
+                  {enhancePending ? "⏳" : "✨"}&nbsp; {t("fileActions.enhancePro")}
                 </button>
                 {generationId && (
                   <button
@@ -280,23 +327,25 @@ export function FileActions({
                     onClick={() => void handleShare()}
                     disabled={sharePending}
                   >
-                    {sharePending ? "⏳" : "🔗"}&nbsp; Поделиться
+                    {sharePending ? "⏳" : "🔗"}&nbsp; {t("fileActions.share")}
                   </button>
                 )}
               </>
             ) : (
               <>
-                <button type="button" role="menuitem" onClick={() => setMenuOpen(false)}>
-                  🔁&nbsp; Продлить трек
-                </button>
+                {!hideExtend && (
+                  <button type="button" role="menuitem" onClick={() => setMenuOpen(false)}>
+                    🔁&nbsp; {t("fileActions.extendTrack")}
+                  </button>
+                )}
                 <button
                   type="button"
                   role="menuitem"
                   onClick={() => void handleWavConvert()}
                   disabled={!canWav}
-                  title={canWav ? undefined : "Нет audio_id для конвертации"}
+                  title={canWav ? undefined : t("fileActions.noAudioId")}
                 >
-                  💿&nbsp; Конвертировать в WAV
+                  💿&nbsp; {t("fileActions.convertToWav")}
                 </button>
                 {generationId && (
                   <button
@@ -305,7 +354,7 @@ export function FileActions({
                     onClick={() => void handleShare()}
                     disabled={sharePending}
                   >
-                    {sharePending ? "⏳" : "🔗"}&nbsp; Поделиться треком
+                    {sharePending ? "⏳" : "🔗"}&nbsp; {t("fileActions.shareTrack")}
                   </button>
                 )}
               </>

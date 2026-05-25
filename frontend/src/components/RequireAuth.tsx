@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/lib/auth";
 
@@ -10,10 +11,11 @@ interface Props {
 export function RequireAuth({ children }: Props) {
   const { user, isLoading } = useAuth();
   const location = useLocation();
+  const { t } = useTranslation();
 
   if (isLoading) {
     return (
-      <div style={{ padding: 24, color: "var(--muted)" }}>Проверяем сессию…</div>
+      <div style={{ padding: 24, color: "var(--muted)" }}>{t("common.loading")}</div>
     );
   }
   if (!user) {

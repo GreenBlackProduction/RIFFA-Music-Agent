@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router-dom";
 
 import type { CurrentUser } from "@/lib/api/client";
@@ -23,7 +24,12 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ user, onSignOut, onItemPicked }: UserMenuProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
+  // Если avatar_url не загрузился (битый CDN, истёкший токен, удалённый объект)
+  // — показываем плейсхолдер с инициалом вместо broken-image icon.
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  useEffect(() => { setAvatarFailed(false); }, [user.avatar_url]);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   // Close on outside click / Esc.
@@ -58,8 +64,13 @@ export function UserMenu({ user, onSignOut, onItemPicked }: UserMenuProps) {
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        {user.avatar_url ? (
-          <img src={user.avatar_url} alt={user.display_name} className="user-menu__avatar" />
+        {user.avatar_url && !avatarFailed ? (
+          <img
+            src={user.avatar_url}
+            alt={user.display_name}
+            className="user-menu__avatar"
+            onError={() => setAvatarFailed(true)}
+          />
         ) : (
           <div className="user-menu__avatar user-menu__avatar--placeholder">
             {user.display_name.slice(0, 1).toUpperCase()}
@@ -89,7 +100,7 @@ export function UserMenu({ user, onSignOut, onItemPicked }: UserMenuProps) {
         <div className="user-menu__popover" role="menu">
           <NavLink to="/profile" className="user-menu__item" onClick={pick} role="menuitem">
             <span className="user-menu__item-icon" aria-hidden>👤</span>
-            <span className="user-menu__item-label">Профиль</span>
+            <span className="user-menu__item-label">{t("userMenu.profile")}</span>
           </NavLink>
 
           {user.is_admin && (
@@ -100,7 +111,7 @@ export function UserMenu({ user, onSignOut, onItemPicked }: UserMenuProps) {
               role="menuitem"
             >
               <span className="user-menu__item-icon" aria-hidden>🛡</span>
-              <span className="user-menu__item-label">Админ-меню</span>
+              <span className="user-menu__item-label">{t("userMenu.adminMenu")}</span>
             </NavLink>
           )}
 
@@ -114,7 +125,7 @@ export function UserMenu({ user, onSignOut, onItemPicked }: UserMenuProps) {
             role="menuitem"
           >
             <span className="user-menu__item-icon" aria-hidden>🚪</span>
-            <span className="user-menu__item-label">Выйти</span>
+            <span className="user-menu__item-label">{t("userMenu.logout")}</span>
           </button>
         </div>
       )}

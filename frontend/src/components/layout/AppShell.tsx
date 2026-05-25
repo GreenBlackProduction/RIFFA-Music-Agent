@@ -6,6 +6,7 @@ import { useGenerationStore } from "@/store/generation";
 import { Sidebar } from "./Sidebar";
 import { MobileTopbar } from "./MobileTopbar";
 import { NoticeBanner } from "./NoticeBanner";
+import { TermsAcceptanceModal } from "./TermsAcceptanceModal";
 import { CollapsedGenerationProgress } from "./ActiveGenerations";
 import "./AppShell.css";
 
@@ -16,10 +17,13 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const reconnectAll = useGenerationStore((s) => s.reconnectAll);
+  const syncFromServer = useGenerationStore((s) => s.syncFromServer);
 
-  // Reconnect WebSockets for any in-flight generations that survived a page reload.
+  // Reconnect WebSockets for any in-flight generations that survived a page reload AND
+  // sync with server to pick up generations started from other devices/sessions.
   useEffect(() => {
     reconnectAll();
+    syncFromServer();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -36,6 +40,7 @@ export function AppShell({ children }: AppShellProps) {
 
       <CollapsedGenerationProgress />
       <ScrollToTop />
+      <TermsAcceptanceModal />
     </div>
   );
 }

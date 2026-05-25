@@ -454,16 +454,24 @@
   padding: 10px 14px;
   background: transparent !important;
   border: none !important;
+  /* Снимаем 82% ограничение от .agent-bubble, чтобы индикатор не
+     зажимался в узкую колонку и не «разъезжался» вертикально. */
+  max-width: 100%;
+  width: max-content;
 }
 
 .agent-thinking {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
   padding: 8px 14px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.07);
+  /* Бабл-родитель имеет white-space: pre-wrap — отменяем здесь, чтобы
+     спаны внутри индикатора не разбивались по символу на узких экранах. */
+  white-space: normal;
 }
 
 .agent-thinking__status {
@@ -471,6 +479,10 @@
   color: rgba(246, 244, 255, 0.6);
   font-style: italic;
   animation: agent-status-pulse 2s ease-in-out infinite;
+  min-width: 0;
+  /* Если статус-фраза длинная — оставляем её в одну строку, она
+     умещается за счёт flex-wrap родителя (бэдж переедет ниже). */
+  white-space: nowrap;
 }
 
 .agent-thinking__elapsed {

@@ -1,10 +1,8 @@
 .panel {
-  border: 1px solid var(--border);
+  border: 1px solid var(--ink);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(20, 20, 32, 0.78), rgba(14, 14, 24, 0.92));
+  background: var(--paper-3);
   box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   padding: var(--space-6);
 }
 
@@ -13,38 +11,35 @@
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: var(--space-5);
-  background:
-    radial-gradient(120% 120% at 0% 0%, rgba(124, 255, 31, 0.08), transparent 55%),
-    radial-gradient(100% 120% at 100% 100%, rgba(214, 0, 255, 0.08), transparent 55%),
-    linear-gradient(180deg, rgba(20, 20, 32, 0.82), rgba(14, 14, 24, 0.94));
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--paper-3);
+  border-color: var(--ink);
 }
 
 .panel--hero h1 {
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(28px, 4vw, 44px);
-  letter-spacing: -0.025em;
-  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-weight: 500;
 }
 
 .panel--hero p {
   margin: var(--space-3) 0 0;
-  color: var(--muted);
+  color: var(--ink-2);
   max-width: 56ch;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .panel--hero .hero-illustration {
   width: clamp(96px, 14vw, 144px);
   height: clamp(96px, 14vw, 144px);
   border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, var(--accent), var(--accent-2), var(--accent-3));
+  background: var(--ink);
   display: grid;
   place-items: center;
   font-size: 56px;
-  color: var(--text-on-accent);
-  font-weight: 800;
-  box-shadow: 0 24px 60px rgba(124, 255, 31, 0.2);
+  color: var(--paper);
+  font-weight: 600;
+  box-shadow: var(--shadow-soft);
 }

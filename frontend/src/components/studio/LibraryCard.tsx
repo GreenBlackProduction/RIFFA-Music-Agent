@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 
 import {
@@ -19,7 +20,6 @@ import {
   MUSIC_TYPES,
   RADIO_TYPES,
   TYPE_ICONS,
-  TYPE_LABELS,
   useLibraryItems,
 } from "@/lib/library";
 import { usePlayer } from "@/store/player";
@@ -31,7 +31,12 @@ import "./LibraryCard.css";
 type FilterType = "all" | LibraryItemType | "trash";
 
 export function LibraryCard() {
+  const { t } = useTranslation();
   const [filter, setFilter] = useState<FilterType>("all");
+  const typeLabel = (k: LibraryItemType) => t(`library.types.${k}`);
+  // Помним id треков, чьи обложки не смогли загрузиться (битый URL, истёкший
+  // CDN-токен), чтобы не показывать «битую картинку» — переключаемся на эмодзи.
+  const [failedCovers, setFailedCovers] = useState<Set<string>>(new Set());
   const { ghosts, showGhost } = useFileGhosts();
   const queryClient = useQueryClient();
   const [viewerImage, setViewerImage] = useState<{ url: string; title: string } | null>(null);
@@ -166,7 +171,7 @@ export function LibraryCard() {
         title: i.title,
         url: i.audioUrl,
         cover: i.coverUrl ?? undefined,
-        meta: `${TYPE_LABELS[i.type]} · ${i.genre} · ${i.mood}`,
+        meta: `${typeLabel(i.type)} · ${i.genre} · ${i.mood}`,
         isOwn: i.isOwn !== false,
         canRadio: RADIO_TYPES.has(i.type) && i.isOwn !== false,
         isMusicType: MUSIC_TYPES.has(i.type),
@@ -178,7 +183,7 @@ export function LibraryCard() {
       title: item.title,
       url: item.audioUrl,
       cover: item.coverUrl ?? undefined,
-      meta: `${TYPE_LABELS[item.type]} · ${item.genre} · ${item.mood}`,
+      meta: `${typeLabel(item.type)} · ${item.genre} · ${item.mood}`,
       isOwn: item.isOwn !== false,
       canRadio: RADIO_TYPES.has(item.type) && item.isOwn !== false,
       isMusicType: MUSIC_TYPES.has(item.type),
@@ -196,47 +201,52 @@ export function LibraryCard() {
         <div>
           <h2 className="library-card__title">
             <span className="library-card__icon" aria-hidden>📁</span>
-            Недавние генерации
+            {t("library.recentTitle")}
           </h2>
           <p className="library-card__hint">
-            Последние файлы. Клик — воспроизведение в общем плеере сайта.
+            {t("library.recentSubtitle")}
           </p>
         </div>
         <div className="library-card__filters">
-          {(["all", "song", "instrumental", "cover", "sfx", "wav", "cover_art"] as Exclude<FilterType, "trash">[]).map((t) => (
+          {(["all", "song", "instrumental", "cover", "sfx", "wav", "cover_art"] as Exclude<FilterType, "trash">[]).map((f) => (
             <button
-              key={t}
+              key={f}
               type="button"
-              className={`filter-chip${filter === t ? " filter-chip--active" : ""}`}
-              onClick={() => setFilter(t)}
+              className={`filter-chip${filter === f ? " filter-chip--active" : ""}`}
+              onClick={() => setFilter(f)}
             >
-              {t === "all" ? "все" : TYPE_LABELS[t].toLowerCase()}
+              {f === "all" ? t("library.filterAll") : typeLabel(f).toLowerCase()}
             </button>
           ))}
           <button
             type="button"
             className={`filter-chip filter-chip--trash${filter === "trash" ? " filter-chip--active" : ""}`}
             onClick={() => setFilter(filter === "trash" ? "all" : "trash")}
-            title="Корзина"
+            title={t("library.trash")}
           >
             🗑
           </button>
         </div>
       </header>
 
+      {isLoading && (
+        <p className="library-card__hint library-card__hint--loading">
+          {t("library.loadingFiles")}
+        </p>
+      )}
       {!isLoading && authError && (
         <p className="library-card__hint" style={{ color: "var(--muted)" }}>
-          Войди в аккаунт — и здесь появятся твои генерации.
+          {t("library.signInPrompt")}
         </p>
       )}
       {!isLoading && !authError && visibleItems.length === 0 && filter !== "trash" && (
         <p className="library-card__hint" style={{ color: "var(--muted)" }}>
-          Пока пусто — запусти первую генерацию в плитках модулей выше.
+          {t("library.emptyStart")}
         </p>
       )}
       {!isLoading && filter === "trash" && visibleItems.length === 0 && (
         <p className="library-card__hint" style={{ color: "var(--muted)" }}>
-          Корзина пуста. Удалённые файлы хранятся 7 дней, потом удаляются навсегда.
+          {t("library.trashEmpty")}
         </p>
       )}
 
@@ -257,7 +267,7 @@ export function LibraryCard() {
               onClick={() => handleClick(it)}
               onKeyDown={(e) => e.key === "Enter" && handleClick(it)}
             >
-              {it.coverUrl ? (
+              {it.coverUrl && !failedCovers.has(it.id) ? (
                 <span
                   className="file-item__icon file-item__icon--cover"
                   aria-hidden
@@ -266,9 +276,14 @@ export function LibraryCard() {
                     setViewerImage({ url: it.coverUrl!, title: it.title });
                   }}
                   style={{ cursor: "zoom-in" }}
-                  title="Открыть в полноэкранном режиме"
+                  title={t("library.openFullscreen")}
                 >
-                  <img src={it.coverUrl} alt="" loading="lazy" />
+                  <img
+                    src={it.coverUrl}
+                    alt=""
+                    loading="lazy"
+                    onError={() => setFailedCovers((s) => new Set(s).add(it.id))}
+                  />
                 </span>
               ) : (
                 <span className="file-item__icon" aria-hidden>{TYPE_ICONS[it.type]}</span>
@@ -277,7 +292,7 @@ export function LibraryCard() {
               <div className="file-item__info">
                 <strong className="file-item__title">{it.title}</strong>
                 <span className="file-item__meta">
-                  {TYPE_LABELS[it.type]} · {it.genre} · {it.mood} · {it.duration}
+                  {typeLabel(it.type)} · {it.genre} · {it.mood} · {it.duration}
                 </span>
               </div>
 
@@ -299,6 +314,7 @@ export function LibraryCard() {
                 isPublic={it.isPublic}
                 generationId={it.generationId}
                 audioId={it.audioId}
+                trackIndex={it.trackIndex}
                 onToggleRadio={
                   canRadio
                     ? (next) =>
@@ -331,7 +347,7 @@ export function LibraryCard() {
           {(trashData?.items ?? []).length > 0 && (
             <div className="library-trash__head">
               <span className="muted">
-                Файлы в корзине хранятся 7 дней, затем удаляются навсегда.
+                {t("library.trashRetention")}
               </span>
               <button
                 type="button"
@@ -339,7 +355,7 @@ export function LibraryCard() {
                 onClick={() => purgeMutation.mutate()}
                 disabled={purgeMutation.isPending}
               >
-                {purgeMutation.isPending ? "Очищаю…" : "Очистить корзину"}
+                {purgeMutation.isPending ? t("library.purging") : t("library.purge")}
               </button>
             </div>
           )}
@@ -358,11 +374,11 @@ export function LibraryCard() {
                   <button
                     type="button"
                     className="filter-chip"
-                    title="Восстановить"
+                    title={t("library.restore")}
                     onClick={() => restoreMutation.mutate(gen.id)}
                     disabled={restoring}
                   >
-                    {restoring ? "…" : "↩ Восстановить"}
+                    {restoring ? "…" : t("library.restoreCta")}
                   </button>
                 </div>
               );

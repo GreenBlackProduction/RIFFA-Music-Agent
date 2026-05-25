@@ -40,6 +40,29 @@
   font-size: 13px;
 }
 
+.library-card__hint--loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.library-card__hint--loading::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(124, 255, 31, 0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: lib-spin 0.8s linear infinite;
+}
+
+@keyframes lib-spin {
+  to { transform: rotate(360deg); }
+}
+
 .library-card__filters {
   display: flex;
   flex-wrap: wrap;

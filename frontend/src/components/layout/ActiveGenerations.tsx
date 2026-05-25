@@ -13,7 +13,8 @@
 
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { createPortal } from "react-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { retryGeneration } from "@/lib/api/client";
 import {
@@ -25,30 +26,15 @@ import { usePlayer } from "@/store/player";
 
 import "./ActiveGenerations.css";
 
-const STEP_LABELS: Record<string, string> = {
-  start: "Запуск...",
-  lyrics: "Пишем текст...",
-  enriching_music: "Обогащаю музыкальный prompt...",
-  music: "Отправляю в Suno AI...",
-  submitting: "Отправка запроса...",
-  queued: "В очереди...",
-  generating: "Suno AI создаёт музыку...",
-  submitting_wav: "Конвертация в WAV...",
-  converting_wav: "Конвертация в WAV...",
-};
+const STEP_KEYS = [
+  "start", "lyrics", "enriching_music", "music",
+  "submitting", "queued", "generating", "submitting_wav", "converting_wav",
+] as const;
 
-const TYPE_LABELS: Record<string, string> = {
-  song: "Песня",
-  instrumental: "Инструментал",
-  sound_effect: "Звуковой эффект",
-  cover: "Кавер",
-  cover_song: "Кавер",
-  occasion: "Поздравление",
-  cover_art: "Обложка",
-  lyrics: "Текст",
-  extend: "Продление",
-  wav_convert: "Конвертация",
-};
+const TYPE_KEYS = [
+  "song", "instrumental", "sound_effect", "cover", "cover_song",
+  "occasion", "cover_art", "lyrics", "extend", "wav_convert",
+] as const;
 
 const TYPE_ICONS: Record<string, string> = {
   song: "🎤",
@@ -98,7 +84,19 @@ interface CardActionsProps {
   onOpenPreview: (url: string, title: string) => void;
 }
 
+function useLabels() {
+  const { t } = useTranslation();
+  const typeLabel = (k: string) =>
+    TYPE_KEYS.includes(k as (typeof TYPE_KEYS)[number]) ? t(`activeGen.types.${k}`) : k;
+  const stepLabel = (k: string | null | undefined) => {
+    if (!k) return t("activeGen.waiting");
+    return STEP_KEYS.includes(k as (typeof STEP_KEYS)[number]) ? t(`activeGen.steps.${k}`) : k;
+  };
+  return { t, typeLabel, stepLabel };
+}
+
 function CompletedActions({ gen, onOpenPreview }: CardActionsProps) {
+  const { t, typeLabel } = useLabels();
   const playerCurrent = usePlayer((s) => s.current);
   const isPlaying = usePlayer((s) => s.isPlaying);
   const play = usePlayer((s) => s.play);
@@ -113,6 +111,16 @@ function CompletedActions({ gen, onOpenPreview }: CardActionsProps) {
     gen.type === "cover_song" ||
     gen.type === "wav_convert" ||
     gen.type === "sound_effect";
+  // Радио-публикация поддерживается только для основных музыкальных
+  // модулей (sfx, wav, обложки не публикуем). Все треки из этого
+  // сайдбара — это свежие генерации текущего пользователя, поэтому
+  // isOwn=true и canRadio определяется только по типу.
+  const canRadio =
+    gen.type === "song" ||
+    gen.type === "instrumental" ||
+    gen.type === "cover" ||
+    gen.type === "cover_song" ||
+    gen.type === "occasion";
 
   function playerIdFor(idx: number): string {
     return tracks.length > 1 ? `${gen.id}#${idx}` : gen.id;
@@ -127,39 +135,37 @@ function CompletedActions({ gen, onOpenPreview }: CardActionsProps) {
     }
     play({
       id: playerKey,
-      title: track.title || gen.title || "Трек",
+      title: track.title || gen.title || t("activeGen.fallbackTrackTitle"),
       url: track.audio_url,
       cover: track.image_url,
-      meta: TYPE_LABELS[gen.type] ?? gen.type,
+      meta: typeLabel(gen.type),
       isMusicType,
+      isOwn: true,
+      canRadio,
       audioId: track.audio_id || undefined,
     });
   }
 
   if (tracks.length === 0 && !previewImage) {
-    return <p className="active-gen__done">✓ Готово</p>;
+    return <p className="active-gen__done">{t("activeGen.done")}</p>;
   }
 
   return (
-    <div className="active-gen__actions" role="group" aria-label="Действия с готовой генерацией">
-      {/* When Suno returns 2 variants, expose them as V1 / V2 with independent
-       *  play controls — clicking V1 plays only V1, and (combined with the
-       *  Radio button on each card in the library) the user can pick which
-       *  variant goes to public Radio without affecting the other. */}
-      {tracks.map((t, i) => {
+    <div className="active-gen__actions" role="group" aria-label={t("activeGen.actionsAria")}>
+      {tracks.map((trk, i) => {
         const playerKey = playerIdFor(i);
         const isCurrent = playerCurrent?.id === playerKey;
         const isThisPlaying = isCurrent && isPlaying;
-        const label = tracks.length > 1 ? `V${i + 1}` : "Слушать";
+        const label = tracks.length > 1 ? `V${i + 1}` : t("activeGen.listen");
         return (
           <button
             key={playerKey}
             type="button"
             className={`active-gen__action active-gen__action--play${isCurrent ? " active-gen__action--current" : ""}`}
-            onClick={() => handlePlay(t, i)}
-            aria-label={`${isThisPlaying ? "Пауза" : "Воспроизвести"} ${label}`}
+            onClick={() => handlePlay(trk, i)}
+            aria-label={`${isThisPlaying ? t("activeGen.pause") : t("activeGen.play")} ${label}`}
             aria-pressed={isCurrent}
-            title={t.title || label}
+            title={trk.title || label}
           >
             <span aria-hidden="true">{isThisPlaying ? "⏸" : "▶"}</span>
             <span>{label}</span>
@@ -170,12 +176,12 @@ function CompletedActions({ gen, onOpenPreview }: CardActionsProps) {
         <button
           type="button"
           className="active-gen__action active-gen__action--preview"
-          onClick={() => onOpenPreview(previewImage, gen.title || "Превью")}
-          aria-label="Открыть обложку"
-          title="Открыть обложку"
+          onClick={() => onOpenPreview(previewImage, gen.title || t("activeGen.previewFallback"))}
+          aria-label={t("activeGen.openCoverAria")}
+          title={t("activeGen.openCover")}
         >
           <span aria-hidden="true">🖼</span>
-          <span>Обложка</span>
+          <span>{t("activeGen.coverLabel")}</span>
         </button>
       ) : null}
     </div>
@@ -183,6 +189,7 @@ function CompletedActions({ gen, onOpenPreview }: CardActionsProps) {
 }
 
 function FailedActions({ gen }: { gen: ActiveGeneration }) {
+  const { t } = useTranslation();
   const track = useGenerationStore((s) => s.track);
   const [retrying, setRetrying] = useState(false);
 
@@ -200,21 +207,22 @@ function FailedActions({ gen }: { gen: ActiveGeneration }) {
 
   return (
     <div className="active-gen__failed-body">
-      <p className="active-gen__error">{gen.error ?? "Ошибка"}</p>
+      <p className="active-gen__error">{gen.error ?? t("activeGen.errorFallback")}</p>
       <button
         type="button"
         className="active-gen__retry"
         onClick={handleRetry}
         disabled={retrying}
-        title="Повторить генерацию"
+        title={t("activeGen.retryTitle")}
       >
-        {retrying ? "Запускаю..." : "Повторить"}
+        {retrying ? t("activeGen.retrying") : t("activeGen.retry")}
       </button>
     </div>
   );
 }
 
 function CardBody({ gen, onOpenPreview }: CardActionsProps) {
+  const { stepLabel } = useLabels();
   if (gen.status === "completed") {
     return <CompletedActions gen={gen} onOpenPreview={onOpenPreview} />;
   }
@@ -226,24 +234,45 @@ function CardBody({ gen, onOpenPreview }: CardActionsProps) {
       <div className="active-gen__bar" aria-hidden="true">
         <div className="active-gen__bar-fill" style={{ width: `${gen.progress}%` }} />
       </div>
-      <p className="active-gen__step">
-        {gen.step ? (STEP_LABELS[gen.step] ?? gen.step) : "Ожидание..."}
-      </p>
+      <p className="active-gen__step">{stepLabel(gen.step)}</p>
     </>
   );
 }
 
 export function CollapsedGenerationProgress() {
+  const { t, typeLabel, stepLabel } = useLabels();
   const active = useGenerationStore((s) => s.active);
   const entries = useMemo(
     () =>
       Object.values(active).filter((gen) => gen.status === "queued" || gen.status === "processing"),
     [active],
   );
+  const containerRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     document.body.classList.toggle("has-collapsed-progress", entries.length > 0);
     return () => document.body.classList.remove("has-collapsed-progress");
+  }, [entries.length]);
+
+  // Замеряем реальную высоту прогресс-бара и публикуем её через CSS-переменную,
+  // чтобы плеер сдвигался ровно на нужное количество пикселей.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || entries.length === 0) {
+      document.body.style.removeProperty("--gen-progress-height");
+      return;
+    }
+    const update = () => {
+      const h = el.getBoundingClientRect().height;
+      document.body.style.setProperty("--gen-progress-height", `${Math.ceil(h)}px`);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      document.body.style.removeProperty("--gen-progress-height");
+    };
   }, [entries.length]);
 
   if (entries.length === 0) {
@@ -251,10 +280,10 @@ export function CollapsedGenerationProgress() {
   }
 
   return (
-    <aside className="collapsed-gen-progress" aria-label="Прогресс генераций">
+    <aside ref={containerRef} className="collapsed-gen-progress" aria-label={t("activeGen.progressAria")}>
       {entries.map((gen) => {
-        const label = gen.title || TYPE_LABELS[gen.type] || "Генерация";
-        const step = gen.step ? (STEP_LABELS[gen.step] ?? gen.step) : "Ожидание";
+        const label = gen.title || typeLabel(gen.type) || t("activeGen.generationFallback");
+        const step = gen.step ? stepLabel(gen.step) : t("activeGen.waitingShort");
         return (
           <div key={gen.id} className="collapsed-gen-progress__row">
             <div className="collapsed-gen-progress__meta">
@@ -272,21 +301,43 @@ export function CollapsedGenerationProgress() {
   );
 }
 
+// Завершённые карточки автоматически испаряются через этот таймаут, чтобы не
+// засорять сайдбар после успешной генерации. Пользователь может закрыть
+// раньше (×) или продолжить взаимодействие — отсчёт стартует от перехода в
+// completed.
+const AUTO_DISMISS_MS = 30_000;
+
 export function ActiveGenerations() {
+  const { t, typeLabel } = useLabels();
   const active = useGenerationStore((s) => s.active);
   const dismiss = useGenerationStore((s) => s.dismiss);
   const entries = Object.values(active);
   const [preview, setPreview] = useState<{ url: string; title: string } | null>(null);
+
+  // Auto-dismiss: для каждой completed-карточки заводим setTimeout. Если
+  // пользователь закроет вручную раньше — gen исчезнет из active, useEffect
+  // перезапустится, и таймер будет очищен через возвращаемый cleanup.
+  useEffect(() => {
+    const timers: number[] = [];
+    for (const gen of entries) {
+      if (gen.status === "completed") {
+        const t = window.setTimeout(() => dismiss(gen.id), AUTO_DISMISS_MS);
+        timers.push(t);
+      }
+    }
+    return () => { for (const t of timers) clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entries.map((g) => `${g.id}:${g.status}`).join(",")]);
 
   function openPreview(url: string, title: string) {
     setPreview({ url, title });
   }
 
   return (
-    <section className="active-gen-panel" aria-label="Активные генерации">
+    <section className="active-gen-panel" aria-label={t("activeGen.panelLabel")}>
       {entries.length > 0 && (
         <header className="active-gen-panel__head">
-          <span>Генерации</span>
+          <span>{t("activeGen.panelTitle")}</span>
           <span className="muted">{entries.length}</span>
         </header>
       )}
@@ -307,17 +358,17 @@ export function ActiveGenerations() {
                 {TYPE_ICONS[gen.type] ?? "🎵"}
               </span>
               <div className="active-gen__meta">
-                <strong className="active-gen__title">{gen.title || "Генерация"}</strong>
+                <strong className="active-gen__title">{gen.title || t("activeGen.genericTitle")}</strong>
                 <span className="active-gen__type">
-                  {TYPE_LABELS[gen.type] ?? gen.type}
+                  {typeLabel(gen.type)}
                 </span>
               </div>
               <button
                 type="button"
                 className="active-gen__close"
                 onClick={() => dismiss(gen.id)}
-                aria-label="Скрыть карточку"
-                title="Скрыть"
+                aria-label={t("activeGen.hideCardAria")}
+                title={t("activeGen.hideCard")}
               >
                 ×
               </button>
@@ -342,7 +393,7 @@ export function ActiveGenerations() {
               e.stopPropagation();
               setPreview(null);
             }}
-            aria-label="Закрыть"
+            aria-label={t("activeGen.closeAria")}
           >
             ×
           </button>

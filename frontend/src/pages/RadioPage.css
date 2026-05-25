@@ -4,6 +4,10 @@
   max-width: 1180px;
   margin: 0 auto;
   padding-bottom: 160px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* ── Hero ──────────────────────────────────────────── */
@@ -11,15 +15,15 @@
 .radio-hero {
   position: relative;
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(124, 255, 31, 0.35);
+  border: 1px solid rgba(255, 59, 31, 0.20);
   padding: var(--space-6);
   overflow: hidden;
   background-color: var(--bg-card);
   background-image:
-    radial-gradient(120% 120% at 0% 0%, rgba(124, 255, 31, 0.32), transparent 60%),
+    radial-gradient(120% 120% at 0% 0%, rgba(255, 59, 31, 0.20), transparent 60%),
     radial-gradient(120% 100% at 100% 0%, rgba(214, 0, 255, 0.28), transparent 60%),
     radial-gradient(100% 120% at 50% 100%, rgba(255, 90, 0, 0.25), transparent 60%),
-    linear-gradient(135deg, rgba(20, 20, 32, 0.6), rgba(14, 14, 24, 0.85));
+    linear-gradient(135deg, var(--paper-3), var(--paper-4));
   background-size: 220% 220%, 220% 220%, 220% 220%, 100% 100%;
   animation: radio-hero-drift 18s ease-in-out infinite;
 }
@@ -45,7 +49,7 @@
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
-  padding-left: 24px;
+  min-width: 0;
 }
 
 .radio-hero__icon {
@@ -53,19 +57,16 @@
   height: 48px;
   object-fit: contain;
   flex-shrink: 0;
-  filter: drop-shadow(0 0 8px rgba(124, 255, 31, 0.5));
+  /* Свечение зафиксировано — пересчитывается один раз. Эффект «дыхания»
+     достигается дешёвыми opacity+scale (GPU, не пересчитывают пиксели). */
+  filter: drop-shadow(0 0 14px var(--hi));
   animation: radio-pulse 2s ease-in-out infinite;
+  will-change: transform, opacity;
 }
 
 @keyframes radio-pulse {
-  0%, 100% {
-    filter: drop-shadow(0 0 8px rgba(124, 255, 31, 0.5));
-    opacity: 0.85;
-  }
-  50% {
-    filter: drop-shadow(0 0 20px rgba(124, 255, 31, 0.9));
-    opacity: 1;
-  }
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.08); }
 }
 .radio-hero--compact .radio-hero__badge { flex-shrink: 0; }
 .radio-hero--compact h1 { font-size: clamp(18px, 2.4vw, 26px); margin: 0; }
@@ -99,7 +100,7 @@
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  background: rgba(124, 255, 31, 0.18);
+  background: var(--hi-soft);
   color: var(--accent-light);
   border: 1px solid rgba(124, 255, 31, 0.45);
 }
@@ -126,6 +127,19 @@
 /* ── Panel shared ──────────────────────────────────── */
 .radio-panel { display: grid; gap: var(--space-4); }
 .radio-panel--compact { gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+
+/* Убираем «разметку»: на десктопе и больших iPad панели радио без жёсткой
+   рамки и без тяжёлой тени — они визуально сливаются с фоном страницы
+   вместо того, чтобы выглядеть как набор отдельных блоков с обводкой. */
+@media (min-width: 769px) {
+  .radio .panel.radio-panel,
+  .radio .panel.radio-panel--half,
+  .radio .panel.radio-panel--compact {
+    border: 1px solid var(--rule-soft);
+    box-shadow: none;
+    background: linear-gradient(180deg, rgba(22, 22, 36, 0.55), rgba(16, 16, 28, 0.7));
+  }
+}
 .radio-section-head { display: grid; gap: 4px; }
 .radio-section-head--compact { display: block; gap: 0; }
 .radio-section-head__title {
@@ -160,7 +174,7 @@
 .mood-grid--compact .mood-card__dot {
   width: 8px; height: 8px;
   grid-column: 1; grid-row: 1;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 2px var(--paper-2);
 }
 .mood-grid--compact .mood-card__count {
   grid-column: 2; grid-row: 1;
@@ -203,18 +217,18 @@
   min-width: 0;
   padding: 8px 10px;
   background:
-    linear-gradient(135deg, rgba(124, 255, 31, 0.22), rgba(214, 0, 255, 0.18) 55%, rgba(255, 122, 26, 0.18));
+    linear-gradient(135deg, var(--hi-soft), rgba(214, 0, 255, 0.18) 55%, rgba(255, 122, 26, 0.18));
   border-color: rgba(124, 255, 31, 0.6);
   box-shadow:
-    0 0 0 1px rgba(124, 255, 31, 0.35) inset,
-    0 10px 32px rgba(124, 255, 31, 0.22);
+    0 0 0 1px rgba(255, 59, 31, 0.20) inset,
+    0 10px 32px var(--hi-soft);
   grid-template-columns: auto 1fr auto;
   grid-template-rows: 1fr;
   align-items: center;
   gap: 9px;
 }
 .mood-grid--compact .mood-card--collection {
-  --mood-color: #7cff1f;
+  --mood-color: var(--hi);
 }
 .mood-grid--compact .mood-card--collection:hover {
   transform: translateY(-2px);
@@ -227,7 +241,7 @@
 .mood-grid--compact .mood-card--collection.mood-card--active {
   background:
     linear-gradient(135deg,
-      color-mix(in srgb, #7cff1f 30%, transparent),
+      color-mix(in srgb, var(--hi) 30%, transparent),
       color-mix(in srgb, #d600ff 22%, transparent) 55%,
       color-mix(in srgb, #ff5a00 18%, transparent));
   border-color: var(--accent-bright);
@@ -246,7 +260,7 @@
   font-weight: 900;
   display: grid;
   place-items: center;
-  box-shadow: 0 0 0 2px rgba(11, 11, 20, 0.5), 0 0 14px rgba(124, 255, 31, 0.55);
+  box-shadow: 0 0 0 2px rgba(11, 11, 20, 0.5), 0 0 14px var(--hi);
   flex-shrink: 0;
 }
 .mood-grid--compact .mood-card--collection .mood-card__body {
@@ -296,13 +310,15 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--space-4);
   align-items: start;
+  min-width: 0;
+  overflow: hidden;
 }
 @media (max-width: 1020px) {
   .radio-columns { grid-template-columns: 1fr; }
 }
 
 /* Узкие (в 2 раза) панели — перекомпонуем строки плейлиста и чартов. */
-.radio-panel--half { min-width: 0; }
+.radio-panel--half { min-width: 0; overflow: hidden; }
 .radio-panel--half .radio-section-head h2 { font-size: clamp(16px, 1.8vw, 20px); }
 .radio-panel--half .radio-section-head .muted { font-size: 11px; }
 
@@ -353,35 +369,168 @@
 /* «Моя коллекция» — эмодзи звезда вместо glyph-иконки */
 .mood-grid--compact .mood-card--collection .mood-card__dot { font-size: 14px; }
 
-/* Узкая панель (desktop 2-column) — компактнее */
-.radio-panel--half .file-item {
-  padding: 8px 10px;
-}
-.radio-panel--half .file-item__icon   { font-size: 16px; }
-.radio-panel--half .file-item__title  { font-size: 13px; }
-.radio-panel--half .file-item__meta   { font-size: 10.5px; }
-.radio-panel--half .file-item__right  { gap: 4px; }
-.radio-panel--half .file-item__stats  { font-size: 10.5px; }
-.radio-panel--half .rate-btn { padding: 3px 6px; font-size: 10px; }
+/* ══════════════════════════════════════════════════════
+   Radio track — изолированная вёрстка, не наследует от .file-item.
+   Один CSS на все viewport'ы:
+      [44px cover] [title \n meta \n actions]
+   Cover жёстко занимает левую колонку.
+   Body (title+meta+actions) — справа, всё видно в одной "пилюле".
+   Ячейка ВСЕГДА растягивается по содержимому (height не задан).
+══════════════════════════════════════════════════════ */
 
-/* Radio: вся строка — кнопка воспроизведения */
-.playlist .file-item { cursor: pointer; }
-
-.radio-panel--half .file-item--chart {
-  grid-template-columns: 24px 32px 1fr auto auto;
-  padding: 8px 10px;
+.r-row {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
-.radio-panel--half .file-item__chart-pos { font-size: 16px; }
-.radio-panel--half .file-item__chart-score { font-size: 12px; }
-.radio-panel--half .chart-ranges { gap: 4px; flex-wrap: wrap; }
+
+.r-track {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  min-width: 0;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.r-track:hover {
+  border-color: rgba(255, 59, 31, 0.20);
+  background: rgba(255, 255, 255, 0.045);
+}
+.r-track--active {
+  border-color: var(--accent);
+  background: rgba(124, 255, 31, 0.08);
+}
+.r-track:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Chart variant — +28px колонка под номер позиции */
+.r-track--chart {
+  grid-template-columns: 28px 44px minmax(0, 1fr);
+}
+
+.r-track__pos {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--hi), #d600ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-align: center;
+  align-self: center;
+}
+
+.r-track__cover {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--paper-3);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  align-self: center;
+}
+.r-track__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.r-track__cover-fallback {
+  font-size: 20px;
+  opacity: 0.85;
+}
+
+.r-track__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.r-track__title {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.r-track__meta {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.r-track__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.r-track__indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.r-track--active .r-track__indicator { color: var(--accent); }
+
+.r-track__score {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-light);
+  padding: 0 4px;
+}
+
+/* В двухколоночной (узкой) панели — чуть мельче шрифты */
+.radio-panel--half .r-track__title { font-size: 13px; }
+.radio-panel--half .r-track__meta  { font-size: 10.5px; }
+.radio-panel--half .r-track__pos   { font-size: 16px; }
+.radio-panel--half .r-track__cover { width: 40px; height: 40px; }
+.radio-panel--half .r-track       { grid-template-columns: 40px minmax(0, 1fr); }
+.radio-panel--half .r-track--chart { grid-template-columns: 24px 40px minmax(0, 1fr); }
+.radio-panel--half .rate-btn       { padding: 3px 6px; font-size: 10px; }
+/* Заголовок секции с фильтрами справа.
+   На узких/половинных панелях (charts на десктопе шириной ≈ половины
+   экрана) фильтрам не хватает места рядом с title+hint — раньше grid
+   1fr+auto сжимал title-колонку и подсказка переносилась побуквенно.
+   Теперь используем flex с wrap: если влезает в одну строку — стоят
+   рядом; если нет — фильтры съезжают под title. */
 .radio-section-head--row {
-  grid-template-columns: 1fr auto;
-  align-items: end;
-  gap: var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
-@media (max-width: 640px) {
-  .radio-section-head--row { grid-template-columns: 1fr; }
-}
+.radio-section-head--row > * { min-width: 0; }
+.radio-section-head--row > div:first-child { flex: 1 1 220px; }
 
 /* ── Mood compact grid — адаптив ──────────────────── */
 
@@ -426,7 +575,7 @@
   padding: 14px 16px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--rule-soft);
   color: var(--text);
   text-align: left;
   cursor: pointer;
@@ -435,27 +584,27 @@
 
 .mood-card:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--mood-color, #7cff1f) 70%, transparent);
-  background: color-mix(in srgb, var(--mood-color, #7cff1f) 7%, transparent);
+  border-color: color-mix(in srgb, var(--mood-color, var(--hi)) 70%, transparent);
+  background: color-mix(in srgb, var(--mood-color, var(--hi)) 7%, transparent);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--mood-color, #7cff1f) 35%, transparent) inset,
-    0 8px 28px color-mix(in srgb, var(--mood-color, #7cff1f) 22%, transparent),
-    0 0 48px  color-mix(in srgb, var(--mood-color, #7cff1f) 12%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--mood-color, var(--hi)) 35%, transparent) inset,
+    0 8px 28px color-mix(in srgb, var(--mood-color, var(--hi)) 22%, transparent),
+    0 0 48px  color-mix(in srgb, var(--mood-color, var(--hi)) 12%, transparent);
 }
 
 .mood-card--active {
-  background: color-mix(in srgb, var(--mood-color, #7cff1f) 12%, transparent);
+  background: color-mix(in srgb, var(--mood-color, var(--hi)) 12%, transparent);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--mood-color, #7cff1f) 55%, transparent) inset,
-    0 10px 36px color-mix(in srgb, var(--mood-color, #7cff1f) 32%, transparent),
-    0 0 64px   color-mix(in srgb, var(--mood-color, #7cff1f) 18%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--mood-color, var(--hi)) 55%, transparent) inset,
+    0 10px 36px color-mix(in srgb, var(--mood-color, var(--hi)) 32%, transparent),
+    0 0 64px   color-mix(in srgb, var(--mood-color, var(--hi)) 18%, transparent);
 }
 
 .mood-card__dot {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px var(--paper-2);
 }
 
 .mood-card__body { display: grid; gap: 2px; min-width: 0; }
@@ -478,7 +627,7 @@
   padding: 2px 9px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--rule-soft);
   color: var(--muted);
   font-family: var(--font-ui);
   font-size: 12px;
@@ -489,7 +638,7 @@
   transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
 }
 .mood-card--active .mood-card__count {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--paper-2);
 }
 
 /* ── Playlist ──────────────────────────────────────── */
@@ -502,21 +651,20 @@
   gap: 8px;
 }
 
-/* Базовый стиль .file-item в global.css.
-   Ниже — только Radio-специфичные overrides. */
-
-/* content-visibility для длинного плейлиста */
-.playlist .file-item {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 52px;
+/* Плейлист: максимум 10 видимых треков, дальше — скролл.
+   overflow-y: scroll (не auto) — iOS WKWebView требует scroll для touch scrolling
+   внутри вложенного scroll-контейнера. */
+.radio-panel--half .playlist {
+  max-height: 720px;  /* около 10-12 строк */
+  overflow-y: scroll;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 255, 31, 0.4) transparent;
+  padding-right: 2px;
 }
-
-/* Активный трек чуть ярче */
-.playlist .file-item--active {
-  border-color: rgba(124, 255, 31, 0.65);
-}
-
-/* Убрать rate-btn stats на мобильном уже в .file-item__stats { display: none } */
 
 /* RADIO кнопка в плейлисте */
 .radio-btn {
@@ -526,7 +674,7 @@
   padding: 3px 8px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--rule-soft);
   color: var(--muted);
   font-size: 10.5px;
   font-weight: 600;
@@ -539,7 +687,7 @@
   color: var(--text);
 }
 .radio-btn--on {
-  background: rgba(124, 255, 31, 0.14);
+  background: var(--hi-soft);
   border-color: rgba(124, 255, 31, 0.6);
   color: var(--accent-light);
 }
@@ -554,7 +702,7 @@
   padding: 4px 8px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--rule-soft);
   color: var(--muted);
   font-size: 11px;
   cursor: pointer;
@@ -564,7 +712,7 @@
 .rate-btn:hover { color: var(--text); border-color: rgba(124, 255, 31, 0.45); }
 
 .rate-btn--like.rate-btn--on {
-  background: rgba(124, 255, 31, 0.14);
+  background: var(--hi-soft);
   border-color: rgba(124, 255, 31, 0.6);
   color: var(--accent-light);
 }
@@ -574,13 +722,65 @@
   color: var(--accent-light-2);
 }
 
-/* Мобильная адаптация: в Radio нет отдельного индикатора в col3 row1,
-   поэтому title+meta растягивается на полную ширину строки */
-@media (max-width: 540px) {
-  .playlist .file-item .file-item__info {
-    grid-column: 2 / 4; /* занимает cols 2-3 целиком в row 1 */
-  }
+.rate-btn--admin {
+  color: #ff6b6b;
+  border-color: rgba(255, 107, 107, 0.3);
 }
+.rate-btn--admin:hover {
+  background: rgba(255, 80, 80, 0.14);
+  border-color: rgba(255, 80, 80, 0.6);
+  color: #ff8888;
+}
+
+/* Admin classify popover — компактная панель чипов под треком */
+.admin-classify {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(20, 18, 32, 0.85);
+  border: 1px solid rgba(255, 107, 107, 0.25);
+  display: grid;
+  gap: 6px;
+}
+.admin-classify__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.admin-classify__label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-right: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.admin-classify__chip {
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: var(--rule-soft);
+  border: 1px solid var(--paper-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.admin-classify__chip:hover {
+  background: var(--hi-soft);
+  border-color: rgba(124, 255, 31, 0.4);
+}
+.admin-classify__chip--on {
+  background: var(--hi-soft);
+  border-color: rgba(124, 255, 31, 0.6);
+  color: var(--accent-light);
+}
+.admin-classify__chip--close {
+  margin-left: auto;
+  color: #ff8888;
+  border-color: rgba(255, 80, 80, 0.4);
+}
+
+/* Мобильный layout: global.css ≤540px уже даёт 3 колонки + 2 ряда.
+   Дополнительные overrides не нужны — file-item__right больше не используется. */
 
 .playlist-empty {
   padding: 20px;
@@ -590,8 +790,7 @@
   border-radius: var(--radius-md);
 }
 
-/* ── Charts ────────────────────────────────────────── */
-/* Чарт-список переиспользует базовый .file-item из global.css. */
+/* ── Charts (используют .r-track--chart, см. выше) ──── */
 
 .playlist--chart {
   list-style: none;
@@ -600,33 +799,6 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-}
-
-/* Расширяем сетку файла одним столбцом в начале — для номера позиции. */
-.file-item--chart {
-  grid-template-columns: 28px 36px 1fr auto auto;
-}
-
-.file-item__chart-pos {
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 700;
-  text-align: center;
-  background: linear-gradient(135deg, #7cff1f, #d600ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  flex-shrink: 0;
-}
-
-/* Score (likes - dislikes) — кратко справа */
-.file-item__chart-score {
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent-light);
-  margin-left: 2px;
-  white-space: nowrap;
 }
 
 .chart-ranges { justify-self: end; }
@@ -647,10 +819,10 @@
   border-radius: 20px;
   border: 1px solid rgba(124, 255, 31, 0.45);
   background:
-    radial-gradient(120% 100% at 0% 0%, rgba(124, 255, 31, 0.12), transparent 60%),
-    linear-gradient(180deg, rgba(18, 16, 28, 0.95), rgba(10, 10, 18, 0.98));
+    radial-gradient(120% 100% at 0% 0%, var(--hi-soft), transparent 60%),
+    linear-gradient(180deg, var(--paper-2), rgba(10, 10, 18, 0.98));
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55),
-              0 0 40px rgba(124, 255, 31, 0.1);
+              0 0 40px var(--hi-soft);
   max-width: calc(100vw - 32px);
   width: min(960px, calc(100vw - 32px));
 }
@@ -672,7 +844,7 @@
   height: 32px;
   border-radius: 50%;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--rule-soft);
   color: var(--muted);
   cursor: pointer;
 }
@@ -688,21 +860,6 @@
 }
 
 @media (max-width: 720px) {
-  .playlist-row {
-    grid-template-columns: 44px 1fr auto;
-  }
-  .playlist-row__stats { display: none; }
-  .playlist-row__rate { grid-column: span 3; justify-self: end; }
-
-  /* На мобильном чарт переходит на стандартный file-item flow с номером слева */
-  .file-item--chart {
-    grid-template-columns: 24px 32px 1fr auto;
-    grid-template-rows: auto auto;
-  }
-  .file-item--chart .file-item__chart-pos { grid-column: 1; grid-row: 1; }
-  .file-item--chart .file-item__icon      { grid-column: 2; grid-row: 1; }
-  .file-item--chart .file-item__info      { grid-column: 3; grid-row: 1; }
-  .file-item--chart .file-actions         { grid-column: 2 / 4; grid-row: 2; }
-  .file-item--chart .file-item__right     { grid-column: 4; grid-row: 1 / 3; }
-  .file-item__chart-score { font-size: 12px; }
+  /* Score не показываем на узких экранах — место экономим */
+  .r-track--chart .r-track__score { display: none; }
 }

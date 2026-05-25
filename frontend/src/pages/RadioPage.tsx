@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { useTranslation } from "react-i18next";
 
 import { Panel } from "@/components/ui/Panel";
 import { FileActions } from "@/components/studio/FileActions";
@@ -8,13 +9,17 @@ import { ImageViewer } from "@/components/ui/ImageViewer";
 import {
   type RadioPeriod,
   type RadioTrackOut,
+  adminClassifyRadioTrack,
+  adminUnpublishRadioTrack,
   fetchMyRadioCollection,
   fetchRadio,
   fetchRadioMoodCounts,
   fetchRadioStats,
+  fetchSharedGeneration,
   recordRadioPlay,
   voteRadioTrack,
 } from "@/lib/api/client";
+import { useAuth } from "@/lib/auth";
 import { usePlayer } from "@/store/player";
 
 import "./RadioPage.css";
@@ -39,23 +44,21 @@ function usePageVisible(): boolean {
 const MOODS: ReadonlyArray<{
   key: string;
   emoji: string;
-  label: string;
   hex: string;
-  descr: string;
   icon?: string;
 }> = [
-  { key: "all",        emoji: "🎶", label: "Все треки",      hex: "#7cff1f", descr: "Полный эфир RIFFA",             icon: "/radio/mood-all.gif"        },
-  { key: "vocal",      emoji: "🎤", label: "С текстом",      hex: "#ffffff", descr: "Все песни с вокалом",           icon: "/radio/mood-vocal.gif"      },
-  { key: "happy",      emoji: "😊", label: "Радостное",      hex: "#ffd54a", descr: "Светлые, уплифтные, мажорные",  icon: "/radio/mood-happy.gif"      },
-  { key: "calm",       emoji: "😌", label: "Спокойное",      hex: "#8fb3ff", descr: "Расслабляющие, уютные, тёплые", icon: "/radio/mood-calm.gif"       },
-  { key: "sad",        emoji: "😢", label: "Грустное",       hex: "#6b8cff", descr: "Меланхоличные, эмоциональные",  icon: "/radio/mood-sad.gif"        },
-  { key: "energetic",  emoji: "😤", label: "Энергичное",     hex: "#ff5a00", descr: "Мощные, динамичные, бодрые",    icon: "/radio/mood-energetic.gif"  },
-  { key: "confident",  emoji: "😎", label: "Уверенное",      hex: "#c4ff4a", descr: "Боевые, bold, стильные",        icon: "/radio/mood-confident.gif"  },
-  { key: "dreamy",     emoji: "🌙", label: "Мечтательное",   hex: "#d6a8ff", descr: "Атмосферные, воздушные",        icon: "/radio/mood-dreamy.gif"     },
-  { key: "aggressive", emoji: "🔥", label: "Агрессивное",    hex: "#ff3b5a", descr: "Тяжёлые, интенсивные",          icon: "/radio/mood-aggressive.gif" },
-  { key: "inspiring",  emoji: "🌅", label: "Вдохновляющее",  hex: "#ffbf7f", descr: "Мотивирующие, уплифтные",       icon: "/radio/mood-inspiring.gif"  },
-  { key: "anxious",    emoji: "😰", label: "Тревожное",      hex: "#a48aff", descr: "Тягучие, тревожные, саспенс",   icon: "/radio/mood-anxious.gif"    },
-  { key: "dramatic",   emoji: "🎭", label: "Драматичное",    hex: "#ff7ac6", descr: "Эпик, кинематик, масштаб",      icon: "/radio/mood-dramatic.gif"   },
+  { key: "all",        emoji: "🎶", hex: "#7cff1f", icon: "/radio/mood-all.webp"        },
+  { key: "vocal",      emoji: "🎤", hex: "#ffffff", icon: "/radio/mood-vocal.webp"      },
+  { key: "happy",      emoji: "😊", hex: "#ffd54a", icon: "/radio/mood-happy.webp"      },
+  { key: "calm",       emoji: "😌", hex: "#8fb3ff", icon: "/radio/mood-calm.webp"       },
+  { key: "sad",        emoji: "😢", hex: "#6b8cff", icon: "/radio/mood-sad.webp"        },
+  { key: "energetic",  emoji: "😤", hex: "#ff5a00", icon: "/radio/mood-energetic.webp"  },
+  { key: "confident",  emoji: "😎", hex: "#c4ff4a", icon: "/radio/mood-confident.webp"  },
+  { key: "dreamy",     emoji: "🌙", hex: "#d6a8ff", icon: "/radio/mood-dreamy.webp"     },
+  { key: "aggressive", emoji: "🔥", hex: "#ff3b5a", icon: "/radio/mood-aggressive.webp" },
+  { key: "inspiring",  emoji: "🌅", hex: "#ffbf7f", icon: "/radio/mood-inspiring.webp"  },
+  { key: "anxious",    emoji: "😰", hex: "#a48aff", icon: "/radio/mood-anxious.webp"    },
+  { key: "dramatic",   emoji: "🎭", hex: "#ff7ac6", icon: "/radio/mood-dramatic.webp"   },
 ];
 
 type Mood = typeof MOODS[number]["key"] | "collection";
@@ -69,11 +72,7 @@ function MoodIcon({ moodKey, size = 18 }: { moodKey: string; size?: number }) {
   return <span aria-hidden>{mood.emoji}</span>;
 }
 
-const CHART_RANGES: ReadonlyArray<[RadioPeriod, string]> = [
-  ["today", "Чарт дня"],
-  ["week",  "Топ недели"],
-  ["month", "Топ месяца"],
-];
+const CHART_PERIODS: ReadonlyArray<RadioPeriod> = ["today", "week", "month", "all"];
 
 function fmtTime(sec: number): string {
   const m = Math.floor(sec / 60);
@@ -84,22 +83,132 @@ function fmtTime(sec: number): string {
 const RADIO_QUERY_KEY = ["radio"] as const;
 
 export function RadioPage() {
+  const { t } = useTranslation();
+  const moodTranslated = (key: string) => {
+    const v = t(`radio.moods.${key}`, { defaultValue: "" });
+    return typeof v === "string" && v ? v : key;
+  };
+  const moodDescr = (key: string) => {
+    const v = t(`radio.moodDescr.${key}`, { defaultValue: "" });
+    return typeof v === "string" && v ? v : "";
+  };
   const [mood, setMood] = useState<Mood>("all");
   const [range, setRange] = useState<RadioPeriod>("today");
   const queryClient = useQueryClient();
-  const [viewerImage, setViewerImage] = useState<{ url: string; title: string } | null>(null);
+  const { user } = useAuth();
+  const isAdmin = !!user?.is_admin;
 
-  const { playOrToggle, currentId, isPlaying } = usePlayer(
+  // Admin moderation: confirm + unpublish + refresh list.
+  const adminRemoveTrack = async (track: RadioTrackOut) => {
+    if (!isAdmin) return;
+    if (!window.confirm(t("radio.adminConfirmRemove", { title: track.title }))) return;
+    try {
+      await adminUnpublishRadioTrack(track.id);
+      await queryClient.invalidateQueries({ queryKey: ["radio"] });
+    } catch (err) {
+      const msg = (err as { detail?: string })?.detail ?? t("errors.generic");
+      window.alert(msg);
+    }
+  };
+
+  // Admin: open quick reclassify popover anchored at a track.
+  const [adminClassifyFor, setAdminClassifyFor] = useState<string | null>(null);
+  const adminReclassify = async (
+    trackId: string,
+    body: { mood?: string | null; has_vocals?: boolean | null },
+  ) => {
+    if (!isAdmin) return;
+    try {
+      await adminClassifyRadioTrack(trackId, body);
+      await queryClient.invalidateQueries({ queryKey: ["radio"] });
+      setAdminClassifyFor(null);
+    } catch (err) {
+      const msg = (err as { detail?: string })?.detail ?? t("errors.generic");
+      window.alert(msg);
+    }
+  };
+  const [viewerImage, setViewerImage] = useState<{ url: string; title: string } | null>(null);
+  // Обложки треков, чьи URL не загрузились (истёкшие CDN-токены Suno и пр.).
+  // Для этих id рендерим эмодзи-плейсхолдер вместо <img>.
+  const [failedCovers, setFailedCovers] = useState<Set<string>>(new Set());
+  const markCoverFailed = (id: string) =>
+    setFailedCovers((prev) => { const n = new Set(prev); n.add(id); return n; });
+
+  // Telegram Mini App WKWebView may preserve horizontal scroll between navigations.
+  // Force reset on mount so the Radio page always starts at x=0.
+  useEffect(() => {
+    const main = document.querySelector<HTMLElement>(".main");
+    if (main) {
+      main.scrollLeft = 0;
+      main.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+    document.documentElement.scrollLeft = 0;
+    document.body.scrollLeft = 0;
+  }, []);
+
+  const { playOrToggle, playDirect, setPlaying, currentId, isPlaying } = usePlayer(
     useShallow((s) => ({
       playOrToggle: s.playOrToggle,
+      playDirect: s.play,
+      setPlaying: s.setPlaying,
       currentId: s.current?.id ?? null,
       isPlaying: s.isPlaying,
     })),
   );
 
+  // Share deep-link: /radio?s=<share_id>&v=<variant> — открыли по
+  // ссылке шеринга из FileActions. Резолвим share_id, играем трек
+  // в общем плеере, чистим query чтобы не зациклиться.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get("s");
+    if (!shareId) return;
+    const variantRaw = params.get("v");
+    const variant = variantRaw !== null && /^\d+$/.test(variantRaw) ? Number(variantRaw) : null;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const gen = await fetchSharedGeneration(shareId, variant);
+        if (cancelled) return;
+        const track = gen.tracks[0];
+        if (!track || !track.audio_url) return;
+        const moodLabel = moodTranslated(gen.mood ?? "");
+        const meta = [gen.genre, moodLabel].filter(Boolean).join(" · ");
+        playDirect({
+          id: shareId,
+          title: track.title || gen.title || "Трек",
+          url: track.audio_url,
+          cover: track.image_url ?? undefined,
+          author: "RIFFA Radio",
+          meta,
+          canRadio: false,
+          isMusicType: true,
+          isPublic: true,
+        }, []);
+        // Браузеры (особенно in-app webview Telegram, Safari, Chrome
+        // Android) блокируют HTML5 audio autoplay без user gesture.
+        // Поэтому грузим трек в плеер, но НЕ пытаемся play() — иначе
+        // вызов отвалится молча, а юзер увидит «ничего не происходит».
+        // Дашборд внизу появится с большой кнопкой ▶ — этого хватит.
+        setPlaying(false);
+      } catch {
+        // битая ссылка — оставляем юзера на радио
+      } finally {
+        // убрать ?s= из URL, чтобы при ре-mount не подёргивалось снова
+        const url = new URL(window.location.href);
+        url.searchParams.delete("s");
+        url.searchParams.delete("v");
+        window.history.replaceState({}, "", url.toString());
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [playDirect, setPlaying]);
+
   /** Convert a RadioTrackOut to the PlayerTrack shape. */
   function toPlayerTrack(track: RadioTrackOut) {
-    const moodLabel = MOODS.find((m) => m.key === track.mood)?.label ?? track.mood ?? "";
+    const moodLabel = moodTranslated(track.mood ?? "");
     const meta = [track.genre, moodLabel, track.tempo].filter(Boolean).join(" · ");
     return {
       id: track.id,
@@ -111,7 +220,7 @@ export function RadioPage() {
       likes: track.like_count,
       dislikes: track.dislike_count,
       isOwn: track.is_own,
-      canRadio: track.is_own,
+      canRadio: false, /* Радио-треки уже в эфире — кнопку не показываем */
       isMusicType: true,
       isPublic: true,
     };
@@ -233,14 +342,14 @@ export function RadioPage() {
         <div className="radio-hero__body">
           <div className="radio-hero__head">
             <img src="/icons/radio.png" alt="Radio" className="radio-hero__icon" />
-            <h1>Эфир сообщества</h1>
+            <h1>{t("radio.title")}</h1>
           </div>
           <div className="radio-stats">
-            <div><strong>{stats?.total_tracks ?? "—"}</strong><span>в эфире</span></div>
-            <div><strong>{(stats?.total_plays ?? 0).toLocaleString("ru")}</strong><span>прослуш.</span></div>
-            <div><strong>{(stats?.today_plays ?? 0).toLocaleString("ru")}</strong><span>прослуш. сегодня</span></div>
-            <div><strong>{stats?.total_likes ?? 0}</strong><span>лайков</span></div>
-            <div><strong>{stats?.today_tracks ?? 0}</strong><span>новых сегодня</span></div>
+            <div><strong>{stats?.total_tracks ?? "—"}</strong><span>{t("radio.onAir")}</span></div>
+            <div><strong>{(stats?.total_plays ?? 0).toLocaleString()}</strong><span>{t("radio.plays")}</span></div>
+            <div><strong>{(stats?.today_plays ?? 0).toLocaleString()}</strong><span>{t("radio.playsToday")}</span></div>
+            <div><strong>{stats?.total_likes ?? 0}</strong><span>{t("radio.likes")}</span></div>
+            <div><strong>{stats?.today_tracks ?? 0}</strong><span>{t("radio.newToday")}</span></div>
           </div>
         </div>
       </section>
@@ -248,7 +357,7 @@ export function RadioPage() {
       {/* ── Mood grid ── */}
       <Panel className="radio-panel radio-panel--compact">
         <header className="radio-section-head radio-section-head--compact">
-          <h3 className="radio-section-head__title">По настроению</h3>
+          <h3 className="radio-section-head__title">{t("radio.filterMood")}</h3>
         </header>
         <div className="mood-grid mood-grid--compact">
 
@@ -258,12 +367,12 @@ export function RadioPage() {
             className={`mood-card mood-card--collection${mood === "collection" ? " mood-card--active" : ""}`}
             onClick={() => setMood("collection")}
             aria-pressed={mood === "collection"}
-            title="Моя коллекция — только лайкнутые треки"
+            title={`${t("radio.filterCollection")} — ${t("radio.collectionDesc")}`}
           >
-            <img src="/radio/mood-collection.gif" alt="" className="mood-card__icon" loading="lazy" decoding="async" aria-hidden />
+            <img src="/radio/mood-collection.webp" alt="" className="mood-card__icon" loading="lazy" decoding="async" aria-hidden />
             <span className="mood-card__body">
-              <span className="mood-card__label">Моя коллекция</span>
-              <span className="mood-card__meta">Только лайкнутые</span>
+              <span className="mood-card__label">{t("radio.filterCollection")}</span>
+              <span className="mood-card__meta">{t("radio.collectionDesc")}</span>
             </span>
             <span className="mood-card__count mood-card__count--collection">{collectionCount}</span>
           </button>
@@ -284,7 +393,7 @@ export function RadioPage() {
                 style={{ '--mood-color': m.hex, borderColor: active ? m.hex : undefined } as React.CSSProperties}
                 onClick={() => setMood(m.key)}
                 aria-pressed={active}
-                title={`${m.emoji} ${m.label} — ${m.descr}`}
+                title={`${m.emoji} ${moodTranslated(m.key)} — ${moodDescr(m.key)}`}
               >
                 {m.icon
                   ? <img src={m.icon} alt="" className="mood-card__icon" loading="lazy" decoding="async" aria-hidden />
@@ -292,12 +401,12 @@ export function RadioPage() {
                 }
                 <span className="mood-card__dot mood-card__dot--hidden" style={{ background: m.hex }} />
                 <span className="mood-card__body">
-                  <span className="mood-card__label">{m.label}</span>
-                  <span className="mood-card__meta" title={m.descr}>{m.descr}</span>
+                  <span className="mood-card__label">{moodTranslated(m.key)}</span>
+                  <span className="mood-card__meta" title={moodDescr(m.key)}>{moodDescr(m.key)}</span>
                 </span>
                 <span
                   className="mood-card__count"
-                  aria-label={`${count} треков`}
+                  aria-label={`${count}`}
                   style={{ color: active ? m.hex : undefined, borderColor: active ? m.hex : undefined }}
                 >
                   {count}
@@ -315,25 +424,23 @@ export function RadioPage() {
         <Panel className="radio-panel radio-panel--half">
           <header className="radio-section-head">
             <h2 className="radio-playlist-title">
-              Плейлист «{mood === "collection" ? (
-                <><img src="/radio/mood-collection.gif" alt="" className="mood-inline-icon" style={{ width: 20, height: 20 }} loading="lazy" decoding="async" aria-hidden /> Моя коллекция</>
+              {t("radio.playlistTitle")} «{mood === "collection" ? (
+                <><img src="/radio/mood-collection.webp" alt="" className="mood-inline-icon" style={{ width: 20, height: 20 }} loading="lazy" decoding="async" aria-hidden /> {t("radio.filterCollection")}</>
               ) : (
-                <><MoodIcon moodKey={mood} size={20} /> {MOODS.find((m) => m.key === mood)?.label ?? mood}</>
+                <><MoodIcon moodKey={mood} size={20} /> {moodTranslated(mood)}</>
               )}»
             </h2>
-            <p className="muted">Лайки и дизлайки двигают треки в чартах. Нажми ▶ чтобы послушать.</p>
+            <p className="muted">{t("radio.playlistHint")}</p>
           </header>
           <ol className="playlist">
             {playlistLoading && (
-              <li className="playlist-empty">Загружаем эфир…</li>
+              <li className="playlist-empty">{t("radio.loadingTracks")}</li>
             )}
             {!playlistLoading && authError && (
-              <li className="playlist-empty">
-                Войди в аккаунт, чтобы видеть свою коллекцию.
-              </li>
+              <li className="playlist-empty">{t("errors.unauthorized")}</li>
             )}
             {!playlistLoading && !authError && playlistError && (
-              <li className="playlist-empty">Не удалось загрузить треки.</li>
+              <li className="playlist-empty">{t("errors.generic")}</li>
             )}
             {!playlistLoading &&
               !authError &&
@@ -341,78 +448,105 @@ export function RadioPage() {
               playlistTracks.map((track) => {
                 const isActive = currentId === track.id;
                 const moodLabel =
-                  MOODS.find((m) => m.key === track.mood)?.label ?? track.mood ?? "—";
+                  moodTranslated(track.mood ?? "");
                 return (
-                  <li
-                    key={track.id}
-                    role="button"
-                    tabIndex={0}
-                    className={`file-item${isActive ? " file-item--active" : ""}`}
-                    onClick={() => play(track, playlistTracks)}
-                    onKeyDown={(e) => e.key === "Enter" && play(track, playlistTracks)}
-                    aria-label={`Слушать: ${track.title}`}
-                  >
-                    {/* col 1: обложка (если есть) или иконка */}
-                    {track.image_url ? (
-                      <span
-                        className="file-item__icon file-item__icon--cover"
-                        aria-hidden
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setViewerImage({ url: track.image_url!, title: track.title });
-                        }}
-                        style={{ cursor: "zoom-in" }}
-                        title="Открыть в полноэкранном режиме"
-                      >
-                        <img src={track.image_url} alt="" loading="lazy" />
-                      </span>
-                    ) : (
-                      <span className="file-item__icon" aria-hidden>🎵</span>
-                    )}
-
-                    {/* col 2: название + мета */}
-                    <div className="file-item__info">
-                      <span className="file-item__title">{track.title}</span>
-                      <span className="file-item__meta">
-                        {track.author} · {track.genre ?? "—"} · {moodLabel}
-                        {track.duration ? ` · ${fmtTime(track.duration)}` : ""}
-                      </span>
-                    </div>
-
-                    {/* col 3: dl + bolt */}
-                    <FileActions
-                      audioUrl={track.audio_url}
-                      title={track.title}
-                      isMusicType={true}
-                      canRadio={false}
-                      fileId={track.id}
-                    />
-
-                    {/* col 4: лайки + индикатор ▶/❚❚ */}
+                  <li key={track.id} className="r-row">
                     <div
-                      className="file-item__right"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
+                      role="button"
+                      tabIndex={0}
+                      className={`r-track${isActive ? " r-track--active" : ""}`}
+                      onClick={() => play(track, playlistTracks)}
+                      onKeyDown={(e) => e.key === "Enter" && play(track, playlistTracks)}
+                      aria-label={track.title}
                     >
-                      <button
-                        type="button"
-                        className={`rate-btn rate-btn--like${track.my_vote === "like" ? " rate-btn--on" : ""}`}
-                        onClick={() => toggleVote(track, "like")}
-                        aria-label="Лайк"
+                      <div
+                        className="r-track__cover"
+                        onClick={(e) => {
+                          if (!track.image_url || failedCovers.has(track.id)) return;
+                          e.stopPropagation();
+                          setViewerImage({ url: track.image_url, title: track.title });
+                        }}
+                        style={track.image_url && !failedCovers.has(track.id) ? { cursor: "zoom-in" } : undefined}
+                        aria-hidden
                       >
-                        👍 {track.like_count}
-                      </button>
-                      <button
-                        type="button"
-                        className={`rate-btn rate-btn--dislike${track.my_vote === "dislike" ? " rate-btn--on" : ""}`}
-                        onClick={() => toggleVote(track, "dislike")}
-                        aria-label="Дизлайк"
-                      >
-                        👎 {track.dislike_count}
-                      </button>
-                      <span className="file-item__indicator" aria-hidden>
-                        {isActive && isPlaying ? "❚❚" : "▶"}
-                      </span>
+                        {track.image_url && !failedCovers.has(track.id)
+                          ? <img
+                              src={track.image_url}
+                              alt=""
+                              loading="lazy"
+                              onError={() => markCoverFailed(track.id)}
+                            />
+                          : <span className="r-track__cover-fallback">🎵</span>
+                        }
+                      </div>
+                      <div className="r-track__body">
+                        <div className="r-track__title">{track.title}</div>
+                        <div className="r-track__meta">
+                          {track.author} · {track.genre ?? "—"} · {moodLabel}
+                          {track.duration ? ` · ${fmtTime(track.duration)}` : ""}
+                        </div>
+                        <div className="r-track__actions" onClick={(e) => e.stopPropagation()}>
+                          <FileActions
+                            audioUrl={track.audio_url}
+                            title={track.title}
+                            isMusicType={true}
+                            canRadio={false}
+                            fileId={track.id}
+                            generationId={track.id}
+                            hideExtend
+                            shareKind="radio"
+                          >
+                            <button
+                              type="button"
+                              className={`rate-btn rate-btn--like${track.my_vote === "like" ? " rate-btn--on" : ""}`}
+                              onClick={(e) => { e.stopPropagation(); toggleVote(track, "like"); }}
+                              aria-label={t("globalPlayer.likeAria")}
+                            >
+                              👍 {track.like_count}
+                            </button>
+                            <button
+                              type="button"
+                              className={`rate-btn rate-btn--dislike${track.my_vote === "dislike" ? " rate-btn--on" : ""}`}
+                              onClick={(e) => { e.stopPropagation(); toggleVote(track, "dislike"); }}
+                              aria-label={t("globalPlayer.dislikeAria")}
+                            >
+                              👎 {track.dislike_count}
+                            </button>
+                            {isAdmin && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="rate-btn rate-btn--admin"
+                                  onClick={(e) => { e.stopPropagation(); setAdminClassifyFor(adminClassifyFor === track.id ? null : track.id); }}
+                                  title={t("radio.adminClassify")}
+                                  aria-label={t("radio.adminClassify")}
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rate-btn rate-btn--admin"
+                                  onClick={(e) => { e.stopPropagation(); void adminRemoveTrack(track); }}
+                                  title={t("radio.adminRemove")}
+                                  aria-label={t("radio.adminRemove")}
+                                >
+                                  🗑
+                                </button>
+                              </>
+                            )}
+                            <span className="r-track__indicator" aria-hidden>
+                              {isActive && isPlaying ? "❚❚" : "▶"}
+                            </span>
+                          </FileActions>
+                          {isAdmin && adminClassifyFor === track.id && (
+                            <AdminClassifyPanel
+                              currentMood={track.mood ?? null}
+                              onPick={(mood, has_vocals) => void adminReclassify(track.id, { mood, has_vocals })}
+                              onClose={() => setAdminClassifyFor(null)}
+                            />
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </li>
                 );
@@ -423,8 +557,8 @@ export function RadioPage() {
               playlistTracks.length === 0 && (
                 <li className="playlist-empty">
                   {mood === "collection"
-                    ? "Коллекция пуста — поставь лайк трекам, и они появятся здесь."
-                    : "Пока треков в этом настроении нет."}
+                    ? t("radio.collectionEmpty")
+                    : t("radio.empty")}
                 </li>
               )}
           </ol>
@@ -434,107 +568,143 @@ export function RadioPage() {
         <Panel className="radio-panel radio-panel--half">
           <header className="radio-section-head radio-section-head--row">
             <div>
-              <h2>Чарты</h2>
-              <p className="muted">Рассчитано по лайкам минус дизлайки за период.</p>
+              <h2>{t("radio.chartsTitle")}</h2>
+              <p className="muted">{t("radio.chartsHint")}</p>
             </div>
             <div className="chip-row chart-ranges">
-              {CHART_RANGES.map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={`filter-chip${range === value ? " filter-chip--active" : ""}`}
-                  onClick={() => setRange(value)}
-                >
-                  {label}
-                </button>
-              ))}
+              {CHART_PERIODS.map((value) => {
+                const labelKey = value === "today" ? "radio.chartDay"
+                               : value === "week"  ? "radio.chartWeek"
+                               : value === "month" ? "radio.chartMonth"
+                               :                     "radio.chartAll";
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`filter-chip${range === value ? " filter-chip--active" : ""}`}
+                    onClick={() => setRange(value)}
+                  >
+                    {t(labelKey)}
+                  </button>
+                );
+              })}
             </div>
           </header>
           <ol className="playlist playlist--chart">
-            {chartTracks.map((t, i) => {
-              const isActive = currentId === t.id;
-              const moodLabel = MOODS.find((m) => m.key === t.mood)?.label ?? t.mood ?? "—";
+            {chartTracks.map((ct, i) => {
+              const isActive = currentId === ct.id;
+              const moodLabel = moodTranslated(ct.mood ?? "");
               return (
-                <li
-                  key={t.id}
-                  role="button"
-                  tabIndex={0}
-                  className={`file-item file-item--chart${isActive ? " file-item--active" : ""}`}
-                  onClick={() => play(t, chartTracks)}
-                  onKeyDown={(e) => e.key === "Enter" && play(t, chartTracks)}
-                  aria-label={`Слушать: ${t.title}`}
-                >
-                  <span className="file-item__chart-pos" aria-hidden>{i + 1}</span>
-
-                  {t.image_url ? (
-                    <span
-                      className="file-item__icon file-item__icon--cover"
-                      aria-hidden
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setViewerImage({ url: t.image_url!, title: t.title });
-                      }}
-                      style={{ cursor: "zoom-in" }}
-                      title="Открыть в полноэкранном режиме"
-                    >
-                      <img src={t.image_url} alt="" loading="lazy" />
-                    </span>
-                  ) : (
-                    <span className="file-item__icon" aria-hidden>🎵</span>
-                  )}
-
-                  <div className="file-item__info">
-                    <span className="file-item__title">{t.title}</span>
-                    <span className="file-item__meta">
-                      {t.author} · {t.genre ?? "—"} · {moodLabel}
-                      {t.duration ? ` · ${fmtTime(t.duration)}` : ""}
-                    </span>
-                  </div>
-
-                  <FileActions
-                    audioUrl={t.audio_url}
-                    title={t.title}
-                    isMusicType={true}
-                    canRadio={false}
-                    fileId={t.id}
-                  />
-
+                <li key={ct.id} className="r-row">
                   <div
-                    className="file-item__right"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
+                    role="button"
+                    tabIndex={0}
+                    className={`r-track r-track--chart${isActive ? " r-track--active" : ""}`}
+                    onClick={() => play(ct, chartTracks)}
+                    onKeyDown={(e) => e.key === "Enter" && play(ct, chartTracks)}
+                    aria-label={ct.title}
                   >
-                    <button
-                      type="button"
-                      className={`rate-btn rate-btn--like${t.my_vote === "like" ? " rate-btn--on" : ""}`}
-                      onClick={() => toggleVote(t, "like")}
-                      aria-label="Лайк"
+                    <div className="r-track__pos" aria-hidden>{i + 1}</div>
+                    <div
+                      className="r-track__cover"
+                      onClick={(e) => {
+                        if (!ct.image_url || failedCovers.has(ct.id)) return;
+                        e.stopPropagation();
+                        setViewerImage({ url: ct.image_url, title: ct.title });
+                      }}
+                      style={ct.image_url && !failedCovers.has(ct.id) ? { cursor: "zoom-in" } : undefined}
+                      aria-hidden
                     >
-                      👍 {t.like_count}
-                    </button>
-                    <button
-                      type="button"
-                      className={`rate-btn rate-btn--dislike${t.my_vote === "dislike" ? " rate-btn--on" : ""}`}
-                      onClick={() => toggleVote(t, "dislike")}
-                      aria-label="Дизлайк"
-                    >
-                      👎 {t.dislike_count}
-                    </button>
-                    <span className="file-item__chart-score" aria-label={`Очки: ${t.score}`}>
-                      {t.score >= 0 ? "+" : ""}{t.score}
-                    </span>
-                    <span className="file-item__indicator" aria-hidden>
-                      {isActive && isPlaying ? "❚❚" : "▶"}
-                    </span>
+                      {ct.image_url && !failedCovers.has(ct.id)
+                        ? <img
+                            src={ct.image_url}
+                            alt=""
+                            loading="lazy"
+                            onError={() => markCoverFailed(ct.id)}
+                          />
+                        : <span className="r-track__cover-fallback">🎵</span>
+                      }
+                    </div>
+                    <div className="r-track__body">
+                      <div className="r-track__title">{ct.title}</div>
+                      <div className="r-track__meta">
+                        {ct.author} · {ct.genre ?? "—"} · {moodLabel}
+                        {ct.duration ? ` · ${fmtTime(ct.duration)}` : ""}
+                      </div>
+                      <div className="r-track__actions" onClick={(e) => e.stopPropagation()}>
+                        <FileActions
+                          audioUrl={ct.audio_url}
+                          title={ct.title}
+                          isMusicType={true}
+                          canRadio={false}
+                          fileId={ct.id}
+                          generationId={ct.id}
+                          hideExtend
+                          shareKind="radio"
+                        >
+                          <button
+                            type="button"
+                            className={`rate-btn rate-btn--like${ct.my_vote === "like" ? " rate-btn--on" : ""}`}
+                            onClick={(e) => { e.stopPropagation(); toggleVote(ct, "like"); }}
+                            aria-label={t("globalPlayer.likeAria")}
+                          >
+                            👍 {ct.like_count}
+                          </button>
+                          <button
+                            type="button"
+                            className={`rate-btn rate-btn--dislike${ct.my_vote === "dislike" ? " rate-btn--on" : ""}`}
+                            onClick={(e) => { e.stopPropagation(); toggleVote(ct, "dislike"); }}
+                            aria-label={t("globalPlayer.dislikeAria")}
+                          >
+                            👎 {ct.dislike_count}
+                          </button>
+                          {isAdmin && (
+                            <>
+                              <button
+                                type="button"
+                                className="rate-btn rate-btn--admin"
+                                onClick={(e) => { e.stopPropagation(); setAdminClassifyFor(adminClassifyFor === ct.id ? null : ct.id); }}
+                                title={t("radio.adminClassify")}
+                                aria-label={t("radio.adminClassify")}
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                type="button"
+                                className="rate-btn rate-btn--admin"
+                                onClick={(e) => { e.stopPropagation(); void adminRemoveTrack(ct); }}
+                                title={t("radio.adminRemove")}
+                                aria-label={t("radio.adminRemove")}
+                              >
+                                🗑
+                              </button>
+                            </>
+                          )}
+                          <span className="r-track__score">
+                            {ct.score >= 0 ? "+" : ""}{ct.score}
+                          </span>
+                          <span className="r-track__indicator" aria-hidden>
+                            {isActive && isPlaying ? "❚❚" : "▶"}
+                          </span>
+                        </FileActions>
+                        {isAdmin && adminClassifyFor === ct.id && (
+                          <AdminClassifyPanel
+                            currentMood={ct.mood ?? null}
+                            onPick={(mood, has_vocals) => void adminReclassify(ct.id, { mood, has_vocals })}
+                            onClose={() => setAdminClassifyFor(null)}
+                          />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </li>
               );
             })}
             {chartQuery.isLoading && (
-              <li className="playlist-empty">Загружаем чарт…</li>
+              <li className="playlist-empty">{t("radio.loadingChart")}</li>
             )}
             {!chartQuery.isLoading && chartTracks.length === 0 && (
-              <li className="playlist-empty">За этот период треки ещё не выбились в топ.</li>
+              <li className="playlist-empty">{t("radio.empty")}</li>
             )}
           </ol>
         </Panel>
@@ -547,6 +717,59 @@ export function RadioPage() {
           onClose={() => setViewerImage(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ─── Admin classify popover ─────────────────────────────────────────
+// Маленькая панель под треком: выбор настроения чипом + кнопки
+// «отметить как с вокалом / без вокала». Только для админа.
+function AdminClassifyPanel({
+  currentMood,
+  onPick,
+  onClose,
+}: {
+  currentMood: string | null;
+  onPick: (mood: string | null, has_vocals: boolean | null) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const moodChips = MOODS.filter((m) => m.key !== "all" && m.key !== "vocal" && m.key !== "collection");
+  const translateMood = (key: string) => {
+    const v = t(`radio.moods.${key}`, { defaultValue: "" });
+    return typeof v === "string" && v ? v : key;
+  };
+  return (
+    <div className="admin-classify" onClick={(e) => e.stopPropagation()}>
+      <div className="admin-classify__row">
+        <span className="admin-classify__label">{t("radio.adminClassifyMoodLabel")}</span>
+        {moodChips.map((m) => {
+          const label = translateMood(m.key);
+          return (
+            <button
+              key={m.key}
+              type="button"
+              className={`admin-classify__chip${m.key === currentMood ? " admin-classify__chip--on" : ""}`}
+              onClick={() => onPick(m.key, null)}
+              title={label}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <div className="admin-classify__row">
+        <span className="admin-classify__label">{t("radio.adminClassifyVocalLabel")}</span>
+        <button type="button" className="admin-classify__chip" onClick={() => onPick(null, true)}>
+          {t("radio.adminClassifyVocalOn")}
+        </button>
+        <button type="button" className="admin-classify__chip" onClick={() => onPick(null, false)}>
+          {t("radio.adminClassifyVocalOff")}
+        </button>
+        <button type="button" className="admin-classify__chip admin-classify__chip--close" onClick={onClose}>
+          ✕
+        </button>
+      </div>
     </div>
   );
 }

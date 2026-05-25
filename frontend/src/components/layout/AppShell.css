@@ -5,34 +5,6 @@
   overflow: hidden;
 }
 
-/* Белое световое пятно — дрейфует в центре/правой части экрана */
-.app-shell::before {
-  content: "";
-  position: fixed;
-  pointer-events: none;
-  z-index: -1;
-  border-radius: 50%;
-  will-change: transform;
-  width: 65vw;
-  height: 65vw;
-  top: 10vh;
-  right: -10vw;
-  background: radial-gradient(circle,
-    rgba(255, 255, 255, 0.09) 0%,
-    rgba(255, 255, 255, 0.04) 38%,
-    transparent 68%);
-  animation: float-white 24s ease-in-out infinite;
-}
-
-@keyframes float-white {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  30%      { transform: translate(-10vw, 14vh) scale(1.12); }
-  65%      { transform: translate(-4vw, -8vh) scale(0.92); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .app-shell::before { animation: none; }
-}
 
 .main {
   flex: 1;
@@ -40,6 +12,7 @@
   height: 100dvh;
   overflow-y: auto;
   overflow-x: hidden;
+  margin-left: 240px;
   padding: var(--space-6) clamp(20px, 4vw, 48px) var(--space-10);
   scroll-behavior: smooth;
   scrollbar-gutter: stable;
@@ -52,13 +25,8 @@ body.has-global-player .main {
 /* Мобильный плеер выше (трек на верхней строке) — нужно больше отступа */
 @media (max-width: 560px) {
   body.has-global-player .main {
-    padding-bottom: 190px;
+    padding-bottom: 196px;
   }
-}
-
-/* На лендинге страница статична — лишний padding сжимает блоки */
-body.has-global-player.studio-landing .main {
-  padding-bottom: var(--space-10);
 }
 
 /* Лендинг студии — главная страница всегда скроллится */
@@ -74,12 +42,20 @@ body.studio-landing .main {
   min-height: 100dvh;
 }
 
+/* Плеер на лендинге — те же отступы что на обычных страницах */
+body.has-global-player.studio-landing .main {
+  padding-bottom: 130px;
+}
+@media (max-width: 560px) {
+  body.has-global-player.studio-landing .main {
+    padding-bottom: 196px;
+  }
+}
+
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(var(--blur-sm));
-  -webkit-backdrop-filter: blur(var(--blur-sm));
+  background: rgba(22, 20, 19, 0.45);
   z-index: var(--z-overlay);
   animation: overlay-in 200ms ease;
 }
@@ -89,7 +65,9 @@ body.studio-landing .main {
   to { opacity: 1; }
 }
 
-@media (max-width: 1180px) {
+/* На тач-устройствах (планшеты/телефоны) до 1400px — убираем постоянный
+   сайдбар, он съедает экранное пространство и мешает контентным карточкам. */
+@media (max-width: 1180px), (pointer: coarse) and (max-width: 1400px) {
   .app-shell {
     height: 100dvh;
     min-height: 100dvh;
@@ -100,9 +78,11 @@ body.studio-landing .main {
   .main {
     height: 100dvh;
     min-height: 0;
+    margin-left: 0;
     overflow-x: hidden;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding: var(--space-4) var(--space-3) var(--space-8);
+    scrollbar-gutter: auto;
   }
 }

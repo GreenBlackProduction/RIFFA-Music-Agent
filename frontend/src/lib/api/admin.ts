@@ -26,8 +26,21 @@ export interface AdminUserRow {
   is_banned: boolean;
   notice_kind: "ban" | "warning" | null;
   created_at: string;
+  last_seen_at: string | null;
+  morning_messages_enabled: boolean;
   generations_count: number;
 }
+
+export type AdminUserStatus =
+  | "all"
+  | "active_30d"
+  | "inactive_30d"
+  | "banned"
+  | "morning_on"
+  | "morning_off"
+  | "email_only"
+  | "telegram_only"
+  | "admins";
 
 export interface AdminUserList {
   total: number;
@@ -87,10 +100,16 @@ export function adminFetchStats(): Promise<AdminStats> {
 }
 
 export function adminFetchUsers(
-  params: { q?: string; offset?: number; limit?: number } = {},
+  params: {
+    q?: string;
+    status?: AdminUserStatus;
+    offset?: number;
+    limit?: number;
+  } = {},
 ): Promise<AdminUserList> {
   const qs = new URLSearchParams();
   if (params.q) qs.set("q", params.q);
+  if (params.status && params.status !== "all") qs.set("status", params.status);
   if (params.offset !== undefined) qs.set("offset", String(params.offset));
   if (params.limit !== undefined) qs.set("limit", String(params.limit));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";

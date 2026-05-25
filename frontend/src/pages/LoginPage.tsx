@@ -1,56 +1,206 @@
-import { useEffect, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/Button";
-import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { Panel } from "@/components/ui/Panel";
 import {
   loginWithEmail,
+  loginWithTelegramInitData,
   loginWithTelegramWidget,
+  pollBotLinkLogin,
   registerWithEmail,
-  type TelegramWidgetPayload,
+  startBotLinkLogin,
 } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth";
+import { getTelegramInitData } from "@/lib/auth";
 import { useT } from "@/lib/i18n";
 import "./LoginPage.css";
 
 const TG_BOT = (import.meta.env.VITE_TG_BOT_USERNAME as string | undefined) ?? "The_Riffa_bot";
+
+// Telegram Login Widget auth data shape (comes from data-onauth callback or redirect params)
+interface TgWidgetData {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
+}
+
+declare global {
+  interface Window {
+    _riffa_tg_auth?: (data: TgWidgetData) => void;
+  }
+}
 
 export function LoginPage() {
   const t = useT();
   const { user, isLoading, refresh } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [emailMode, setEmailMode] = useState<"login" | "register">("login");
   const [emailValue, setEmailValue] = useState("");
   const [passwordValue, setPasswordValue] = useState("");
   const [confirmValue, setConfirmValue] = useState("");
   const [emailStatus, setEmailStatus] = useState<"idle" | "sending" | "error">("idle");
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [tgError, setTgError] = useState<string | null>(null);
-  const [botNotStarted, setBotNotStarted] = useState<string | null>(null);
+  const [tgLoading, setTgLoading] = useState(false);
+  const [tgBtnError, setTgBtnError] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+  const tgLoadingRef = useRef(false);
 
+  // ── Bot-link auth: state for the magic-link via bot flow ──────────────────
+  const [botLinkStatus, setBotLinkStatus] = useState<
+    "idle" | "waiting" | "approved" | "expired" | "error"
+  >("idle");
+  const botLinkPollRef = useRef<number | null>(null);
+  const botLinkAbortRef = useRef<boolean>(false);
+
+  // Errors passed back via redirect fallback from /tg-auth
+  const tgError = searchParams.get("tg_error")
+    ? t.tgError
+    : null;
+  const botNotStarted = searchParams.get("bot_not_started")
+    ? searchParams.get("bot_url")
+    : null;
+
+  // ── Telegram widget: data-onauth callback ─────────────────────────────────
+  // We expose a global function that the Telegram widget script calls after
+  // the user authorises. This avoids the redirect round-trip (/tg-auth) which
+  // loses params in some mobile browsers / Telegram WebView configurations.
   useEffect(() => {
-    // Listen for postMessage from the Telegram OAuth iframe.
-    function handleMessage(event: MessageEvent) {
-      if (event.origin !== "https://oauth.telegram.org") return;
-      if (!event.data || typeof event.data !== "object") return;
-      const payload = event.data as Record<string, unknown>;
-      if (!payload.id || !payload.hash) return;
-      void (async () => {
-        try {
-          await loginWithTelegramWidget(payload as unknown as TelegramWidgetPayload);
-          await refresh();
-        } catch (err) {
-          const botUrl = extractBotUrl(err);
-          if (botUrl) { setBotNotStarted(botUrl); } else { setTgError(toMessage(err)); }
+    window._riffa_tg_auth = async (data: TgWidgetData) => {
+      if (tgLoadingRef.current) return;
+      tgLoadingRef.current = true;
+      setTgLoading(true);
+      setTgBtnError(null);
+      try {
+        await loginWithTelegramWidget({
+          id: data.id,
+          auth_date: data.auth_date,
+          hash: data.hash,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          username: data.username,
+          photo_url: data.photo_url,
+        });
+        await refresh();
+        navigate("/studio", { replace: true });
+      } catch (err: unknown) {
+        const detail = (err as { detail?: { code?: string; bot_url?: string } } | null)?.detail;
+        if (detail?.code === "bot_not_started" && detail?.bot_url) {
+          navigate(`/login?bot_not_started=1&bot_url=${encodeURIComponent(detail.bot_url)}`, { replace: true });
+        } else {
+          setTgBtnError(t.tgBtnError);
         }
-      })();
+      } finally {
+        tgLoadingRef.current = false;
+        setTgLoading(false);
+      }
+    };
+    return () => { window._riffa_tg_auth = undefined; };
+  }, [navigate, refresh]);
+
+  // ── Inject Telegram widget script ─────────────────────────────────────────
+  useEffect(() => {
+    const container = document.getElementById("tg-widget-host");
+    if (!container) return;
+    container.innerHTML = "";
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.setAttribute("data-telegram-login", TG_BOT);
+    script.setAttribute("data-size", "large");
+    // data-onauth: popup mode — auth data passed directly to JS callback (no redirect)
+    script.setAttribute("data-onauth", "window._riffa_tg_auth(user)");
+    // data-auth-url: fallback redirect mode if popup is blocked
+    script.setAttribute("data-auth-url", "https://riffastudio.site/tg-auth");
+    script.setAttribute("data-request-access", "write");
+    container.appendChild(script);
+    return () => { container.innerHTML = ""; };
+  }, []);
+
+  async function handleTelegramLogin() {
+    setTgBtnError(null);
+
+    // Telegram Mini App — use initData (silent, no widget needed).
+    const initData = getTelegramInitData();
+    if (initData) {
+      setTgLoading(true);
+      try {
+        await loginWithTelegramInitData(initData);
+        await refresh();
+      } catch {
+        setTgBtnError(t.errors.generic);
+      } finally {
+        setTgLoading(false);
+      }
     }
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [refresh]);
+  }
+
+  // ── Bot-link auth: kick off the magic-link via bot flow ────────────────────
+  // 1. Backend creates a nonce, returns a deep-link to the bot
+  // 2. We open the bot, then poll the backend until the user confirms
+  // 3. On approved=true, backend sets the session cookie automatically
+  useEffect(() => {
+    return () => {
+      botLinkAbortRef.current = true;
+      if (botLinkPollRef.current) {
+        window.clearTimeout(botLinkPollRef.current);
+        botLinkPollRef.current = null;
+      }
+    };
+  }, []);
+
+  async function handleBotLinkLogin() {
+    if (botLinkStatus === "waiting") return;
+    setTgBtnError(null);
+    setBotLinkStatus("waiting");
+    botLinkAbortRef.current = false;
+    try {
+      const { nonce, bot_url } = await startBotLinkLogin();
+      // Open the bot — Telegram Mini App uses native opener, browser opens new tab
+      const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram;
+      if (tg?.WebApp?.openTelegramLink) {
+        tg.WebApp.openTelegramLink(bot_url);
+      } else {
+        window.open(bot_url, "_blank", "noopener,noreferrer");
+      }
+      // Poll the backend every 2s up to 5 min (matches Redis TTL)
+      const startedAt = Date.now();
+      const tick = async () => {
+        if (botLinkAbortRef.current) return;
+        if (Date.now() - startedAt > 5 * 60 * 1000) {
+          setBotLinkStatus("expired");
+          return;
+        }
+        try {
+          const r = await pollBotLinkLogin(nonce);
+          if (r.approved) {
+            setBotLinkStatus("approved");
+            await refresh();
+            navigate("/studio", { replace: true });
+            return;
+          }
+        } catch (err: unknown) {
+          const status = (err as { status?: number } | null)?.status;
+          if (status === 410) {
+            setBotLinkStatus("expired");
+            return;
+          }
+          // Network blip — keep polling
+        }
+        botLinkPollRef.current = window.setTimeout(tick, 2000);
+      };
+      botLinkPollRef.current = window.setTimeout(tick, 2000);
+    } catch (err) {
+      setBotLinkStatus("error");
+      setTgBtnError(t.tgBtnError);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -74,7 +224,7 @@ export function LoginPage() {
           <img src="/riffa-logo.png" alt="" className="login-brand__logo" />
           <strong className="brand-name">RIFFA<span className="brand-name__sub">Studio</span></strong>
         </div>
-        <LanguageSwitcher />
+        <LoginLangSwitch />
       </header>
 
       <main className="login-grid">
@@ -115,33 +265,68 @@ export function LoginPage() {
               </div>
             </div>
             <p className="muted">{t.telegram.explainer}</p>
-            <iframe
-              id="telegram-login-widget"
-              src={`https://oauth.telegram.org/embed/${TG_BOT}?origin=${encodeURIComponent(window.location.origin)}&size=large&request_access=write`}
-              style={{ border: "none", width: "100%", height: 56, overflow: "hidden", borderRadius: 8 }}
-              title="Login with Telegram"
-            />
-            <a
-              href={`https://t.me/${TG_BOT}?start=weblogin`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="tg-fallback-btn"
-            >
-              Открыть @{TG_BOT} в Telegram
-            </a>
+
+            {/* Главная кнопка: вход через бот (deep-link). Работает всегда —
+                не требует настройки доменa в @BotFather как Login Widget. */}
+            {!getTelegramInitData() && (
+              <button
+                type="button"
+                className="tg-login-btn"
+                onClick={() => { void handleBotLinkLogin(); }}
+                disabled={botLinkStatus === "waiting" || botLinkStatus === "approved"}
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+                  <path d="M21.8 3.1L2.3 10.7c-1.3.5-1.3 1.3-.2 1.6l5 1.6 11.4-7.2c.5-.3 1 0 .6.4L9 16.5v3.1c0 .9 1.2 1.3 1.8.6l2.6-2.5 5.1 3.8c.9.5 1.6.2 1.8-.8l3.3-16.2c.4-1.4-.5-2-1.8-1.4z" fill="#fff"/>
+                </svg>
+                {botLinkStatus === "waiting"
+                  ? t.telegram.btnWaiting
+                  : botLinkStatus === "approved"
+                  ? t.telegram.btnApproved
+                  : t.telegram.btnText}
+              </button>
+            )}
+
+            {botLinkStatus === "waiting" && (
+              <p className="muted login-hint">{t.telegram.waitingHint}</p>
+            )}
+            {botLinkStatus === "expired" && (
+              <p className="muted login-hint" style={{ color: "var(--accent)" }}>
+                {t.telegram.expiredHint}
+              </p>
+            )}
+
+            {/* Альтернативный вариант: официальный Telegram Login Widget */}
+            <div id="tg-widget-host" className="tg-widget-host" />
+
+            {/* Кнопка для Telegram Mini App — используется initData */}
+            {getTelegramInitData() && (
+              <button
+                type="button"
+                className="tg-login-btn"
+                onClick={() => { void handleTelegramLogin(); }}
+                disabled={tgLoading}
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+                  <path d="M21.8 3.1L2.3 10.7c-1.3.5-1.3 1.3-.2 1.6l5 1.6 11.4-7.2c.5-.3 1 0 .6.4L9 16.5v3.1c0 .9 1.2 1.3 1.8.6l2.6-2.5 5.1 3.8c.9.5 1.6.2 1.8-.8l3.3-16.2c.4-1.4-.5-2-1.8-1.4z" fill="#fff"/>
+                </svg>
+                {tgLoading ? t.telegram.loadingShort : t.telegram.btnText}
+              </button>
+            )}
+
+            {tgLoading && !getTelegramInitData() && (
+              <p className="muted login-hint">{t.telegram.loadingHint}</p>
+            )}
+            {tgBtnError && <p className="muted login-hint" style={{ color: "var(--accent)" }}>{tgBtnError}</p>}
             {botNotStarted && (
               <div className="login-bot-gate">
-                <p className="login-bot-gate__text">
-                  Чтобы войти через Telegram, сначала запустите бота — нажмите <strong>/start</strong>, затем вернитесь и войдите снова.
-                </p>
+                <p className="login-bot-gate__text">{t.telegram.botNotStartedText}</p>
                 <a
                   href={botNotStarted}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="login-bot-gate__btn"
-                  onClick={() => setBotNotStarted(null)}
                 >
-                  Открыть @{TG_BOT} в Telegram
+                  {t.telegram.botNotStartedBtn.replace("{{bot}}", TG_BOT)}
                 </a>
               </div>
             )}
@@ -356,19 +541,33 @@ function EnvelopeIcon() {
 }
 
 function toMessage(err: unknown): string {
-  if (err && typeof err === "object" && "detail" in err && typeof err.detail === "string") {
-    return err.detail;
+  if (err && typeof err === "object" && "detail" in err && typeof (err as { detail: unknown }).detail === "string") {
+    return (err as { detail: string }).detail;
   }
   if (err instanceof Error) return err.message;
   return "";
 }
 
-function extractBotUrl(err: unknown): string | null {
-  if (err && typeof err === "object" && "detail" in err) {
-    const detail = (err as Record<string, unknown>).detail;
-    if (detail && typeof detail === "object" && "code" in detail && (detail as Record<string, unknown>).code === "bot_not_started") {
-      return (detail as Record<string, unknown>).bot_url as string ?? null;
-    }
-  }
-  return null;
+// Минимальный RU/EN переключатель в шапке Login (сайдбара нет до входа)
+import { useTranslation } from "react-i18next";
+
+function LoginLangSwitch() {
+  const { i18n } = useTranslation();
+  const current = (i18n.resolvedLanguage || i18n.language || "ru").startsWith("en") ? "en" : "ru";
+  const set = (l: "ru" | "en") => { if (l !== current) void i18n.changeLanguage(l); };
+  return (
+    <div style={{ display: "inline-flex", gap: 4, background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)", borderRadius: 999, padding: 2 }}>
+      <button type="button" onClick={() => set("ru")}
+        style={{ padding: "4px 10px", fontSize: 11, fontWeight: 600, borderRadius: 999,
+                 border: "none", cursor: "pointer",
+                 background: current === "ru" ? "rgba(124,255,31,0.16)" : "transparent",
+                 color: current === "ru" ? "#cfff9a" : "#9b95b6" }}>RU</button>
+      <button type="button" onClick={() => set("en")}
+        style={{ padding: "4px 10px", fontSize: 11, fontWeight: 600, borderRadius: 999,
+                 border: "none", cursor: "pointer",
+                 background: current === "en" ? "rgba(124,255,31,0.16)" : "transparent",
+                 color: current === "en" ? "#cfff9a" : "#9b95b6" }}>EN</button>
+    </div>
+  );
 }

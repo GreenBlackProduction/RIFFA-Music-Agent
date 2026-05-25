@@ -4,8 +4,9 @@
   gap: var(--space-2);
   padding: 0 var(--space-2);
   margin-top: var(--space-3);
-  flex: 1 1 0;
+  flex: 1 1 auto;
   min-height: 0;
+  height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -35,7 +36,14 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  overflow: hidden;
+  /* Карточка — атомарный блок: не ужимается по высоте, если не хватает места
+     в сайдбаре, его панель-родитель скроллится (overflow-y: auto). Удалили
+     overflow:hidden — он обрезал кнопки V1/V2/Обложка когда они переносились
+     на 2-ю строку. */
+  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .active-gen--processing,
@@ -44,8 +52,8 @@
   background: linear-gradient(
     135deg,
     rgba(124, 255, 31, 0.10),
-    rgba(214, 0, 255, 0.08),
-    rgba(28, 28, 56, 0.85)
+    rgba(255, 190, 143, 0.05),
+    rgba(36, 36, 50, 0.88)
   );
 }
 
@@ -279,17 +287,22 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
+/* Прогресс активных генераций — показывается всегда внизу страницы,
+   когда сайдбар скрыт (mobile/iPad/desktop при свёрнутом сайдбаре).
+   Плеер сдвигается ВЫШЕ прогресса через CSS-переменную --gen-progress-height,
+   которую публикует CollapsedGenerationProgress.tsx через ResizeObserver. */
 .collapsed-gen-progress {
   display: none;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1180px), (pointer: coarse) and (max-width: 1400px) {
   .collapsed-gen-progress {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 220;
+    /* Ниже плеера по z-index, плеер сдвинется вверх через bottom (см. GlobalPlayer.css) */
+    z-index: calc(var(--z-modal) - 1);
     display: grid;
     gap: 1px;
     pointer-events: none;
@@ -355,20 +368,8 @@
     font-size: 11px;
   }
 
-  body.has-global-player .collapsed-gen-progress {
-    bottom: 68px;
-    left: 12px;
-    right: 12px;
-  }
-
-  body.has-global-player .collapsed-gen-progress__row {
-    border: 1px solid rgba(124, 255, 31, 0.3);
-    border-radius: 12px;
-  }
-}
-
-@media (max-width: 560px) {
-  body.has-global-player .collapsed-gen-progress {
-    bottom: 72px;
-  }
+  /* Прогресс-бар ВСЕГДА приклеен к низу страницы — даже когда плеер
+     открыт. Плеер сам сдвигается вверх на высоту прогресса через
+     CSS-переменную --gen-progress-height (см. GlobalPlayer.css).
+     Несколько параллельных генераций стакаются под плеером лентой. */
 }

@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/lib/auth";
 
@@ -29,6 +30,7 @@ const STORAGE_PREFIX = "riffa:notice-dismissed:";
 
 export function NoticeBanner() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [dismissed, setDismissed] = useState(false);
 
   const kind = user?.notice_kind ?? null;
@@ -57,7 +59,7 @@ export function NoticeBanner() {
   if (dismissed) return null;
 
   const isBan = kind === "ban";
-  const title = isBan ? "Аккаунт заблокирован" : "Сообщение от администратора";
+  const title = isBan ? t("noticeBannerExt.bannedTitle") : t("noticeBannerExt.adminMessage");
 
   const handleClose = () => {
     setDismissed(true);
@@ -86,8 +88,8 @@ export function NoticeBanner() {
         type="button"
         className="notice-banner__close"
         onClick={handleClose}
-        aria-label="Закрыть"
-        title="Закрыть"
+        aria-label={t("common.close")}
+        title={t("common.close")}
       >
         ×
       </button>
