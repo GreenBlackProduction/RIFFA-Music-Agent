@@ -45,6 +45,18 @@ const IconShuffle = () => (
     <path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
   </svg>
 );
+const IconThumbUp = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" />
+    <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+  </svg>
+);
+const IconThumbDown = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z" />
+    <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+  </svg>
+);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 const INVALID_FILENAME_CHARS = new Set(["<", ">", ":", '"', "/", "\\", "|", "?", "*"]);
@@ -683,9 +695,10 @@ export function GlobalPlayer() {
           title={t("globalPlayer.download")}
           aria-label={t("globalPlayer.download")}
         >
-          <svg viewBox="0 0 16 16" width="13" height="13" fill="none" aria-hidden>
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" aria-hidden>
             <path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
+          MP3
         </button>
 
         {currentIsMusicType && (
@@ -711,7 +724,7 @@ export function GlobalPlayer() {
           aria-label={t("globalPlayer.likeAria")}
           aria-pressed={rating === "like"}
         >
-          👍{likes > 0 ? <span className="gp-act-count">{likes}</span> : null}
+          <IconThumbUp />{likes > 0 ? <span className="gp-act-count">{likes}</span> : null}
         </button>
 
         <button
@@ -721,7 +734,7 @@ export function GlobalPlayer() {
           aria-label={t("globalPlayer.dislikeAria")}
           aria-pressed={rating === "dislike"}
         >
-          👎{dislikes > 0 ? <span className="gp-act-count">{dislikes}</span> : null}
+          <IconThumbDown />{dislikes > 0 ? <span className="gp-act-count">{dislikes}</span> : null}
         </button>
 
         {currentCanRadio && (
