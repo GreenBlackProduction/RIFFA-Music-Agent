@@ -1,34 +1,6 @@
 .studio {
-  display: grid;
-  gap: var(--space-6);
   max-width: 1120px;
   margin: 0 auto;
-  width: 100%;
-}
-
-.studio--landing {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding-top: var(--space-3);
-  /* Лендинг скроллится естественно — высоту не фиксируем */
-  overflow: visible;
-}
-
-/* Грид без принудительного растяжения: карточки занимают свой контентный
-   размер, "Недавние генерации" — 2 ряда плиток (114px) c прокруткой
-   до 4 рядов (238px) внутри самого блока. */
-.studio--landing .studio-grid {
-  grid-template-rows: 240px 132px auto;
-}
-
-/* ── Compact landing grid ───────────────────────────── */
-
-.studio-grid {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  grid-auto-rows: minmax(0, auto);
-  gap: var(--space-4);
   width: 100%;
 }
 

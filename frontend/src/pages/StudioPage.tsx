@@ -481,29 +481,6 @@ function buildPrompt(module: Module, state: SongState): string {
   return parts.join("\n");
 }
 
-function HeroAIIcon() {
-  return (
-    <div className="hero-ai-icon" aria-hidden="true">
-      <img src="/icons8-chatgpt.png" alt="" className="hero-ai-icon__img" />
-    </div>
-  );
-}
-
-function formatCost(value: number): string {
-  // Целые показываем как "2", дроби — как "0.5".
-  return Number.isInteger(value) ? String(value) : value.toString();
-}
-
-function ModuleCost({ meta }: { meta: ModuleMeta }) {
-  return (
-    <span className="tile__cost">
-      {meta.costFrom && <span className="tile__cost-from" aria-hidden="true">~</span>}
-      {formatCost(meta.cost)}
-      <Coin size={14} className="riffa-coin--after" />
-    </span>
-  );
-}
-
 // ─────────────────── Lyrics building blocks ───────────────────
 // Two small render-only sub-components that own the lyrics state machine UI.
 // Logic lives in StudioPage; these only know how to render based on `state.lyricsState`.
@@ -1565,83 +1542,71 @@ export function StudioPage() {
 
   // ───────────────────── tile picker ─────────────────────
   if (!activeModule) {
-    const featured = MODULES[0];
-    const supporting = MODULES.slice(1);
     return (
-      <div className="studio studio--landing">
-        <div className="studio-grid">
-          <section className="hero-card">
-            <div className="hero-card__inner">
-              <div className="hero-card__title-row">
-                <h1 className="hero-card__title">
-                  {t("studio.heroQuestion")} <span className="hero-card__accent">{t("studio.heroAccent")}</span>?
-                </h1>
-                <HeroAIIcon />
-              </div>
-              <p className="hero-card__subtitle">
-                {t("studio.heroLead")}
-              </p>
-              <form className="hero-card__form" onSubmit={startWithIdea}>
-                <input
-                  className="hero-card__input"
-                  type="text"
-                  value={heroIdea}
-                  onChange={(e) => setHeroIdea(e.target.value)}
-                  placeholder={t("studio.heroInputPlaceholder")}
-                  aria-label={t("studio.heroInputAria")}
-                />
-                <button
-                  type="submit"
-                  className="hero-card__submit"
-                  aria-label={t("studio.heroSubmitAria")}
-                  disabled={!heroIdea.trim()}
-                >
-                  →
-                </button>
-              </form>
-              <span className="hero-card__hint">{t("studio.heroHint")}</span>
-            </div>
-            <div className="hero-card__glow" aria-hidden="true" />
-          </section>
+      <div className="studio">
+        <div className="top-meta">
+          <div className="breadcrumb">
+            <span>raw</span><span>/</span><b>{t("studio.breadcrumb", { defaultValue: "студия" })}</b>
+          </div>
+          <div>{t("studio.release", { defaultValue: "выпуск 2026.05 · v1.4" })}</div>
+        </div>
 
-          <button
-            type="button"
-            className={`tile tile--featured-square${activeModule === featured.id ? " tile--active" : ""}`}
-            onClick={() => openModule(featured.id)}
-          >
-            <div className="tile__inner">
-              <ModuleIcon kind={featured.id} />
-              {featured.badge && <span className="tile__badge">{t("studio.mainModule")}</span>}
-              <div className="tile__body">
-                <h3 className="tile__title">{moduleTrans(featured.id, "title") || featured.title}</h3>
-                <p className="tile__short">{moduleTrans(featured.id, "short") || featured.shortDesc}</p>
-              </div>
-              <ModuleCost meta={featured} />
-            </div>
+        <h1 className="h-page">
+          {t("studio.heroQuestion")} <em>{t("studio.heroAccent")}</em>.
+        </h1>
+        <p className="h-lead">{t("studio.heroLead")}</p>
+
+        <form className="studio-quick" onSubmit={startWithIdea}>
+          <input
+            className="studio-quick__input"
+            type="text"
+            value={heroIdea}
+            onChange={(e) => setHeroIdea(e.target.value)}
+            placeholder={t("studio.heroInputPlaceholder")}
+            aria-label={t("studio.heroInputAria")}
+          />
+          <button type="submit" className="btn btn-primary" disabled={!heroIdea.trim()}>
+            {t("studio.heroSubmit", { defaultValue: "передать агенту →" })}
           </button>
+        </form>
 
-          {supporting.map((m) => (
+        <div className="h-section">
+          <div className="tag"><span className="num">01</span> · {t("studio.sectionModules", { defaultValue: "модули" })}</div>
+          <h2>{t("studio.sectionModulesTitle", { defaultValue: "выбери тип контента" })}</h2>
+          <div className="right">{t("studio.sectionModulesRight", { defaultValue: "все на единых токенах" })}</div>
+        </div>
+
+        <div className="modules">
+          {MODULES.map((m, i) => (
             <button
               key={m.id}
               type="button"
-              className={`tile tile--row${m.postponed ? " tile--postponed" : ""}${activeModule === m.id ? " tile--active" : ""}`}
+              className={`module${i === 0 ? " is-main" : ""}${m.postponed ? " is-soon" : ""}`}
               onClick={() => !m.postponed && openModule(m.id)}
               disabled={m.postponed}
             >
-              <div className="tile__inner">
-                <ModuleIcon kind={m.id} />
-                {m.postponed && <span className="tile__badge tile__badge--muted">{t("studio.soonBadge")}</span>}
-                <div className="tile__body">
-                  <h3 className="tile__title">{moduleTrans(m.id, "title") || m.title}</h3>
-                  <p className="tile__short">{moduleTrans(m.id, "short") || m.shortDesc}</p>
-                </div>
-                <ModuleCost meta={m} />
+              <div className="module-head">
+                <div className="module-icon"><ModuleIcon kind={m.id} /></div>
+                {m.badge && <span className="module-badge">{t("studio.mainModule", { defaultValue: "главный" })}</span>}
+                {m.postponed && <span className="module-badge is-soon">{t("studio.soonBadge", { defaultValue: "скоро" })}</span>}
+              </div>
+              <h3>{moduleTrans(m.id, "title") || m.title}</h3>
+              <p>{moduleTrans(m.id, "short") || m.shortDesc}</p>
+              <div className="module-cost">
+                <span>{m.id === "song" ? "suno v5.5" : m.id === "instrumental" ? t("studio.noVocal", { defaultValue: "без вокала" }) : m.id === "cover" ? t("studio.withAudio", { defaultValue: "+ ваше аудио" }) : m.id === "sound_effect" ? t("studio.sfxDur", { defaultValue: "до 30 сек" }) : "nano-banana"}</span>
+                <span className="price">{m.costFrom ? "~" : ""}{m.cost} ⓡ</span>
               </div>
             </button>
           ))}
-
-          <LibraryCard />
         </div>
+
+        <div className="h-section">
+          <div className="tag"><span className="num">02</span> · {t("studio.sectionRecent", { defaultValue: "недавнее" })}</div>
+          <h2>{t("studio.sectionRecentTitle", { defaultValue: "последние треки" })}</h2>
+          <div className="right">{t("studio.sectionRecentRight", { defaultValue: "все →" })}</div>
+        </div>
+
+        <LibraryCard />
       </div>
     );
   }
@@ -1649,22 +1614,23 @@ export function StudioPage() {
   // ─────────────────── selected module editor ───────────────────
   return (
     <div className="studio">
-      <Panel className="builder-panel">
-        <header className="builder-head">
-          <button type="button" className="builder-back" onClick={backToTiles}>
-            {t("studio.backToModules")}
+      <div className="top-meta">
+        <div className="breadcrumb">
+          <span>raw</span><span>/</span>
+          <button type="button" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "var(--ink-3)" }} onClick={backToTiles}>
+            {t("studio.breadcrumb", { defaultValue: "студия" })}
           </button>
-          <div className="builder-head__main">
-            <span className="builder-head__icon builder-head__icon--active" aria-hidden="true">
-              <ModuleIcon kind={activeModule} />
-            </span>
-            <div className="builder-head__text">
-              <h2>{moduleFullTitle(moduleMeta!.id, moduleMeta!.title)}</h2>
-              <p className="muted">{moduleFullDesc(moduleMeta!.id, "longDesc", moduleMeta!.longDesc)}</p>
-            </div>
-          </div>
-        </header>
+          <span>/</span><b>{moduleFullTitle(moduleMeta!.id, moduleMeta!.title)}</b>
+        </div>
+        <div>{t("studio.release", { defaultValue: "выпуск 2026.05 · v1.4" })}</div>
+      </div>
 
+      <h1 className="h-page">
+        {moduleFullTitle(moduleMeta!.id, moduleMeta!.title)}
+      </h1>
+      <p className="h-lead">{moduleFullDesc(moduleMeta!.id, "longDesc", moduleMeta!.longDesc)}</p>
+
+      <Panel className="builder-panel">
         {activeModule === "song" && !agentOpen && (
           <div className="agent-cta agent-cta--hero">
             <div className="agent-cta__glow" aria-hidden="true" />
