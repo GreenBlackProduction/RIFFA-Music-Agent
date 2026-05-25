@@ -1176,7 +1176,6 @@ export function ProfilePage() {
           <div className="insights-grid">
             <div>
               <div className="profile-card__header">
-                <Icon name="📊" />
                 <h2 className="profile-card__title">{t("profile.statsHeader")}</h2>
               </div>
               <div className="stat-summary">
@@ -1193,10 +1192,7 @@ export function ProfilePage() {
                     <div className="stat-bar__track">
                       <div
                         className="stat-bar__fill"
-                        style={{
-                          width: `${(s.count / maxStat) * 100}%`,
-                          background: s.color,
-                        }}
+                        style={{ width: `${(s.count / maxStat) * 100}%` }}
                       />
                     </div>
                   </div>
@@ -1209,7 +1205,6 @@ export function ProfilePage() {
 
             <div>
               <div className="profile-card__header">
-                <Icon name="🎨" />
                 <h2 className="profile-card__title">{t("profile.tastesHeader")}</h2>
               </div>
 

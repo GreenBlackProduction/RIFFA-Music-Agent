@@ -749,15 +749,12 @@
 .stat-summary strong {
   font-family: var(--font-display);
   font-size: clamp(24px, 8vw, 36px);
-  font-weight: 700;
+  font-weight: 900;
   line-height: 1;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--ink);
 }
 
-.stat-summary span { color: var(--muted); font-size: 13px; }
+.stat-summary span { color: var(--ink-3); font-size: 13px; font-family: var(--font-mono); }
 
 .profile-card--stats .stat-bars { gap: 6px; }
 .profile-card--stats .stat-bar__head { font-size: 12px; }
@@ -775,8 +772,11 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 8px;
-  font-size: 13px;
-  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .stat-bar__head span {
@@ -793,16 +793,17 @@
 }
 
 .stat-bar__track {
-  height: 6px;
+  height: 5px;
   margin-top: 4px;
-  border-radius: 999px;
-  background: var(--paper-3);
+  border-radius: 0;
+  background: var(--paper-2);
   overflow: hidden;
 }
 
 .stat-bar__fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: 0;
+  background: var(--ink);
   transition: width 240ms ease;
 }
 
@@ -829,15 +830,20 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--radius-pill);
-  background: var(--rule-soft);
-  border: 1px solid var(--border);
-  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 0;
+  background: transparent;
+  border: 1px solid var(--ink);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
 }
 
 .taste-chip small {
-  color: var(--accent);
+  color: var(--hi);
   font-weight: 700;
   font-size: 11px;
 }
