@@ -1632,6 +1632,19 @@ export function StudioPage() {
     }
   }
 
+  // Pickup pending agent launch from /agent navigation (one-shot).
+  useEffect(() => {
+    let raw: string | null = null;
+    try { raw = sessionStorage.getItem("riffa_pending_agent_launch"); } catch { /* noop */ }
+    if (!raw) return;
+    try { sessionStorage.removeItem("riffa_pending_agent_launch"); } catch { /* noop */ }
+    try {
+      const parsed = JSON.parse(raw) as AgentResult;
+      void handleAgentLaunch(parsed);
+    } catch { /* malformed payload — ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ───────────────────── tile picker ─────────────────────
   if (!activeModule) {
     return (

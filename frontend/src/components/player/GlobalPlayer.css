@@ -20,7 +20,7 @@
   box-shadow: none;
   max-width: calc(100vw - 24px);
   width: min(780px, calc(100vw - 24px));
-  overflow: visible;
+  overflow: hidden;
   isolation: isolate;
 }
 
@@ -201,11 +201,11 @@
   background: var(--hi);
 }
 
-/* Source label — закреплён в правом-нижнем углу плеера */
+/* Source label — закреплён в левом-нижнем углу плеера */
 .gp-source {
   position: absolute;
   bottom: 4px;
-  right: 12px;
+  left: 12px;
   z-index: 2;
   font-family: var(--font-mono);
   font-size: 9px;

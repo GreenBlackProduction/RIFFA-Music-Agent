@@ -142,18 +142,19 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
           rawHigh = sumHigh / ((n - midEnd) * 255);
           rawEnergy = (rawLow + rawMid + rawHigh) / 3;
         } else {
-          // Псевдо-музыкальная анимация (без захвата аудио).
-          // Когда играет — частоты выше и с дополнительными "перкуссиями".
-          const ts = t * (active ? 0.045 : 0.012);
-          const beat = active ? 0.25 * Math.abs(Math.sin(t * 0.0035)) : 0;
-          rawLow = Math.max(0, Math.min(1, 0.45 + 0.35 * Math.sin(ts) + 0.2 * Math.sin(ts * 7.3) + beat));
-          rawMid = Math.max(0, Math.min(1, 0.45 + 0.35 * Math.sin(ts * 1.31 + 1.7) + 0.18 * Math.sin(ts * 3.7)));
-          rawHigh = Math.max(0, Math.min(1, 0.45 + 0.35 * Math.sin(ts * 1.93 + 3.1) + 0.22 * Math.sin(ts * 11) + beat));
+          // Плавная синусоидная анимация — без резких "битов" и ряби.
+          // Реагирует на воспроизведение через амплитуду, но плавно.
+          const ts = t * (active ? 0.022 : 0.010);
+          const amp = active ? 0.32 : 0.18;
+          rawLow = 0.5 + amp * Math.sin(ts);
+          rawMid = 0.5 + amp * Math.sin(ts * 1.31 + 1.7);
+          rawHigh = 0.5 + amp * Math.sin(ts * 1.93 + 3.1);
           rawEnergy = (rawLow + rawMid + rawHigh) / 3;
         }
       }
 
-      const smooth = reduceMotion ? 0.04 : (active ? 0.28 : 0.12);
+      // Меньший smoothing коэффициент — более плавные переходы без ряби.
+      const smooth = reduceMotion ? 0.03 : (active ? 0.06 : 0.04);
       const prev = levelsRef.current;
       prev.low += (rawLow - prev.low) * smooth;
       prev.mid += (rawMid - prev.mid) * smooth;

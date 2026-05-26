@@ -44,6 +44,23 @@ export function AgentPage() {
           agentInitiates
           module="song"
           onComplete={setResult}
+          onLaunch={async (r) => {
+            // Сохраняем бриф и переходим в студию — StudioPage подхватит
+            // sessionStorage и автоматически запустит generation через
+            // handleAgentLaunch (его логика уже есть).
+            try {
+              sessionStorage.setItem(
+                "riffa_pending_agent_launch",
+                JSON.stringify({
+                  summary: r.summary,
+                  prompt: r.prompt,
+                  intent: r.intent,
+                  transcript: r.transcript,
+                }),
+              );
+            } catch { /* sessionStorage может быть недоступен */ }
+            navigate("/studio");
+          }}
           onCancel={() => navigate("/studio")}
         />
       </div>

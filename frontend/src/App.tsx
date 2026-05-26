@@ -63,13 +63,20 @@ export default function App() {
     }
   }, []);
 
-  // Reset horizontal scroll on every route change.
+  // Reset scroll (vertical + horizontal) on every route change so each page
+  // opens at the top. На мобильной/планшетной разметке скроллится контейнер
+  // .main; на десктопе сам window. Сбрасываем оба, плюс сам элемент main.
   useEffect(() => {
     const main = document.querySelector<HTMLElement>(".main");
-    if (main) { main.scrollLeft = 0; }
+    if (main) {
+      main.scrollLeft = 0;
+      main.scrollTop = 0;
+    }
     window.scrollTo(0, 0);
     document.documentElement.scrollLeft = 0;
+    document.documentElement.scrollTop = 0;
     document.body.scrollLeft = 0;
+    document.body.scrollTop = 0;
   }, [location.pathname]);
 
   if (location.pathname.startsWith("/s/")) {
