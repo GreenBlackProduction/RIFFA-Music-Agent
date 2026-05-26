@@ -31,7 +31,7 @@ interface SavedAgentSession {
   wizardParamsCurrent: WizardParams;
   lyricsGenerated: boolean;
   done: boolean;
-  result: { summary: string; prompt: string; intent: AgentIntent | null } | null;
+  result: AgentResult | null;
   savedAt: number;
 }
 
@@ -164,7 +164,7 @@ function AgentAvatar({ thinking }: { thinking?: boolean }) {
 // ─── Props / result types ──────────────────────────────────────────────────
 
 export interface AgentChatProps {
-  onComplete: (result: AgentResult) => void;
+  onComplete?: (result: AgentResult) => void;
   onCancel: () => void;
   onLaunch?: (result: AgentResult) => void | Promise<void>;
   initialAnswer?: string;
@@ -180,7 +180,9 @@ export interface AgentResult {
   summary: string;
   prompt: string;
   intent: AgentIntent | null;
-  transcript: AgentChatMessage[];
+  transcript?: AgentChatMessage[];
+  musicParams?: Record<string, unknown>;
+  researchNotes?: string;
 }
 
 interface UiMessage {
@@ -225,9 +227,7 @@ export function AgentChat({
   const wizardParams = useRef<WizardParams>({ lyrics: "", genre: "", mood: "", tempo: "", vocal: "" });
   const lyricsGeneratedRef = useRef(false); // true once agent has drafted lyrics
 
-  const [result, setResult] = useState<
-    { summary: string; prompt: string; intent: AgentIntent | null } | null
-  >(null);
+  const [result, setResult] = useState<AgentResult | null>(null);
 
   const thinkingTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const thinkingTick = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -529,7 +529,10 @@ export function AgentChat({
           intent.params.lyrics = wizardParams.current.lyrics;
           intent.params.text_mode = "custom";
         }
-        setResult({ summary: resp.summary, prompt: resp.prompt, intent });
+        setResult({
+          summary: resp.summary, prompt: resp.prompt, intent,
+          musicParams: resp.music_params, researchNotes: resp.research_notes,
+        });
         setDone(true);
         setWizardPhase("free");
       }
@@ -554,8 +557,8 @@ export function AgentChat({
   }
 
   function handleAccept() {
-    if (!result) return;
-    onComplete({ summary: result.summary, prompt: result.prompt, intent: result.intent, transcript: history });
+    if (!result || !onComplete) return;
+    onComplete({ ...result, transcript: history });
   }
 
   async function handleLaunch() {
@@ -563,7 +566,7 @@ export function AgentChat({
     setLaunching(true);
     setError(null);
     try {
-      await onLaunch({ summary: result.summary, prompt: result.prompt, intent: result.intent, transcript: history });
+      await onLaunch({ ...result, transcript: history });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось запустить генерацию");
     } finally {
@@ -806,9 +809,11 @@ export function AgentChat({
               {launching ? "Запускаю…" : "🚀 Запустить генерацию"}
             </Button>
           ) : null}
-          <Button variant="secondary" onClick={handleAccept} disabled={launching}>
-            Вставить в форму
-          </Button>
+          {onComplete && (
+            <Button variant="secondary" onClick={handleAccept} disabled={launching}>
+              Вставить в форму
+            </Button>
+          )}
         </div>
       )}
     </div>

@@ -1104,7 +1104,7 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink-3);
+  color: var(--ink);
   flex-shrink: 0;
 }
 .module.is-main .module-icon {

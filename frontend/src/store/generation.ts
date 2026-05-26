@@ -235,6 +235,20 @@ export const useGenerationStore = create<GenerationStore>()(
         ),
         dismissed: state.dismissed,
       }) as GenerationStore,
+      // На старте убираем completed/failed карточки из прошлой сессии —
+      // их WebSocket уже нет, повторно показывать нет смысла.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const stale = Object.keys(state.active).filter(
+          (id) => state.active[id].status === "completed" || state.active[id].status === "failed",
+        );
+        if (stale.length === 0) return;
+        const next = { ...state.active };
+        for (const id of stale) delete next[id];
+        const dismissed = [...new Set([...stale, ...state.dismissed])].slice(0, 50);
+        state.active = next;
+        state.dismissed = dismissed;
+      },
     },
   ),
 );

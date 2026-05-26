@@ -156,7 +156,6 @@ export function GlobalPlayer() {
   const trackGeneration = useGenerationStore((s) => s.track);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playerRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -576,20 +575,6 @@ export function GlobalPlayer() {
     }
   }
 
-  function handleEnergy(energy: number) {
-    if (!playerRef.current) return;
-    // When idle, keep the CSS baseline glow — don't overwrite with near-zero values
-    if (energy < 0.02) {
-      playerRef.current.style.boxShadow = "";
-      return;
-    }
-    const size = Math.round(10 + energy * 56);
-    const a1 = (0.18 + energy * 0.58).toFixed(2);
-    const a2 = (Math.min((0.18 + energy * 0.58) * 1.8, 0.92)).toFixed(2);
-    playerRef.current.style.boxShadow =
-      `0 30px 80px rgba(0,0,0,0.55), 0 0 ${size}px rgba(124,255,31,${a1}), 0 0 1.5px rgba(124,255,31,${a2})`;
-  }
-
   function handleDownload() {
     if (!currentUrl) return;
     const filename = `RIFFA - ${sanitizeFilename(currentTitle ?? "Track")}.mp3`;
@@ -599,11 +584,10 @@ export function GlobalPlayer() {
   return (
     <div
       className={`global-player${collapsed ? " global-player--collapsed" : ""}`}
-      ref={playerRef}
       role="region"
       aria-label={t("globalPlayer.regionLabel")}
     >
-      <PlayerAura audio={audioRef} active={isPlaying} onEnergy={handleEnergy} />
+      <PlayerAura audio={audioRef} active={isPlaying} />
 
       {/* LEFT: track info — click opens queue list */}
       <button

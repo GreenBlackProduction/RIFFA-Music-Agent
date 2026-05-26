@@ -242,10 +242,6 @@ export function LoginPage() {
       <main className="login-grid">
         <section className="login-hero">
           <div className="login-hero__inner">
-            <div className="login-hero__wordmark" aria-hidden="true">
-              <PlayMark size={64} />
-              <strong className="login-hero__brand">RIFFA <span>studio</span></strong>
-            </div>
             <h1>{t.hero.title}</h1>
             <p className="login-hero__lead">{t.hero_lead}</p>
             <ul className="login-hero__features">

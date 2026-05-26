@@ -11,13 +11,12 @@
 /* SVG filled icons */
 .module-icon--svg {
   fill: currentColor;
-  color: var(--ink-3);
-  transition: color 0.18s ease, transform 0.18s ease;
+  color: var(--ink);
+  transition: transform 0.18s ease;
 }
 
 .tile:hover .module-icon--svg,
 .tile--active .module-icon--svg {
-  color: var(--hi);
   transform: scale(1.06);
 }
 

@@ -373,6 +373,8 @@ export interface SongParams {
   tempo?: string;
   vocal?: string;
   agent_prompt?: string;
+  agent_music_params?: Record<string, unknown>;
+  agent_research_notes?: string;
   track_name?: string;
 }
 
@@ -390,6 +392,8 @@ export interface InstrumentalParams {
   mood?: string;
   tempo?: string;
   agent_prompt?: string;
+  agent_music_params?: Record<string, unknown>;
+  agent_research_notes?: string;
   track_name?: string;
 }
 
@@ -403,6 +407,8 @@ export function generateInstrumental(params: InstrumentalParams): Promise<Genera
 export interface SoundEffectParams {
   prompt: string;
   agent_prompt?: string;
+  agent_music_params?: Record<string, unknown>;
+  agent_research_notes?: string;
   track_name?: string;
 }
 
@@ -420,6 +426,8 @@ export interface OccasionParams {
   mood?: string;
   vocal?: string;
   agent_prompt?: string;
+  agent_music_params?: Record<string, unknown>;
+  agent_research_notes?: string;
 }
 
 export function generateOccasion(params: OccasionParams): Promise<GenerateResponse> {
@@ -564,6 +572,8 @@ export interface LyricsDraftParams {
   vocal?: string;
   language?: string;
   agent_prompt?: string;
+  agent_music_params?: Record<string, unknown>;
+  agent_research_notes?: string;
 }
 
 export interface LyricsDraftResponse {
@@ -643,6 +653,8 @@ export interface AgentChatResponse {
   done: boolean;
   summary: string;
   prompt: string;
+  music_params: Record<string, unknown>;
+  research_notes: string;
   intent: AgentIntent | null;
   suggestions: string[];
 }

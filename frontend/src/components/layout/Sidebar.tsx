@@ -22,7 +22,18 @@ const IconAgent = () => (
 );
 
 const IconStudio = () => (
-  <img src="/studio-icon.svg" width="22" height="22" alt="" aria-hidden="true" style={{ objectFit: "contain", display: "block" }} />
+  <span
+    style={{
+      display: "block",
+      width: "22px",
+      height: "22px",
+      backgroundColor: "currentColor",
+      WebkitMask: "url(/studio-icon.svg) no-repeat center / contain",
+      mask: "url(/studio-icon.svg) no-repeat center / contain",
+      flexShrink: 0,
+    }}
+    aria-hidden="true"
+  />
 );
 
 const IconRadio = () => (

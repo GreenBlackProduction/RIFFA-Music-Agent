@@ -1514,6 +1514,8 @@ export function StudioPage() {
 
     const params = intent.params;
     const enrichedPrompt = result.prompt;
+    const agentMusicParams = result.musicParams || {};
+    const agentResearchNotes = result.researchNotes || "";
 
     if (intent.module === "cover_art") {
       try {
@@ -1573,6 +1575,8 @@ export function StudioPage() {
           tempo: params.tempo || "",
           vocal: params.vocal || "",
           agent_prompt: enrichedPrompt,
+          agent_music_params: agentMusicParams,
+          agent_research_notes: agentResearchNotes,
         });
         title =
           (params.description || "").slice(0, 60) ||
@@ -1586,6 +1590,8 @@ export function StudioPage() {
           mood: params.mood || "",
           tempo: params.tempo || "",
           agent_prompt: enrichedPrompt,
+          agent_music_params: agentMusicParams,
+          agent_research_notes: agentResearchNotes,
         });
         title =
           (params.description || "").slice(0, 60) ||
@@ -1596,6 +1602,8 @@ export function StudioPage() {
         response = await generateSoundEffect({
           prompt: sfxPrompt,
           agent_prompt: enrichedPrompt,
+          agent_music_params: agentMusicParams,
+          agent_research_notes: agentResearchNotes,
         });
         title = sfxPrompt.slice(0, 60) || "SFX · агент";
         trackKind = "sound_effect";
@@ -1607,6 +1615,8 @@ export function StudioPage() {
           mood: params.mood || "",
           vocal: params.vocal || "",
           agent_prompt: enrichedPrompt,
+          agent_music_params: agentMusicParams,
+          agent_research_notes: agentResearchNotes,
         });
         title =
           (params.description || "").slice(0, 60) ||
@@ -1657,7 +1667,7 @@ export function StudioPage() {
         </div>
 
         <h1 className="h-page">
-          {t("studio.heroQuestion")} <em>{t("studio.heroAccent")}</em>.
+          {t("studio.heroQuestion")} <em>{t("studio.heroAccent")}</em>?
         </h1>
         <p className="h-lead">{t("studio.heroLead")}</p>
 
@@ -1774,7 +1784,6 @@ export function StudioPage() {
                 : state.tempo
             }
             selectedVocal={state.vocal}
-            onComplete={(r) => { handleAgentComplete(r); setAgentSeed(null); }}
             onLaunch={handleAgentLaunch}
             onCancel={() => { setAgentOpen(false); setAgentSeed(null); }}
           />
