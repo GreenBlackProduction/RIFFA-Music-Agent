@@ -1684,7 +1684,7 @@ export function StudioPage() {
               <p>{moduleTrans(m.id, "short") || m.shortDesc}</p>
               <div className="module-cost">
                 <span>{m.id === "song" ? "suno v5.5" : m.id === "instrumental" ? t("studio.noVocal", { defaultValue: "без вокала" }) : m.id === "cover" ? t("studio.withAudio", { defaultValue: "+ ваше аудио" }) : m.id === "sound_effect" ? t("studio.sfxDur", { defaultValue: "до 30 сек" }) : "nano-banana"}</span>
-                <span className="price">{m.costFrom ? "~" : ""}{m.cost} ⓡ</span>
+                <span className="price">{m.costFrom ? "~" : ""}{m.cost} <Coin size={11} /></span>
               </div>
             </button>
           ))}

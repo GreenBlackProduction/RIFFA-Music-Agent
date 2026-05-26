@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { ActiveGenerations } from "@/components/layout/ActiveGenerations";
 import { RiffaMark } from "@/components/brand/RiffaMark";
+import { Coin } from "@/components/ui/Coin";
 import { useAuth } from "@/lib/auth";
 
 import "./Sidebar.css";
@@ -128,7 +129,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             <span className="nav-icon">{item.icon}</span>
             <span className="nav-label">{item.label}</span>
             {item.showBalance && !isLoading && user && (
-              <span className="nav-balance">{user.balance_tokens}</span>
+              <span className="nav-balance"><Coin size={11} />{user.balance_tokens}</span>
             )}
           </NavLink>
         ))}

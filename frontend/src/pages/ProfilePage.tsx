@@ -22,6 +22,7 @@ import {
   useLibraryItems,
 } from "@/lib/library";
 
+import { Coin } from "@/components/ui/Coin";
 import "./ProfilePage.css";
 
 // ─────────── Токен-пакеты и способы оплаты ────────────
@@ -424,7 +425,7 @@ export function ProfilePage() {
           <div className="stats" style={{ marginBottom: 24 }}>
             <div className="stat">
               <div className="label">{isEN ? "balance" : "баланс"}</div>
-              <div className="val">{userBalance}<small>ⓡ</small></div>
+              <div className="val">{userBalance}<Coin size={16} style={{ marginLeft: 3 }} /></div>
               <div className="delta">{isEN ? "available" : "доступно"}</div>
             </div>
             <div className="stat">
@@ -440,7 +441,7 @@ export function ProfilePage() {
             <div className="stat">
               <div className="label">{isEN ? "invited" : "приглашено"}</div>
               <div className="val">0<small>{isEN ? "fr." : "др."}</small></div>
-              <div className="delta">+0 ⓡ {isEN ? "bonus" : "бонус"}</div>
+              <div className="delta">+0 <Coin size={11} /> {isEN ? "bonus" : "бонус"}</div>
             </div>
           </div>
 
@@ -457,6 +458,58 @@ export function ProfilePage() {
               <input type="text" value={displayName} readOnly onClick={() => { setNameInput(displayName); setEditingName(true); }} />
             )}
           </div>
+
+          {/* Inline gen stats — в пустом пространстве справа */}
+          {totalGens > 0 && (
+            <div className="inline-gen-stats">
+              <div className="inline-gen-stats__row">
+                <div className="gen-stats-label">{isEN ? "by type" : "по типу"}</div>
+                {genStats.map((s) => (
+                  <div key={s.type} className="inline-gen-stats__bar">
+                    <div className="stat-bar__head">
+                      <span>{s.label}</span>
+                      <strong>{s.count}</strong>
+                    </div>
+                    <div className="stat-bar__track">
+                      <div className="stat-bar__fill" style={{ width: `${Math.round((s.count / totalGens) * 100)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {topGenres.length > 0 && (
+                <div className="inline-gen-stats__row">
+                  <div className="gen-stats-label">{isEN ? "top genres" : "топ жанров"}</div>
+                  {topGenres.map(([genre, count]) => (
+                    <div key={genre} className="inline-gen-stats__bar">
+                      <div className="stat-bar__head">
+                        <span>{genre}</span>
+                        <strong>{count}</strong>
+                      </div>
+                      <div className="stat-bar__track">
+                        <div className="stat-bar__fill" style={{ width: `${Math.round((count / (topGenres[0]?.[1] ?? 1)) * 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {topMoods.length > 0 && (
+                <div className="inline-gen-stats__row">
+                  <div className="gen-stats-label">{isEN ? "top moods" : "топ настроений"}</div>
+                  {topMoods.map(([mood, count]) => (
+                    <div key={mood} className="inline-gen-stats__bar">
+                      <div className="stat-bar__head">
+                        <span>{mood}</span>
+                        <strong>{count}</strong>
+                      </div>
+                      <div className="stat-bar__track">
+                        <div className="stat-bar__fill" style={{ width: `${Math.round((count / (topMoods[0]?.[1] ?? 1)) * 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -471,8 +524,8 @@ export function ProfilePage() {
         {localPackages.map((p) => {
           const isFeatured = p.id === "premium";
           const perks = isEN
-            ? [`${p.tokens} ⓡ to balance`, `${Math.floor(p.tokens / 2)} songs`, `WAV export`, `priority queue`]
-            : [`${p.tokens} ⓡ на баланс`, `${Math.floor(p.tokens / 2)} песен с вокалом`, `экспорт в WAV`, `приоритет очереди`];
+            ? [`${p.tokens} tokens to balance`, `${Math.floor(p.tokens / 2)} songs`, `WAV export`, `priority queue`]
+            : [`${p.tokens} токенов на баланс`, `${Math.floor(p.tokens / 2)} песен с вокалом`, `экспорт в WAV`, `приоритет очереди`];
           return (
             <div key={p.id} className={`price-tile${isFeatured ? " is-featured" : ""}${selectedPack === p.id ? " is-selected" : ""}`} onClick={() => setSelectedPack(p.id)}>
               <div className="tier">{p.name}{isFeatured ? ` · ${isEN ? "best value" : "лучшее"}` : ""}</div>
@@ -549,7 +602,7 @@ export function ProfilePage() {
       <div className="h-section">
         <div className="tag"><span className="num">03</span> · {isEN ? "referral" : "реферальная программа"}</div>
         <h2>{isEN ? "invite friends" : "приглашай друзей"}</h2>
-        <div className="right">{isEN ? "10 ⓡ you + 4 ⓡ friend" : "10 ⓡ тебе + 4 ⓡ другу"}</div>
+        <div className="right">{isEN ? "10 tok you + 4 tok friend" : "10 токенов тебе + 4 другу"}</div>
       </div>
 
       <div className="p-panel">
@@ -560,15 +613,15 @@ export function ProfilePage() {
           </div>
           <div className="stat" style={{ background: "var(--paper-3)" }}>
             <div className="label">{isEN ? "bonus tokens" : "бонусных на баланс"}</div>
-            <div className="val">0<small>ⓡ</small></div>
+            <div className="val">0<Coin size={13} style={{ marginLeft: 2 }} /></div>
           </div>
           <div className="stat" style={{ background: "var(--paper-3)" }}>
             <div className="label">{isEN ? "from refs" : "от оплат рефералов"}</div>
-            <div className="val">0<small>ⓡ</small></div>
+            <div className="val">0<Coin size={13} style={{ marginLeft: 2 }} /></div>
           </div>
           <div className="stat" style={{ background: "var(--paper-3)" }}>
             <div className="label">{isEN ? "total earned" : "всего заработано"}</div>
-            <div className="val">0<small>ⓡ</small></div>
+            <div className="val">0<Coin size={13} style={{ marginLeft: 2 }} /></div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 20, alignItems: "center" }}>
@@ -581,77 +634,9 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {/* ── 04 · статистика генераций ── */}
-      {totalGens > 0 && (
-        <>
-          <div className="h-section">
-            <div className="tag"><span className="num">04</span> · {isEN ? "statistics" : "статистика"}</div>
-            <h2>{isEN ? "your generations" : "твои генерации"}</h2>
-            <div className="right">{totalGens} {isEN ? "total" : "всего"}</div>
-          </div>
-
-          <div className="gen-stats-grid">
-            <div className="gen-stats-col">
-              <div className="gen-stats-label">{isEN ? "by type" : "по типу"}</div>
-              <div className="stat-bars">
-                {genStats.map((s) => (
-                  <div key={s.type}>
-                    <div className="stat-bar__head">
-                      <span>{s.label}</span>
-                      <strong>{s.count}</strong>
-                    </div>
-                    <div className="stat-bar__track">
-                      <div className="stat-bar__fill" style={{ width: `${Math.round((s.count / totalGens) * 100)}%` }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {topGenres.length > 0 && (
-              <div className="gen-stats-col">
-                <div className="gen-stats-label">{isEN ? "top genres" : "топ жанров"}</div>
-                <div className="stat-bars">
-                  {topGenres.map(([genre, count]) => (
-                    <div key={genre}>
-                      <div className="stat-bar__head">
-                        <span>{genre}</span>
-                        <strong>{count}</strong>
-                      </div>
-                      <div className="stat-bar__track">
-                        <div className="stat-bar__fill" style={{ width: `${Math.round((count / (topGenres[0]?.[1] ?? 1)) * 100)}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {topMoods.length > 0 && (
-              <div className="gen-stats-col">
-                <div className="gen-stats-label">{isEN ? "top moods" : "топ настроений"}</div>
-                <div className="stat-bars">
-                  {topMoods.map(([mood, count]) => (
-                    <div key={mood}>
-                      <div className="stat-bar__head">
-                        <span>{mood}</span>
-                        <strong>{count}</strong>
-                      </div>
-                      <div className="stat-bar__track">
-                        <div className="stat-bar__fill" style={{ width: `${Math.round((count / (topMoods[0]?.[1] ?? 1)) * 100)}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
-      {/* ── 05 · документы ── */}
+      {/* ── 04 · документы ── */}
       <div className="h-section">
-        <div className="tag"><span className="num">{totalGens > 0 ? "05" : "04"}</span> · {isEN ? "documents" : "документы"}</div>
+        <div className="tag"><span className="num">04</span> · {isEN ? "documents" : "документы"}</div>
         <h2>{isEN ? "legal information" : "правовая информация"}</h2>
         <div className="right">{isEN ? "for reference" : "для справки"}</div>
       </div>

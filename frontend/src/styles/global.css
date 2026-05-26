@@ -474,7 +474,7 @@ a {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--paper-2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -483,10 +483,8 @@ a {
   flex-shrink: 0;
   overflow: hidden;
 }
-/* Cover art rendered inside .file-item__icon. ``cover`` modifier removes the
- * background tint so the image fills the slot edge-to-edge. */
 .file-item__icon--cover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--paper-2);
 }
 .file-item__icon img {
   width: 100%;

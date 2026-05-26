@@ -195,21 +195,24 @@
   letter-spacing: 0.04em;
 }
 
-/* ── Gen stats grid ── */
-.gen-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
-  padding: 20px;
-  border: 1px solid var(--ink);
-  border-radius: 14px;
-  background: var(--paper-3);
-}
-
-.gen-stats-col {
+/* ── Inline gen stats (in profile-grid right col) ── */
+.inline-gen-stats {
+  margin-top: 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 18px;
+}
+
+.inline-gen-stats__row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inline-gen-stats__bar {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .gen-stats-label {
@@ -219,6 +222,7 @@
   letter-spacing: 0.1em;
   color: var(--ink-3);
   font-weight: 500;
+  margin-bottom: 2px;
 }
 
 /* ── Doc list ── */
