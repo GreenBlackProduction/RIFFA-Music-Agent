@@ -150,19 +150,7 @@
   min-height: 420px;
   background: var(--ink);
   color: var(--paper);
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 24px;
-}
-
-@media (max-width: 768px) {
-  .login-hero {
-    grid-template-columns: 1fr;
-  }
-  .login-hero__side {
-    padding-right: clamp(24px, 4vw, 40px);
-    padding-bottom: 0;
-  }
+  display: flex;
 }
 
 .login-hero__inner {
@@ -172,6 +160,7 @@
   flex-direction: column;
   gap: 20px;
   padding: clamp(24px, 4vw, 40px);
+  width: 100%;
   height: 100%;
   justify-content: center;
 }

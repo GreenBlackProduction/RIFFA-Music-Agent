@@ -15,9 +15,11 @@
   align-items: center;
   padding: 12px 18px;
   border-radius: 14px;
-  border: none;
-  background: var(--ink);
-  box-shadow: 0 4px 24px rgba(22, 20, 19, 0.18);
+  border: 1px solid #0a0908;
+  background: #000;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5),
+              0 0 40px rgba(15, 93, 71, 0.08) inset,
+              0 0 60px rgba(233, 229, 218, 0.04) inset;
   max-width: calc(100vw - 24px);
   width: min(780px, calc(100vw - 24px));
   overflow: visible;
@@ -162,50 +164,29 @@
 }
 .gp-ctrl--shuffle { font-size: 14px; }
 
-/* Progress */
+/* Progress — waveform */
 .gp-progress {
   position: relative;
-  height: 30px;
+  height: 28px;
   background: transparent;
   cursor: pointer;
   width: 100%;
-  max-width: 460px;
+  max-width: 480px;
   touch-action: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
-.gp-progress::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 3px;
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 999px;
+.gp-wave-bar {
+  flex: 1;
+  min-width: 1px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 1px;
+  transition: background 120ms;
   pointer-events: none;
 }
-.gp-progress-fill {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  height: 3px;
+.gp-wave-bar--active {
   background: var(--hi);
-  transition: width 120ms linear;
-  border-radius: 999px;
-  pointer-events: none;
-}
-.gp-progress-fill::after {
-  content: "";
-  position: absolute;
-  right: -4px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--paper);
-  border: 2px solid var(--ink);
 }
 
 .gp-time {
@@ -235,13 +216,13 @@
   align-items: center;
   justify-content: center;
   gap: 3px;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border-radius: 50%;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   background: transparent;
-  color: rgba(233, 229, 218, 0.55);
+  color: rgba(233, 229, 218, 0.65);
   font-size: 13px;
   cursor: pointer;
   transition: border-color 120ms, background 120ms, color 120ms;
@@ -250,59 +231,81 @@
 }
 .gp-act:hover {
   color: var(--paper);
-  border-color: rgba(255, 255, 255, 0.30);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.40);
+  background: rgba(255, 255, 255, 0.06);
 }
 
-/* Download */
+/* Download — green accent */
 .gp-act--dl {
   border-radius: 999px;
   width: auto;
   padding: 0 10px;
-  border: 1px solid rgba(15, 93, 71, 0.5);
-  color: rgba(15, 93, 71, 0.7);
+  border: 1px solid var(--emr);
+  color: var(--emr-2, #2da383);
   font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   gap: 5px;
 }
-.gp-act--dl:hover { border-color: var(--emr); color: var(--emr); background: rgba(15,93,71,0.08); }
-
-/* Bolt */
-.gp-act--bolt { color: rgba(255, 200, 50, 0.65); }
-.gp-act--bolt:hover, .gp-act--open {
-  border-color: rgba(255, 200, 50, 0.45);
-  background: rgba(255, 200, 50, 0.08);
-  color: rgba(255, 210, 80, 1);
-}
-
-/* Rating */
-.gp-act--rate {
-  font-size: 14px;
-  min-width: 52px;
-  width: 52px;
-  padding: 0 5px;
-  border-radius: 999px;
-}
-.gp-act--like-on,
-.gp-act--like-on:hover {
-  background: var(--emr-soft);
+.gp-act--dl:hover {
   border-color: var(--emr);
-  color: var(--emr-2);
+  color: var(--paper);
+  background: var(--emr);
 }
-.gp-act--dis-on,
-.gp-act--dis-on:hover {
-  background: var(--hi-soft);
+
+/* Bolt — true orange */
+.gp-act--bolt {
+  border-color: rgba(255, 59, 31, 0.5);
+  color: var(--hi);
+}
+.gp-act--bolt:hover, .gp-act--open {
   border-color: var(--hi);
+  background: rgba(255, 59, 31, 0.14);
   color: var(--hi);
 }
 
+/* Rating — circular */
+.gp-act--rate {
+  font-size: 13px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  position: relative;
+}
+.gp-act--like-on,
+.gp-act--like-on:hover {
+  background: var(--emr);
+  border-color: var(--emr);
+  color: var(--paper);
+}
+.gp-act--dis-on,
+.gp-act--dis-on:hover {
+  background: var(--hi);
+  border-color: var(--hi);
+  color: var(--paper);
+}
+
+/* Small count tooltip on top-right */
 .gp-act-count {
-  font-size: 10px;
-  font-weight: 600;
-  opacity: 0.75;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 /* Radio pill */

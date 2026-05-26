@@ -1638,7 +1638,7 @@ export function StudioPage() {
           <div className="breadcrumb">
             <b>{t("studio.breadcrumb", { defaultValue: "студия" })}</b>
           </div>
-          <div>{t("studio.release", { defaultValue: "выпуск 2026.05 · v1.4" })}</div>
+          
         </div>
 
         <h1 className="h-page">
@@ -1711,7 +1711,7 @@ export function StudioPage() {
           </button>
           <span>/</span><b>{moduleFullTitle(moduleMeta!.id, moduleMeta!.title)}</b>
         </div>
-        <div>{t("studio.release", { defaultValue: "выпуск 2026.05 · v1.4" })}</div>
+        
       </div>
 
       <h1 className="h-page">

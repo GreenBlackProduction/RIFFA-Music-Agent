@@ -495,6 +495,19 @@ export function ProfilePage() {
         </div>
       </div>
 
+      {/* Token icon explainer */}
+      <div className="token-explainer">
+        <span className="token-explainer__icon"><Coin size={28} /></span>
+        <div className="token-explainer__text">
+          <strong>{isEN ? "What is a token?" : "Что такое токен?"}</strong>
+          <span>
+            {isEN
+              ? <>This icon <Coin size={11} /> means a RIFFA token — the universal currency of the studio. The number next to it shows how many tokens you have. Generations consume tokens.</>
+              : <>Эта иконка <Coin size={11} /> — токен RIFFA, универсальная валюта студии. Цифра рядом показывает их количество. Генерации списывают токены.</>}
+          </span>
+        </div>
+      </div>
+
       {/* ── 01 · купить токены ── */}
       <div className="h-section">
         <div className="tag"><span className="num">01</span> · {isEN ? "top up" : "пополнить"}</div>
@@ -505,9 +518,12 @@ export function ProfilePage() {
       <div className="pricing">
         {localPackages.map((p) => {
           const isFeatured = p.id === "premium";
+          const tokensLine = isEN
+            ? <>{p.tokens} <Coin size={12} /> to balance</>
+            : <><Coin size={12} /> {p.tokens} на баланс</>;
           const perks = isEN
-            ? [`${p.tokens} tokens to balance`, `${Math.floor(p.tokens / 2)} songs`, `WAV export`, `priority queue`]
-            : [`${p.tokens} токенов на баланс`, `${Math.floor(p.tokens / 2)} песен с вокалом`, `экспорт в WAV`, `приоритет очереди`];
+            ? [tokensLine, `${Math.floor(p.tokens / 2)} songs`, `WAV export`, `priority queue`]
+            : [tokensLine, `${Math.floor(p.tokens / 2)} песен с вокалом`, `экспорт в WAV`, `приоритет очереди`];
           return (
             <div key={p.id} className={`price-tile${isFeatured ? " is-featured" : ""}${selectedPack === p.id ? " is-selected" : ""}`} onClick={() => setSelectedPack(p.id)}>
               <div className="tier">{p.name}{isFeatured ? ` · ${isEN ? "best value" : "лучшее"}` : ""}</div>
@@ -515,7 +531,7 @@ export function ProfilePage() {
               {p.starsPrice !== undefined && (
                 <div className="price-stars">{isEN ? `or ${p.starsPrice} ★` : `или ${p.starsPrice} ★`}</div>
               )}
-              <div className="tokens-meta">{p.tokens} {isEN ? "tokens" : "токенов"} · ~{Math.floor(p.tokens / 2)} {isEN ? "tracks" : "треков"}</div>
+              <div className="tokens-meta">{p.tokens} <Coin size={11} /> · ~{Math.floor(p.tokens / 2)} {isEN ? "tracks" : "треков"}</div>
               {p.discount !== undefined && (
                 <div className="discount">{isEN ? `save ${p.discount}%` : `выгода ${p.discount}%`}</div>
               )}

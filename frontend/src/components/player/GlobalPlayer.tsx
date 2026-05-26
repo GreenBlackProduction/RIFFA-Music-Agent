@@ -61,6 +61,14 @@ const IconThumbDown = () => (
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 const INVALID_FILENAME_CHARS = new Set(["<", ">", ":", '"', "/", "\\", "|", "?", "*"]);
 
+// Псевдослучайные высоты столбиков waveform (40 баров, 18–100%).
+const WAVE_BARS = [
+  0.42, 0.68, 0.55, 0.82, 0.34, 0.71, 0.48, 0.92, 0.38, 0.61,
+  0.78, 0.52, 0.66, 0.45, 0.88, 0.32, 0.74, 0.58, 0.40, 0.86,
+  0.50, 0.72, 0.36, 0.64, 0.95, 0.43, 0.69, 0.54, 0.81, 0.39,
+  0.76, 0.46, 0.62, 0.84, 0.51, 0.30, 0.70, 0.57, 0.44, 0.79,
+];
+
 function extractGenId(id: string | number): string | null {
   const s = String(id).split("#")[0];
   return UUID_RE.test(s) ? s : null;
@@ -675,10 +683,17 @@ export function GlobalPlayer() {
           aria-valuenow={duration ? Math.round((progress / duration) * 100) : 0}
           style={{ touchAction: "none" }}
         >
-          <div
-            className="gp-progress-fill"
-            style={{ width: duration ? `${(progress / duration) * 100}%` : "0%" }}
-          />
+          {WAVE_BARS.map((h, i) => {
+            const ratio = duration ? progress / duration : 0;
+            const active = i / WAVE_BARS.length < ratio;
+            return (
+              <span
+                key={i}
+                className={`gp-wave-bar${active ? " gp-wave-bar--active" : ""}`}
+                style={{ height: `${Math.round(h * 100)}%` }}
+              />
+            );
+          })}
         </div>
 
         <span className="gp-time">

@@ -18,6 +18,8 @@ interface PlayerAuraProps {
 interface Blob {
   /** Опорный оттенок в градусах; модулируется балансом спектра. */
   baseHue: number;
+  /** Насыщенность 0–100. 0 = почти белое, 80+ = насыщенный цвет. */
+  saturation: number;
   /** Доля max(width, height), задающая базовый радиус. */
   radiusRatio: number;
   /** Фазы для уникального орбитального движения. */
@@ -27,11 +29,12 @@ interface Blob {
   speedY: number;
 }
 
+// Зелёный (emr ~ 165°) + белый (нулевая насыщенность) — два мягких свечения.
 const BLOBS: ReadonlyArray<Blob> = [
-  { baseHue: 95,  radiusRatio: 0.68, phaseX: 0.0, phaseY: 0.8, speedX: 0.00042, speedY: 0.00058 },
-  { baseHue: 22,  radiusRatio: 0.58, phaseX: 1.9, phaseY: 2.1, speedX: 0.00037, speedY: 0.00049 },
-  { baseHue: 295, radiusRatio: 0.62, phaseX: 3.4, phaseY: 0.4, speedX: 0.00051, speedY: 0.00033 },
-  { baseHue: 200, radiusRatio: 0.52, phaseX: 5.0, phaseY: 3.2, speedX: 0.00046, speedY: 0.00061 },
+  { baseHue: 165, saturation: 75, radiusRatio: 0.66, phaseX: 0.0, phaseY: 0.8, speedX: 0.00042, speedY: 0.00058 },
+  { baseHue: 0,   saturation: 0,  radiusRatio: 0.58, phaseX: 1.9, phaseY: 2.1, speedX: 0.00037, speedY: 0.00049 },
+  { baseHue: 165, saturation: 65, radiusRatio: 0.52, phaseX: 3.4, phaseY: 0.4, speedX: 0.00051, speedY: 0.00033 },
+  { baseHue: 0,   saturation: 0,  radiusRatio: 0.48, phaseX: 5.0, phaseY: 3.2, speedX: 0.00046, speedY: 0.00061 },
 ];
 
 /**
@@ -53,84 +56,17 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
   // AudioContext суспендится при сворачивании браузера/Telegram и звук
   // обрывается. Там работает синусоидная имитация — плавно, без реакции
   // на пики, но фоновое воспроизведение остаётся стабильным.
-  const audioCtxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const freqDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
-  const sourceConnectedRef = useRef(false);
   const reactiveModeRef = useRef(false);
 
-  // Инициализация Web Audio API — только для десктопа.
-  // Подключается лениво при первом active=true (нужен user gesture для
-  // resume AudioContext).
+  // Web Audio полностью отключён — createMediaElementSource захватывает аудио
+  // в граф, и если контекст по любой причине не работает (suspended,
+  // CORS, заблокирован браузером), звук пропадает. Это была причина
+  // тишины на десктопе. Теперь рисуем синусоидную имитацию для всех.
   useEffect(() => {
     if (!active) return;
-    const el = audio.current;
-    if (!el) return;
-
-    // Десктоп определяем по комбинации pointer и отсутствию touch.
-    // На iPad с подключённой мышкой это всё равно даст "fine + ontouchstart" —
-    // лучше быть консервативными и не ломать фон на гибридных устройствах.
-    const isDesktop =
-      window.matchMedia("(pointer: fine)").matches &&
-      !("ontouchstart" in window) &&
-      navigator.maxTouchPoints === 0;
-    if (!isDesktop) return;
-    if (sourceConnectedRef.current) {
-      // Уже подключали для этого <audio> — переиспользуем существующий граф.
-      reactiveModeRef.current = true;
-      const ctx = audioCtxRef.current;
-      if (ctx && ctx.state === "suspended") {
-        void ctx.resume();
-      }
-      return;
-    }
-    try {
-      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AC) return;
-      const ctx = new AC();
-
-      // Если AudioContext создался в suspended-состоянии (это бывает, когда
-      // useEffect запускается вне прямого user gesture), пытаемся его
-      // возобновить. Если resume не удался — НЕ захватываем аудиоэлемент,
-      // иначе звук пропадёт (audio уйдёт в граф, но граф заморожен).
-      const connect = () => {
-        const source = ctx.createMediaElementSource(el);
-        const analyser = ctx.createAnalyser();
-        analyser.fftSize = 256;
-        analyser.smoothingTimeConstant = 0.78;
-        source.connect(analyser);
-        analyser.connect(ctx.destination);
-        audioCtxRef.current = ctx;
-        analyserRef.current = analyser;
-        freqDataRef.current = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
-        sourceConnectedRef.current = true;
-        reactiveModeRef.current = true;
-      };
-
-      const connectAndWatch = () => {
-        connect();
-        // Если браузер суспендит контекст mid-play (фоновая вкладка, экран выключен) —
-        // автоматически возобновляем, иначе звук пропадёт (audio захвачен графом).
-        ctx.addEventListener("statechange", () => {
-          if (ctx.state === "suspended") void ctx.resume();
-        });
-      };
-
-      if (ctx.state === "running") {
-        connectAndWatch();
-      } else {
-        ctx.resume().then(() => {
-          if (ctx.state === "running") {
-            connectAndWatch();
-          } else {
-            ctx.close();
-          }
-        }).catch(() => ctx.close());
-      }
-    } catch (err) {
-      console.warn("[PlayerAura] Web Audio unavailable, falling back to idle animation:", err);
-      reactiveModeRef.current = false;
-    }
+    // намеренно ничего не делаем: reactiveModeRef.current = false → fallback анимация
   }, [active, audio]);
 
   // Основной цикл отрисовки.
@@ -257,9 +193,10 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
         const r = baseR * b.radiusRatio * breathe * pulse;
 
         const grad = ctx2d.createRadialGradient(cx, cy, 0, cx, cy, r);
-        grad.addColorStop(0, `hsla(${hue}, 92%, ${lightness}%, 0.95)`);
-        grad.addColorStop(0.55, `hsla(${hue}, 78%, ${lightness - 8}%, 0.4)`);
-        grad.addColorStop(1, `hsla(${hue}, 70%, ${lightness - 16}%, 0)`);
+        const sat = b.saturation;
+        grad.addColorStop(0, `hsla(${hue}, ${sat}%, ${lightness}%, 0.7)`);
+        grad.addColorStop(0.55, `hsla(${hue}, ${Math.max(0, sat - 10)}%, ${lightness - 8}%, 0.3)`);
+        grad.addColorStop(1, `hsla(${hue}, ${Math.max(0, sat - 20)}%, ${lightness - 16}%, 0)`);
         ctx2d.fillStyle = grad;
         ctx2d.beginPath();
         ctx2d.arc(cx, cy, r, 0, Math.PI * 2);

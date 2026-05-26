@@ -195,6 +195,43 @@
   letter-spacing: 0.04em;
 }
 
+/* ── Token explainer ── */
+.token-explainer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  margin-top: 24px;
+  border: 1px solid var(--ink);
+  border-radius: 12px;
+  background: var(--paper-3);
+}
+.token-explainer__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+}
+.token-explainer__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.token-explainer__text strong { font-size: 14px; font-weight: 600; color: var(--ink); }
+.token-explainer__text span { font-size: 12.5px; color: var(--ink-3); line-height: 1.4; }
+@media (max-width: 540px) {
+  .token-explainer { padding: 12px; gap: 10px; }
+  .token-explainer__icon { width: 36px; height: 36px; }
+  .token-explainer__text strong { font-size: 13px; }
+  .token-explainer__text span { font-size: 12px; }
+}
+
 /* ── Inline gen stats (compact pills) ── */
 .inline-gen-stats {
   margin-top: 14px;

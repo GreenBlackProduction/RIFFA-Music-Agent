@@ -19,6 +19,17 @@ import "./LoginPage.css";
 
 const TG_BOT = (import.meta.env.VITE_TG_BOT_USERNAME as string | undefined) ?? "The_Riffa_bot";
 
+/** First login → /guide, subsequent logins → /studio. Marker stored locally. */
+function firstVisitDest(): string {
+  try {
+    if (!localStorage.getItem("riffa_visited")) {
+      localStorage.setItem("riffa_visited", "1");
+      return "/guide";
+    }
+  } catch { /* localStorage unavailable */ }
+  return "/studio";
+}
+
 // Telegram Login Widget auth data shape (comes from data-onauth callback or redirect params)
 interface TgWidgetData {
   id: number;
@@ -89,7 +100,7 @@ export function LoginPage() {
           photo_url: data.photo_url,
         });
         await refresh();
-        navigate("/studio", { replace: true });
+        navigate(firstVisitDest(), { replace: true });
       } catch (err: unknown) {
         const detail = (err as { detail?: { code?: string; bot_url?: string } } | null)?.detail;
         if (detail?.code === "bot_not_started" && detail?.bot_url) {
@@ -214,7 +225,7 @@ export function LoginPage() {
   }
 
   if (user) {
-    const next = (location.state as { from?: string } | null)?.from ?? "/studio";
+    const next = (location.state as { from?: string } | null)?.from ?? firstVisitDest();
     return <Navigate to={next} replace />;
   }
 
@@ -229,23 +240,8 @@ export function LoginPage() {
         <LoginLangSwitch />
       </header>
 
-      <div className="login-meta-ruler">
-        <span>вход · v1</span>
-        <span>выпуск 2026.05</span>
-        <span>riffastudio.site</span>
-      </div>
-
       <main className="login-grid">
         <section className="login-hero">
-          <aside className="login-hero__side">
-            <div className="login-kv">
-              <div>тип</div><div className="login-kv__v">веб + tg-бот</div>
-              <div>движок</div><div className="login-kv__v">нейросеть</div>
-              <div>трек</div><div className="login-kv__v">≈1–2 мин</div>
-              <div>формат</div><div className="login-kv__v">mp3 · wav</div>
-              <div>язык</div><div className="login-kv__v">русский</div>
-            </div>
-          </aside>
           <div className="login-hero__inner">
             <div className="login-hero__wordmark" aria-hidden="true">
               <img

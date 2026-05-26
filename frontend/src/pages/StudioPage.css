@@ -1190,12 +1190,18 @@
   font-size: 14px;
 }
 .model-card__cost {
-  font-size: 11px;
-  color: var(--muted);
-  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  border: 1px solid var(--ink);
   border-radius: 999px;
-  padding: 3px 8px;
+  padding: 3px 10px;
+  background: var(--paper);
 }
+.model-card__cost .riffa-coin { color: var(--ink); }
 .model-card__descr { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
 
 .cover-art-chat {
