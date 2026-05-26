@@ -152,11 +152,12 @@ function extractLyrics(text: string): string {
 
 function AgentAvatar({ thinking }: { thinking?: boolean }) {
   return (
-    <img
-      src="/icons/chatgpt.png"
-      alt="AI Agent"
-      className={`agent-chat__avatar-icon ${thinking ? 'agent-chat__avatar-icon--thinking' : ''}`}
-    />
+    <div className={`agent-chat__avatar-icon${thinking ? " agent-chat__avatar-icon--thinking" : ""}`}>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="3" fill="var(--paper)" />
+        <circle cx="8" cy="8" r="6" stroke="var(--paper)" strokeWidth="1.2" strokeOpacity="0.4" />
+      </svg>
+    </div>
   );
 }
 

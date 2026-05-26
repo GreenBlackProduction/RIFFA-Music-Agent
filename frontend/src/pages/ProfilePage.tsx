@@ -1,41 +1,26 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   changePassword,
   createRobokassaLink,
   createStarsInvoice,
-  deleteGeneration,
   fetchTrash,
   purgeTrash,
   redeemPromo,
   restoreGeneration,
   updateDisplayName,
   uploadAvatar,
-  type GenerationOut,
-  type HistoryPage,
   type PackageCode,
 } from "@/lib/api/client";
-import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
 
 import { useAuth } from "@/lib/auth";
-import { FileActions } from "@/components/studio/FileActions";
-import { FileGhostsOverlay, useFileGhosts } from "@/components/studio/FileGhost";
-import { ImageViewer } from "@/components/ui/ImageViewer";
-import { toggleHistoryRadio, trackDownloadUrl } from "@/lib/api/client";
 import {
   HISTORY_QUERY_KEY,
-  type LibraryItem,
-  type LibraryItemType,
-  MUSIC_TYPES,
-  RADIO_TYPES,
-  TYPE_ICONS,
   TYPE_LABELS,
   useLibraryItems,
 } from "@/lib/library";
-import { usePlayer } from "@/store/player";
 
 import "./ProfilePage.css";
 
@@ -47,15 +32,17 @@ interface TokenPackage {
   tokens: number;
   gens: number;
   priceRub: number;
+  /** Цена в Telegram Stars (только для premium). */
+  starsPrice?: number;
   /** Процент выгоды по сравнению со стартовым пакетом. */
   discount?: number;
 }
 
 const TOKEN_PACKAGES: readonly TokenPackage[] = [
-  { id: "starter", name: "Стартовый",    tokens: 10,  gens: 5,  priceRub: 100 },
-  { id: "basic",   name: "Базовый",       tokens: 25,  gens: 12, priceRub: 200, discount: 20 },
-  { id: "pro",     name: "Продвинутый",  tokens: 60,  gens: 30, priceRub: 400, discount: 33 },
-  { id: "premium", name: "Премиум",      tokens: 150, gens: 75, priceRub: 900, discount: 40 },
+  { id: "starter", name: "Стартовый",   tokens: 10,  gens: 5,  priceRub: 100 },
+  { id: "basic",   name: "Базовый",      tokens: 25,  gens: 12, priceRub: 200, discount: 20 },
+  { id: "pro",     name: "Продвинутый", tokens: 60,  gens: 30, priceRub: 400, discount: 33 },
+  { id: "premium", name: "Премиум",     tokens: 150, gens: 75, priceRub: 999, starsPrice: 620, discount: 40 },
 ];
 
 
@@ -75,110 +62,12 @@ const STAT_COLORS: Record<string, string> = {
   wav: "#c0c0c0",
 };
 
-// «Мои файлы» получает данные из того же источника, что и «Мои генерации» (StudioPage),
-// через useLibraryItems(). Разные фильтры — один и тот же файл видимый в обоих
-// местах одинаковым (обложка, название, «в эфире»).
-
-
 const PROFILE_DOCS: readonly { id: string; title: string; hint: string; href: string }[] = [
   { id: "offer", title: "Пользовательское соглашение", hint: "Публичная оферта", href: "/docs/offer.txt" },
   { id: "privacy", title: "Политика конфиденциальности", hint: "Как храним и обрабатываем данные", href: "/docs/privacy.txt" },
   { id: "copyright", title: "Лицензия на треки", hint: "Авторские права и использование", href: "/docs/copyright.txt" },
   { id: "refund", title: "Политика возврата", hint: "Условия возврата средств", href: "/docs/refund.txt" },
 ];
-
-// ─────────── Кастомный брендированный дропдаун ────────────
-
-interface SelectOption { value: string; label: string; }
-
-function FilterSelect({
-  options,
-  value,
-  onChange,
-}: {
-  options: SelectOption[];
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number; width: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const selected = options.find((o) => o.value === value);
-  const isDefault = value === options[0]?.value;
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (btnRef.current?.contains(t) || menuRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-    document.addEventListener("click", close, true);
-    return () => document.removeEventListener("click", close, true);
-  }, [open]);
-
-  function toggle() {
-    if (btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      const menuH = Math.min(options.length * 40 + 8, 260);
-      if (window.innerHeight - r.bottom >= menuH) {
-        setPos({ top: r.bottom + 4, left: r.left, width: r.width });
-      } else {
-        setPos({ bottom: window.innerHeight - r.top + 4, left: r.left, width: r.width });
-      }
-    }
-    setOpen((v) => !v);
-  }
-
-  return (
-    <div className="fsel">
-      <button
-        ref={btnRef}
-        type="button"
-        className={[
-          "fsel__btn",
-          open ? "fsel__btn--open" : "",
-          !isDefault ? "fsel__btn--set" : "",
-        ].filter(Boolean).join(" ")}
-        onClick={toggle}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-      >
-        <span className="fsel__label">{selected?.label ?? value}</span>
-        <svg className="fsel__arrow" viewBox="0 0 12 12" width="11" height="11" fill="none" aria-hidden>
-          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {open && pos &&
-        createPortal(
-          <div
-            ref={menuRef}
-            role="listbox"
-            className="fsel__menu"
-            style={{ top: pos.top, bottom: pos.bottom, left: pos.left, minWidth: pos.width }}
-          >
-            {options.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                role="option"
-                aria-selected={o.value === value}
-                className={`fsel__item${o.value === value ? " fsel__item--active" : ""}`}
-                onClick={() => { onChange(o.value); setOpen(false); }}
-              >
-                <span className="fsel__check">{o.value === value ? "✓" : ""}</span>
-                {o.label}
-              </button>
-            ))}
-          </div>,
-          document.body,
-        )}
-    </div>
-  );
-}
 
 // ─────────── ProfilePage ────────────
 
@@ -187,7 +76,6 @@ export function ProfilePage() {
   const { t, i18n: i18nClient } = useTranslation();
   const i18nLang = i18nClient.resolvedLanguage || i18nClient.language || "ru";
   const isEN = i18nLang.startsWith("en");
-  const [viewerImage, setViewerImage] = useState<{ url: string; title: string } | null>(null);
   // Если avatar_url битый — fallback на инициал, чтобы не показывать broken-image.
   const [avatarFailed, setAvatarFailed] = useState(false);
   useEffect(() => { setAvatarFailed(false); }, [user?.avatar_url]);
@@ -336,88 +224,8 @@ export function ProfilePage() {
     }
   };
 
-  // ── Files (единый data source с LibraryCard на StudioPage) ──
-  const [filterType, setFilterType] = useState<"all" | LibraryItemType>("all");
-  const [filterMood, setFilterMood] = useState<string>("all");
-  const [filterGenre, setFilterGenre] = useState<string>("all");
-  const [filterSort, setFilterSort] = useState<"newest" | "oldest">("newest");
-
   const queryClient = useQueryClient();
-  const { items: libraryItems, isLoading: filesLoading, authError: filesAuthError } =
-    useLibraryItems();
-
-  const { playOrToggle, currentId, isPlaying, setRadioState } = usePlayer(
-    useShallow((s) => ({
-      playOrToggle: s.playOrToggle,
-      currentId: s.current?.id ?? null,
-      isPlaying: s.isPlaying,
-      setRadioState: s.setRadioState,
-    })),
-  );
-
-  // Синхронизируем per-track radio state с плеером (key = item.id).
-  useEffect(() => {
-    for (const it of libraryItems) {
-      setRadioState(it.id, it.isPublic);
-    }
-  }, [libraryItems, setRadioState]);
-
-  const radioMutation = useMutation({
-    mutationFn: ({
-      generationId,
-      trackIndex,
-      isPublic,
-    }: {
-      itemId: string;
-      generationId: string;
-      trackIndex: number | null;
-      isPublic: boolean;
-    }) => toggleHistoryRadio(generationId, isPublic, trackIndex),
-    onSuccess: async (_, vars) => {
-      setRadioState(vars.itemId, vars.isPublic);
-      await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
-      await queryClient.invalidateQueries({ queryKey: ["radio"] });
-    },
-  });
-
-  // ── Soft-delete (move to trash) ──
-  // The ghost is purely visual; actual list update is via OPTIMISTIC cache
-  // mutation so the file disappears instantly and stays gone (or rolls back
-  // on API failure) instead of flashing back when a timer expires.
-  const { ghosts: fileGhosts, showGhost: showFileGhost } = useFileGhosts();
-  const deleteFileMutation = useMutation({
-    mutationFn: (generationId: string) => deleteGeneration(generationId),
-    onMutate: async (generationId) => {
-      await queryClient.cancelQueries({ queryKey: HISTORY_QUERY_KEY });
-      const snapshots = queryClient.getQueriesData<HistoryPage>({
-        queryKey: HISTORY_QUERY_KEY,
-      });
-      queryClient.setQueriesData<HistoryPage>({ queryKey: HISTORY_QUERY_KEY }, (old) => {
-        if (!old?.items) return old;
-        return {
-          ...old,
-          items: old.items.filter((g: GenerationOut) => g.id !== generationId),
-          total: Math.max(0, (old.total ?? 0) - 1),
-        };
-      });
-      return { snapshots };
-    },
-    onError: (_err, _id, ctx) => {
-      if (ctx?.snapshots) {
-        for (const [key, data] of ctx.snapshots) {
-          queryClient.setQueryData(key, data);
-        }
-      }
-    },
-    onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
-      await queryClient.invalidateQueries({ queryKey: ["history", "trash"] });
-      // Soft-delete also un-publishes the track from the public Radio
-      // (handled server-side); refresh radio caches so the playlist/chart
-      // reflect the change immediately.
-      await queryClient.invalidateQueries({ queryKey: ["radio"] });
-    },
-  });
+  const { items: libraryItems } = useLibraryItems();
 
   // Restore from trash → moves item back to library.
   const restoreFileMutation = useMutation({
@@ -470,66 +278,6 @@ export function ProfilePage() {
     }
   }
 
-  const allMoods = useMemo(
-    () =>
-      Array.from(
-        new Set(libraryItems.map((f) => f.mood).filter((m): m is string => Boolean(m))),
-      ),
-    [libraryItems],
-  );
-  const allGenres = useMemo(
-    () =>
-      Array.from(
-        new Set(libraryItems.map((f) => f.genre).filter((g): g is string => Boolean(g))),
-      ),
-    [libraryItems],
-  );
-
-  const moodOptions = useMemo<SelectOption[]>(
-    () => [{ value: "all", label: t("profile.filterMoodAny") }, ...allMoods.map((m) => ({ value: m, label: m }))],
-    [allMoods, t],
-  );
-  const genreOptions = useMemo<SelectOption[]>(
-    () => [{ value: "all", label: t("profile.filterGenreAny") }, ...allGenres.map((g) => ({ value: g, label: g }))],
-    [allGenres, t],
-  );
-  const sortOptions: SelectOption[] = [
-    { value: "newest", label: t("profile.sortNewest") },
-    { value: "oldest", label: t("profile.sortOldest") },
-  ];
-
-  const filteredFiles = useMemo<LibraryItem[]>(() => {
-    let list = libraryItems.slice();
-    if (filterType !== "all") list = list.filter((f) => f.type === filterType);
-    if (filterMood !== "all") list = list.filter((f) => f.mood === filterMood);
-    if (filterGenre !== "all") list = list.filter((f) => f.genre === filterGenre);
-    list.sort((a, b) => {
-      const delta = a.createdAt.localeCompare(b.createdAt);
-      return filterSort === "newest" ? -delta : delta;
-    });
-    return list;
-  }, [libraryItems, filterType, filterMood, filterGenre, filterSort]);
-
-  const handlePlayItem = (item: LibraryItem) => {
-    if (!item.audioUrl) return;
-    const toPlayerTrack = (f: LibraryItem) => ({
-      id: f.id,
-      title: f.title,
-      url: f.audioUrl,
-      cover: f.coverUrl ?? undefined,
-      meta: `${typeLabel(f.type)} · ${f.genre} · ${f.mood}`,
-      isOwn: f.isOwn,
-      canRadio: RADIO_TYPES.has(f.type) && f.isOwn,
-      isMusicType: MUSIC_TYPES.has(f.type),
-      isPublic: f.isPublic,
-    });
-    // Build queue from the current filtered list so prev/next navigates
-    // only through files the user is currently looking at. Re-clicking the
-    // active row toggles play/pause via the shared store helper.
-    const queue = filteredFiles.filter((f) => !!f.audioUrl).map(toPlayerTrack);
-    playOrToggle(toPlayerTrack(item), queue);
-  };
-
   // ── Referral ──
   const referralCode = user?.referral_code ?? (user?.id ? `R${user.id}` : "RGUEST");
   const referralLink = `https://riffastudio.site/r/${referralCode}`;
@@ -581,12 +329,28 @@ export function ProfilePage() {
     return new Set(libraryItems.map((f) => f.genre).filter(Boolean)).size;
   }, [libraryItems]);
 
+  const topGenres = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const it of libraryItems) {
+      if (it.genre) counts[it.genre] = (counts[it.genre] ?? 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [libraryItems]);
+
+  const topMoods = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const it of libraryItems) {
+      if (it.mood) counts[it.mood] = (counts[it.mood] ?? 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [libraryItems]);
+
   return (
     <div className="profile">
       {/* top-meta */}
       <div className="top-meta">
         <div className="breadcrumb">
-          <span>raw</span><span>/</span><b>{isEN ? "profile" : "профиль"}</b>
+          <b>{isEN ? "profile" : "профиль"}</b>
         </div>
         <div>{joinDate}</div>
       </div>
@@ -705,14 +469,17 @@ export function ProfilePage() {
 
       <div className="pricing">
         {localPackages.map((p) => {
-          const isFeatured = p.id === "basic";
+          const isFeatured = p.id === "premium";
           const perks = isEN
             ? [`${p.tokens} ⓡ to balance`, `${Math.floor(p.tokens / 2)} songs`, `WAV export`, `priority queue`]
             : [`${p.tokens} ⓡ на баланс`, `${Math.floor(p.tokens / 2)} песен с вокалом`, `экспорт в WAV`, `приоритет очереди`];
           return (
             <div key={p.id} className={`price-tile${isFeatured ? " is-featured" : ""}${selectedPack === p.id ? " is-selected" : ""}`} onClick={() => setSelectedPack(p.id)}>
-              <div className="tier">{p.name}{isFeatured ? ` · ${isEN ? "popular" : "популярный"}` : ""}</div>
+              <div className="tier">{p.name}{isFeatured ? ` · ${isEN ? "best value" : "лучшее"}` : ""}</div>
               <div className="price">{p.priceRub}<small>₽</small></div>
+              {p.starsPrice !== undefined && (
+                <div className="price-stars">{isEN ? `or ${p.starsPrice} ★` : `или ${p.starsPrice} ★`}</div>
+              )}
               <div className="tokens-meta">{p.tokens} {isEN ? "tokens" : "токенов"} · ~{Math.floor(p.tokens / 2)} {isEN ? "tracks" : "треков"}</div>
               {p.discount !== undefined && (
                 <div className="discount">{isEN ? `save ${p.discount}%` : `выгода ${p.discount}%`}</div>
@@ -733,15 +500,18 @@ export function ProfilePage() {
         })}
       </div>
 
-      <div className="pill-row" style={{ margin: "20px 0 0" }}>
-        <button className={`pill${payMethod === "card" ? " on-hi" : ""}`} onClick={() => setPayMethod("card")}>
-          {isEN ? "Card RF · Robokassa · instant" : "Карта РФ · Robokassa · мгновенно"}
+      <div className="pay-method-row">
+        <button className={`pay-method-btn${payMethod === "card" ? " pay-method-btn--active-hi" : ""}`} onClick={() => setPayMethod("card")}>
+          <span className="pay-method-btn__label">{isEN ? "Card RF" : "Карта РФ"}</span>
+          <span className="pay-method-btn__hint">Robokassa · {isEN ? "instant" : "мгновенно"}</span>
         </button>
-        <button className={`pill${payMethod === "stars" ? " on" : ""}`} onClick={() => setPayMethod("stars")}>
-          {isEN ? "Telegram Stars · no fee" : "Telegram Stars · без комиссии"}
+        <button className={`pay-method-btn${payMethod === "stars" ? " pay-method-btn--active" : ""}`} onClick={() => setPayMethod("stars")}>
+          <span className="pay-method-btn__label">Telegram Stars</span>
+          <span className="pay-method-btn__hint">{isEN ? "no fee" : "без комиссии"}</span>
         </button>
-        <button className="pill" style={{ opacity: 0.6 }} disabled>
-          {isEN ? "Crypto · USDT · soon" : "Крипта · USDT TRC-20 · скоро"}
+        <button className="pay-method-btn pay-method-btn--disabled" disabled>
+          <span className="pay-method-btn__label">{isEN ? "Crypto · USDT" : "Крипта · USDT"}</span>
+          <span className="pay-method-btn__hint">{isEN ? "coming soon" : "скоро"}</span>
         </button>
       </div>
       {payError && <p style={{ color: "var(--hi)", fontSize: 13, margin: "8px 0 0" }}>{payError}</p>}
@@ -811,9 +581,77 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {/* ── 04 · документы ── */}
+      {/* ── 04 · статистика генераций ── */}
+      {totalGens > 0 && (
+        <>
+          <div className="h-section">
+            <div className="tag"><span className="num">04</span> · {isEN ? "statistics" : "статистика"}</div>
+            <h2>{isEN ? "your generations" : "твои генерации"}</h2>
+            <div className="right">{totalGens} {isEN ? "total" : "всего"}</div>
+          </div>
+
+          <div className="gen-stats-grid">
+            <div className="gen-stats-col">
+              <div className="gen-stats-label">{isEN ? "by type" : "по типу"}</div>
+              <div className="stat-bars">
+                {genStats.map((s) => (
+                  <div key={s.type}>
+                    <div className="stat-bar__head">
+                      <span>{s.label}</span>
+                      <strong>{s.count}</strong>
+                    </div>
+                    <div className="stat-bar__track">
+                      <div className="stat-bar__fill" style={{ width: `${Math.round((s.count / totalGens) * 100)}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {topGenres.length > 0 && (
+              <div className="gen-stats-col">
+                <div className="gen-stats-label">{isEN ? "top genres" : "топ жанров"}</div>
+                <div className="stat-bars">
+                  {topGenres.map(([genre, count]) => (
+                    <div key={genre}>
+                      <div className="stat-bar__head">
+                        <span>{genre}</span>
+                        <strong>{count}</strong>
+                      </div>
+                      <div className="stat-bar__track">
+                        <div className="stat-bar__fill" style={{ width: `${Math.round((count / (topGenres[0]?.[1] ?? 1)) * 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {topMoods.length > 0 && (
+              <div className="gen-stats-col">
+                <div className="gen-stats-label">{isEN ? "top moods" : "топ настроений"}</div>
+                <div className="stat-bars">
+                  {topMoods.map(([mood, count]) => (
+                    <div key={mood}>
+                      <div className="stat-bar__head">
+                        <span>{mood}</span>
+                        <strong>{count}</strong>
+                      </div>
+                      <div className="stat-bar__track">
+                        <div className="stat-bar__fill" style={{ width: `${Math.round((count / (topMoods[0]?.[1] ?? 1)) * 100)}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── 05 · документы ── */}
       <div className="h-section">
-        <div className="tag"><span className="num">04</span> · {isEN ? "documents" : "документы"}</div>
+        <div className="tag"><span className="num">{totalGens > 0 ? "05" : "04"}</span> · {isEN ? "documents" : "документы"}</div>
         <h2>{isEN ? "legal information" : "правовая информация"}</h2>
         <div className="right">{isEN ? "for reference" : "для справки"}</div>
       </div>
@@ -829,100 +667,6 @@ export function ProfilePage() {
             <span className="chevron">→</span>
           </a>
         ))}
-      </div>
-
-      {/* ── 05 · мои файлы ── */}
-      <div className="h-section">
-        <div className="tag"><span className="num">05</span> · {isEN ? "files" : "мои файлы"}</div>
-        <h2>{t("profile.myFiles")}</h2>
-        <div className="right">{filteredFiles.length} / {libraryItems.length}</div>
-      </div>
-
-      <div className="pill-row" style={{ marginBottom: 16 }}>
-        {(["all", "song", "instrumental", "cover", "sfx", "cover_art"] as Array<"all" | LibraryItemType>).map((ft) => (
-          <button key={ft} type="button" className={`pill${filterType === ft ? " on" : ""}`} onClick={() => setFilterType(ft)}>
-            {ft === "all" ? t("profile.filesAll") : typeLabel(ft)}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-        <FilterSelect options={moodOptions} value={filterMood} onChange={setFilterMood} />
-        <FilterSelect options={genreOptions} value={filterGenre} onChange={setFilterGenre} />
-        <FilterSelect options={sortOptions} value={filterSort} onChange={(v) => setFilterSort(v as "newest" | "oldest")} />
-      </div>
-
-      <div className="generations-list">
-        {filesAuthError ? (
-          <div className="empty-state"><div className="empty-state__icon">🔒</div><div className="empty-state__text">{t("profile.filesNeedAuth")}</div></div>
-        ) : filesLoading ? (
-          Array.from({ length: 5 }).map((_, i) => (
-            <div key={`skel-${i}`} className="file-skeleton" aria-hidden="true">
-              <div className="file-skeleton__icon" />
-              <div className="file-skeleton__lines">
-                <div className="file-skeleton__line" style={{ width: `${60 + ((i * 17) % 40)}%` }} />
-                <div className="file-skeleton__line file-skeleton__line--short" />
-              </div>
-              <div className="file-skeleton__action" />
-            </div>
-          ))
-        ) : filteredFiles.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state__icon">📂</div>
-            <div className="empty-state__text">{libraryItems.length === 0 ? t("profile.filesEmptyFirst") : t("profile.filesNoMatch")}</div>
-          </div>
-        ) : (
-          <AnimatePresence initial={false}>
-            {filteredFiles.map((f) => {
-              const isActive = currentId === f.id;
-              const canRadio = RADIO_TYPES.has(f.type) && f.isOwn;
-              const canBolt = MUSIC_TYPES.has(f.type);
-              const radioPending = radioMutation.isPending && radioMutation.variables?.itemId === f.id;
-              return (
-                <motion.div
-                  key={f.id}
-                  role="button"
-                  tabIndex={0}
-                  className={`file-item${isActive ? " file-item--active" : ""}`}
-                  onClick={() => handlePlayItem(f)}
-                  onKeyDown={(e) => e.key === "Enter" && handlePlayItem(f)}
-                  initial={{ opacity: 0, x: -16 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.22, ease: "easeOut" }}
-                >
-                  {f.coverUrl ? (
-                    <span className="file-item__icon file-item__icon--cover" aria-hidden onClick={(e) => { e.stopPropagation(); setViewerImage({ url: f.coverUrl!, title: f.title }); }} style={{ cursor: "zoom-in" }}>
-                      <img src={f.coverUrl} alt="" loading="lazy" />
-                    </span>
-                  ) : (
-                    <span className="file-item__icon" aria-hidden>{TYPE_ICONS[f.type]}</span>
-                  )}
-                  <div className="file-item__info">
-                    <span className="file-item__title">{f.title}</span>
-                    <span className="file-item__meta">{typeLabel(f.type)} · {f.genre} · {f.mood} · {f.duration}</span>
-                  </div>
-                  <FileActions
-                    audioUrl={f.audioUrl}
-                    downloadUrl={f.trackIndex !== null ? trackDownloadUrl(f.generationId, f.trackIndex) : undefined}
-                    title={f.title}
-                    isMusicType={canBolt}
-                    canRadio={canRadio}
-                    fileId={f.id}
-                    isPublic={f.isPublic}
-                    generationId={f.generationId}
-                    audioId={f.audioId}
-                    onToggleRadio={canRadio ? (next) => radioMutation.mutateAsync({ itemId: f.id, generationId: f.generationId, trackIndex: f.trackIndex, isPublic: next }) : undefined}
-                    radioPending={radioPending}
-                    isActive={isActive}
-                    isPlaying={isPlaying}
-                    onPlayPause={f.audioUrl ? () => handlePlayItem(f) : undefined}
-                    onDelete={(rect) => { showFileGhost(f, rect); deleteFileMutation.mutate(f.generationId); }}
-                  />
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        )}
       </div>
 
       {/* Trash modal */}
@@ -966,10 +710,6 @@ export function ProfilePage() {
           document.body,
         )}
 
-      <FileGhostsOverlay ghosts={fileGhosts} />
-      {viewerImage && (
-        <ImageViewer imageUrl={viewerImage.url} title={viewerImage.title} onClose={() => setViewerImage(null)} />
-      )}
     </div>
   );
 }

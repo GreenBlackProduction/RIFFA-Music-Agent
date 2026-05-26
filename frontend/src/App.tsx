@@ -8,6 +8,7 @@ import { GlobalPlayer } from "@/components/player/GlobalPlayer";
 
 const AdminPage         = lazy(() => import("@/pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const AgentPage         = lazy(() => import("@/pages/AgentPage").then((m) => ({ default: m.AgentPage })));
+const GuidePage         = lazy(() => import("@/pages/GuidePage").then((m) => ({ default: m.GuidePage })));
 const EmailCallbackPage       = lazy(() => import("@/pages/EmailCallbackPage").then((m) => ({ default: m.EmailCallbackPage })));
 const TelegramAuthCallbackPage = lazy(() => import("@/pages/TelegramAuthCallbackPage").then((m) => ({ default: m.TelegramAuthCallbackPage })));
 const LibraryPage       = lazy(() => import("@/pages/LibraryPage").then((m) => ({ default: m.LibraryPage })));
@@ -101,6 +102,7 @@ export default function App() {
           <Route path="/studio" element={<StudioPage />} />
           <Route path="/radio" element={<RadioPage />} />
           <Route path="/agent" element={<AgentPage />} />
+          <Route path="/guide" element={<GuidePage />} />
           <Route
             path="/library"
             element={

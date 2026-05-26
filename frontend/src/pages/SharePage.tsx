@@ -85,7 +85,7 @@ export function SharePage() {
     <div className="share-page">
       <header className="share-header">
         <a href="/studio" className="share-brand">
-          <img src="/riffa-logo.png" alt="RIFFA" className="share-brand__logo" />
+          <img src="/riffa-mark.svg" alt="RIFFA" className="share-brand__logo" />
           <strong className="brand-name">RIFFA<span className="brand-name__sub">Studio</span></strong>
         </a>
       </header>

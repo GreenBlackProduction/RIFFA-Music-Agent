@@ -15,7 +15,7 @@ export function MobileTopbar({ onMenuClick }: MobileTopbarProps) {
         ☰
       </button>
       <NavLink to="/studio" className="mobile-brand">
-        <img src="/riffa-logo.png" alt="" className="mobile-brand__logo" />
+        <img src="/riffa-mark.svg" alt="" className="mobile-brand__logo" />
         <strong className="brand-name">RIFFA<span className="brand-name__sub">Studio</span></strong>
       </NavLink>
     </div>

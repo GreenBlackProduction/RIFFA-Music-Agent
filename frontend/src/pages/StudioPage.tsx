@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 import { usePlayer } from "@/store/player";
 
 import { Panel } from "@/components/ui/Panel";
@@ -8,7 +9,6 @@ import { Chip } from "@/components/ui/Chip";
 import { Button } from "@/components/ui/Button";
 import { Coin } from "@/components/ui/Coin";
 import { AgentChat, type AgentResult } from "@/components/studio/AgentChat";
-import { LibraryCard } from "@/components/studio/LibraryCard";
 import { ModuleIcon } from "@/components/studio/ModuleIcon";
 import { VoiceRecorder } from "@/components/studio/VoiceRecorder";
 import {
@@ -30,6 +30,7 @@ import {
 import { SUNO_LIMITS } from "@/lib/sunoConstraints";
 import { blobToWav } from "@/lib/audio/recordToWav";
 import { useGenerationStore } from "@/store/generation";
+import { MUSIC_TYPES, useLibraryItems } from "@/lib/library";
 import "./StudioPage.css";
 
 type LyricsState = "idle" | "generating" | "review" | "approved";
@@ -625,6 +626,95 @@ function LyricsCustomBlock({
         )}
       </div>
     </label>
+  );
+}
+
+/* ── Color palette for track covers ─────────────────── */
+const TRACK_COLORS = ["c-emr", "c-hi", "c-ink", "c-paper", "c-blue", "c-rose"] as const;
+function colorFor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return TRACK_COLORS[h % TRACK_COLORS.length];
+}
+
+function RecentTracks() {
+  const { items, isLoading } = useLibraryItems();
+  const { playOrToggle, currentId, isPlaying } = usePlayer(
+    useShallow((s) => ({
+      playOrToggle: s.playOrToggle,
+      currentId: s.current?.id ?? null,
+      isPlaying: s.isPlaying,
+    })),
+  );
+  const recent = items.slice(0, 8);
+
+  if (isLoading) return <p className="tracks-empty">Загружаем…</p>;
+  if (!recent.length) return <p className="tracks-empty">Треков ещё нет — создай первый выше.</p>;
+
+  const queue = recent
+    .filter((i) => !!i.audioUrl)
+    .map((i) => ({
+      id: i.id,
+      title: i.title,
+      url: i.audioUrl,
+      cover: i.coverUrl ?? undefined,
+      meta: [i.genre, i.mood].filter(Boolean).join(" · "),
+      isOwn: true,
+      canRadio: MUSIC_TYPES.has(i.type),
+      isMusicType: MUSIC_TYPES.has(i.type),
+      isPublic: i.isPublic,
+    }));
+
+  return (
+    <div className="tracks">
+      {recent.map((item) => {
+        const isActive = item.id === currentId;
+        const color = colorFor(item.generationId);
+        const track = {
+          id: item.id,
+          title: item.title,
+          url: item.audioUrl,
+          cover: item.coverUrl ?? undefined,
+          meta: [item.genre, item.mood].filter(Boolean).join(" · "),
+          isOwn: true,
+          canRadio: MUSIC_TYPES.has(item.type),
+          isMusicType: MUSIC_TYPES.has(item.type),
+          isPublic: item.isPublic,
+        };
+        return (
+          <div
+            key={item.id}
+            className="track"
+            onClick={() => item.audioUrl && playOrToggle(track, queue)}
+          >
+            <div className={`track-cover ${color}`}>
+              {item.coverUrl && (
+                <img src={item.coverUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              )}
+              {item.duration && <span className="duration">{item.duration}</span>}
+              <button
+                type="button"
+                className="play"
+                aria-label={isActive && isPlaying ? "Пауза" : "Играть"}
+                onClick={(e) => { e.stopPropagation(); item.audioUrl && playOrToggle(track, queue); }}
+              >
+                {isActive && isPlaying ? "⏸" : "▶"}
+              </button>
+            </div>
+            <div className="track-meta">
+              <div className="track-num">{item.type.toUpperCase()}</div>
+              <div className="track-title">{item.title || "Без названия"}</div>
+              <div className="track-artist">
+                {[item.genre, item.mood].filter(Boolean).join(" · ") || "—"}
+              </div>
+              {item.isPublic && (
+                <div className="track-stats"><span className="live">в радио</span></div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1546,7 +1636,7 @@ export function StudioPage() {
       <div className="studio">
         <div className="top-meta">
           <div className="breadcrumb">
-            <span>raw</span><span>/</span><b>{t("studio.breadcrumb", { defaultValue: "студия" })}</b>
+            <b>{t("studio.breadcrumb", { defaultValue: "студия" })}</b>
           </div>
           <div>{t("studio.release", { defaultValue: "выпуск 2026.05 · v1.4" })}</div>
         </div>
@@ -1603,10 +1693,10 @@ export function StudioPage() {
         <div className="h-section">
           <div className="tag"><span className="num">02</span> · {t("studio.sectionRecent", { defaultValue: "недавнее" })}</div>
           <h2>{t("studio.sectionRecentTitle", { defaultValue: "последние треки" })}</h2>
-          <div className="right">{t("studio.sectionRecentRight", { defaultValue: "все →" })}</div>
+          <Link className="right" to="/library">{t("studio.sectionRecentRight", { defaultValue: "все →" })}</Link>
         </div>
 
-        <LibraryCard />
+        <RecentTracks />
       </div>
     );
   }
@@ -1616,7 +1706,6 @@ export function StudioPage() {
     <div className="studio">
       <div className="top-meta">
         <div className="breadcrumb">
-          <span>raw</span><span>/</span>
           <button type="button" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "var(--ink-3)" }} onClick={backToTiles}>
             {t("studio.breadcrumb", { defaultValue: "студия" })}
           </button>

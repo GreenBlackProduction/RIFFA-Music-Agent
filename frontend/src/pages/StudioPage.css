@@ -1071,9 +1071,9 @@
   flex: 1 1 auto;
   min-width: 220px;
   padding: 10px 14px;
-  border: 1px dashed var(--rule-strong);
-  background: var(--paper-3);
-  color: var(--ink-2);
+  border: 1px solid rgba(15, 93, 71, 0.45);
+  background: var(--emr-soft);
+  color: var(--emr);
   border-radius: var(--radius-md);
   font-size: 13px;
   text-align: left;
@@ -1081,19 +1081,17 @@
 }
 .cover-upload-btn:hover {
   border-color: var(--emr);
-  background: var(--emr-soft);
-  color: var(--emr);
+  background: rgba(15, 93, 71, 0.18);
 }
 
 .cover-upload-btn--record {
-  border-color: var(--rule-strong);
-  background: var(--paper-3);
-  color: var(--ink-2);
+  border: 1px solid rgba(255, 59, 31, 0.45);
+  background: var(--hi-soft);
+  color: var(--hi);
 }
 .cover-upload-btn--record:hover {
   border-color: var(--hi);
-  background: var(--hi-soft);
-  color: var(--hi);
+  background: rgba(255, 59, 31, 0.18);
 }
 .cover-upload-btn--loading {
   border-style: solid;
@@ -1168,7 +1166,9 @@
 }
 .model-card--active {
   border-color: var(--emr);
+  border-width: 2px;
   background: var(--emr-soft);
+  box-shadow: 0 0 0 2px rgba(15, 93, 71, 0.15);
 }
 
 .model-card__head {

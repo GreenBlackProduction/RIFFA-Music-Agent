@@ -646,8 +646,8 @@ a {
   background: transparent;
 }
 .filter-chip--active {
-  border-color: var(--ink);
-  background: var(--ink);
+  border-color: var(--emr);
+  background: var(--emr);
   color: var(--paper);
   font-weight: 500;
   box-shadow: none;
@@ -1059,10 +1059,10 @@ a {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--ink-3);
-  cursor: pointer;
   white-space: nowrap;
 }
-.h-section .right:hover { color: var(--ink); }
+.h-section a.right:hover,
+.h-section button.right:hover { color: var(--ink); }
 
 /* ── Module tiles (Studio) ── */
 .modules {
@@ -1092,8 +1092,8 @@ a {
   color: var(--ink);
 }
 .module:hover { background: var(--paper-4); }
-.module.is-main { background: var(--ink); color: var(--paper); }
-.module.is-main:hover { background: var(--ink); }
+.module.is-main { background: none; }
+.module.is-main:hover { background: var(--paper-4); }
 .module.is-soon { opacity: 0.7; cursor: default; }
 .module-head {
   display: flex;
@@ -1103,19 +1103,14 @@ a {
 .module-icon {
   width: 38px;
   height: 38px;
-  border-radius: 10px;
-  border: 1px solid var(--ink);
-  background: var(--paper);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink);
+  color: var(--ink-3);
   flex-shrink: 0;
 }
 .module.is-main .module-icon {
-  background: var(--hi);
-  color: var(--paper);
-  border-color: var(--hi);
+  color: var(--hi);
 }
 .module-badge {
   font-family: var(--font-mono);
@@ -1147,7 +1142,7 @@ a {
   line-height: 1.45;
   margin: 0;
 }
-.module.is-main p { color: rgba(233,229,218,0.75); }
+.module.is-main p { color: var(--ink-2); }
 .module-cost {
   margin-top: auto;
   padding-top: 10px;
@@ -1160,9 +1155,7 @@ a {
   letter-spacing: 0.08em;
   color: var(--ink-3);
 }
-.module.is-main .module-cost { border-top-color: rgba(255,255,255,0.18); color: rgba(233,229,218,0.5); }
 .module-cost .price { color: var(--ink); font-weight: 600; }
-.module.is-main .module-cost .price { color: var(--hi); }
 
 /* ── Track tiles ── */
 .tracks {
