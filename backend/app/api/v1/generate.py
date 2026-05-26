@@ -62,8 +62,6 @@ class SongRequest(BaseModel):
     agent_prompt: str = Field(default="", max_length=5000)
     agent_music_params: dict[str, object] = Field(default_factory=dict)
     agent_research_notes: str = Field(default="", max_length=2000)
-    agent_music_params: dict[str, object] = Field(default_factory=dict)
-    agent_research_notes: str = Field(default="", max_length=2000)
     # User-facing track name. Suno V5.5 limit (`title`) is 80 chars.
     track_name: str = Field(default="", max_length=80)
     idempotency_key: str = Field(default="", max_length=64)
