@@ -129,6 +129,7 @@
 
 .nav-item--active:hover {
   background: var(--ink);
+  color: var(--paper);
 }
 
 .nav-item--signout { color: var(--ink-3); }

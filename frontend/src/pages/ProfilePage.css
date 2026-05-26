@@ -195,34 +195,49 @@
   letter-spacing: 0.04em;
 }
 
-/* ── Inline gen stats (in profile-grid right col) ── */
+/* ── Inline gen stats (compact pills) ── */
 .inline-gen-stats {
-  margin-top: 20px;
+  margin-top: 14px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 6px;
 }
 
 .inline-gen-stats__row {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.inline-gen-stats__bar {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
 }
 
 .gen-stats-label {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--ink-3);
+  color: var(--ink-4);
   font-weight: 500;
-  margin-bottom: 2px;
+  margin-right: 2px;
+  flex-shrink: 0;
+}
+
+.gen-stats-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  padding: 2px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper-2);
+  white-space: nowrap;
+}
+.gen-stats-pill strong {
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 10px;
 }
 
 /* ── Doc list ── */
@@ -1199,6 +1214,43 @@
 /* Docs компактнее — чтобы визуально был меньше Referral */
 .profile-card--docs {
   padding: var(--space-4);
+}
+
+/* ── Referral + Documents side-by-side grid ── */
+.referral-docs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+  margin-top: 36px;
+}
+.referral-docs-grid .h-section {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+@media (max-width: 800px) {
+  .referral-docs-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Pricing grid mobile ── */
+@media (max-width: 640px) {
+  .pricing { grid-template-columns: repeat(2, 1fr); }
+  .price-tile { padding: 18px 14px; }
+  .price-tile .price { font-size: 36px; }
+
+  /* pay method buttons */
+  .pay-method-row { flex-direction: column; }
+  .pay-method-btn { flex: none; width: 100%; }
+
+  /* profile-grid: уже 1fr на 860px, но поля на мобиле */
+  .avatar-block { padding: 20px; }
+
+  /* referral link текст */
+  .referral-link-text {
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 /* .generation-item → переименован в .file-item (стили в global.css) */

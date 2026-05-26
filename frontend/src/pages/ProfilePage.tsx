@@ -463,48 +463,30 @@ export function ProfilePage() {
           {totalGens > 0 && (
             <div className="inline-gen-stats">
               <div className="inline-gen-stats__row">
-                <div className="gen-stats-label">{isEN ? "by type" : "по типу"}</div>
+                <span className="gen-stats-label">{isEN ? "by type" : "по типу"}</span>
                 {genStats.map((s) => (
-                  <div key={s.type} className="inline-gen-stats__bar">
-                    <div className="stat-bar__head">
-                      <span>{s.label}</span>
-                      <strong>{s.count}</strong>
-                    </div>
-                    <div className="stat-bar__track">
-                      <div className="stat-bar__fill" style={{ width: `${Math.round((s.count / totalGens) * 100)}%` }} />
-                    </div>
-                  </div>
+                  <span key={s.type} className="gen-stats-pill">
+                    {s.label}&nbsp;<strong>{s.count}</strong>
+                  </span>
                 ))}
               </div>
               {topGenres.length > 0 && (
                 <div className="inline-gen-stats__row">
-                  <div className="gen-stats-label">{isEN ? "top genres" : "топ жанров"}</div>
-                  {topGenres.map(([genre, count]) => (
-                    <div key={genre} className="inline-gen-stats__bar">
-                      <div className="stat-bar__head">
-                        <span>{genre}</span>
-                        <strong>{count}</strong>
-                      </div>
-                      <div className="stat-bar__track">
-                        <div className="stat-bar__fill" style={{ width: `${Math.round((count / (topGenres[0]?.[1] ?? 1)) * 100)}%` }} />
-                      </div>
-                    </div>
+                  <span className="gen-stats-label">{isEN ? "genres" : "жанры"}</span>
+                  {topGenres.slice(0, 4).map(([genre, count]) => (
+                    <span key={genre} className="gen-stats-pill">
+                      {genre}&nbsp;<strong>{count}</strong>
+                    </span>
                   ))}
                 </div>
               )}
               {topMoods.length > 0 && (
                 <div className="inline-gen-stats__row">
-                  <div className="gen-stats-label">{isEN ? "top moods" : "топ настроений"}</div>
-                  {topMoods.map(([mood, count]) => (
-                    <div key={mood} className="inline-gen-stats__bar">
-                      <div className="stat-bar__head">
-                        <span>{mood}</span>
-                        <strong>{count}</strong>
-                      </div>
-                      <div className="stat-bar__track">
-                        <div className="stat-bar__fill" style={{ width: `${Math.round((count / (topMoods[0]?.[1] ?? 1)) * 100)}%` }} />
-                      </div>
-                    </div>
+                  <span className="gen-stats-label">{isEN ? "moods" : "настроения"}</span>
+                  {topMoods.slice(0, 4).map(([mood, count]) => (
+                    <span key={mood} className="gen-stats-pill">
+                      {mood}&nbsp;<strong>{count}</strong>
+                    </span>
                   ))}
                 </div>
               )}
@@ -542,7 +524,7 @@ export function ProfilePage() {
               </ul>
               <button
                 type="button"
-                className={`btn ${isFeatured ? "btn-primary" : "btn-ghost"} btn-block`}
+                className="btn btn-emr btn-block"
                 onClick={(e) => { e.stopPropagation(); setSelectedPack(p.id); handleBuyPack(); }}
                 disabled={payStatus === "loading"}
               >
@@ -598,60 +580,54 @@ export function ProfilePage() {
         </p>
       )}
 
-      {/* ── 03 · реферальная программа ── */}
-      <div className="h-section">
-        <div className="tag"><span className="num">03</span> · {isEN ? "referral" : "реферальная программа"}</div>
-        <h2>{isEN ? "invite friends" : "приглашай друзей"}</h2>
-        <div className="right">{isEN ? "10 tok you + 4 tok friend" : "10 токенов тебе + 4 другу"}</div>
-      </div>
-
-      <div className="p-panel">
-        <div className="stats" style={{ border: "none", background: "transparent" }}>
-          <div className="stat" style={{ background: "var(--paper-3)" }}>
-            <div className="label">{isEN ? "invited" : "приглашено"}</div>
-            <div className="val">0<small>{isEN ? "fr." : "др."}</small></div>
+      <div className="referral-docs-grid">
+        {/* ── 03 · реферальная программа ── */}
+        <div>
+          <div className="h-section">
+            <div className="tag"><span className="num">03</span> · {isEN ? "referral" : "реф. программа"}</div>
+            <h2>{isEN ? "invite friends" : "приглашай друзей"}</h2>
           </div>
-          <div className="stat" style={{ background: "var(--paper-3)" }}>
-            <div className="label">{isEN ? "bonus tokens" : "бонусных на баланс"}</div>
-            <div className="val">0<Coin size={13} style={{ marginLeft: 2 }} /></div>
-          </div>
-          <div className="stat" style={{ background: "var(--paper-3)" }}>
-            <div className="label">{isEN ? "from refs" : "от оплат рефералов"}</div>
-            <div className="val">0<Coin size={13} style={{ marginLeft: 2 }} /></div>
-          </div>
-          <div className="stat" style={{ background: "var(--paper-3)" }}>
-            <div className="label">{isEN ? "total earned" : "всего заработано"}</div>
-            <div className="val">0<Coin size={13} style={{ marginLeft: 2 }} /></div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 20, alignItems: "center" }}>
-          <div style={{ flex: 1, padding: "12px 16px", background: "var(--paper)", border: "1px solid var(--rule)", borderRadius: 999, fontFamily: "var(--font-mono)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {referralLink}
-          </div>
-          <button type="button" className="btn btn-ink" onClick={copyReferral}>
-            {copied ? t("common.copied") : (isEN ? "copy →" : "скопировать →")}
-          </button>
-        </div>
-      </div>
-
-      {/* ── 04 · документы ── */}
-      <div className="h-section">
-        <div className="tag"><span className="num">04</span> · {isEN ? "documents" : "документы"}</div>
-        <h2>{isEN ? "legal information" : "правовая информация"}</h2>
-        <div className="right">{isEN ? "for reference" : "для справки"}</div>
-      </div>
-
-      <div className="doc-list">
-        {localLegalDocs.map((d) => (
-          <a key={d.id} href={d.href} className="doc-row" target="_blank" rel="noopener noreferrer">
-            <div className="icon">📄</div>
-            <div>
-              <div className="title">{d.title}</div>
-              <div className="hint">{d.hint}</div>
+          <div className="p-panel">
+            <div className="stats" style={{ border: "none", background: "transparent", marginBottom: 16 }}>
+              <div className="stat" style={{ background: "var(--paper-3)" }}>
+                <div className="label">{isEN ? "invited" : "приглашено"}</div>
+                <div className="val">0<small>{isEN ? "fr." : "др."}</small></div>
+              </div>
+              <div className="stat" style={{ background: "var(--paper-3)" }}>
+                <div className="label">{isEN ? "bonus tokens" : "бонусных токенов"}</div>
+                <div className="val">0<Coin size={13} style={{ marginLeft: 2 }} /></div>
+              </div>
             </div>
-            <span className="chevron">→</span>
-          </a>
-        ))}
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <div style={{ flex: 1, minWidth: 0, padding: "10px 14px", background: "var(--paper)", border: "1px solid var(--rule)", borderRadius: 999, fontFamily: "var(--font-mono)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {referralLink}
+              </div>
+              <button type="button" className="btn btn-ink btn-sm" onClick={copyReferral}>
+                {copied ? t("common.copied") : (isEN ? "copy →" : "скопировать →")}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── 04 · документы ── */}
+        <div>
+          <div className="h-section">
+            <div className="tag"><span className="num">04</span> · {isEN ? "documents" : "документы"}</div>
+            <h2>{isEN ? "legal" : "правовая информация"}</h2>
+          </div>
+          <div className="doc-list">
+            {localLegalDocs.map((d) => (
+              <a key={d.id} href={d.href} className="doc-row" target="_blank" rel="noopener noreferrer">
+                <div className="icon">📄</div>
+                <div>
+                  <div className="title">{d.title}</div>
+                  <div className="hint">{d.hint}</div>
+                </div>
+                <span className="chevron">→</span>
+              </a>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Trash modal */}

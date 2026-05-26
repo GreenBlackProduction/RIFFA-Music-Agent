@@ -277,17 +277,17 @@
 .agent-suggestion-chip {
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--rule);
-  background: var(--paper);
-  color: var(--ink);
+  border: 1px solid rgba(15, 93, 71, 0.4);
+  background: var(--emr-soft);
+  color: var(--emr);
   font-size: 13px;
   cursor: pointer;
   transition: border-color 120ms, background 120ms;
   white-space: nowrap;
 }
 .agent-suggestion-chip:hover {
-  border-color: var(--ink);
-  background: var(--paper-4);
+  border-color: var(--emr);
+  background: rgba(15, 93, 71, 0.18);
 }
 .agent-suggestion-chip:active { transform: scale(0.97); }
 
