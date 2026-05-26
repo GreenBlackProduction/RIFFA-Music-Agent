@@ -38,18 +38,19 @@
   border-color: var(--emr);
 }
 
-/* Custom option chip */
+/* Custom option chip — emerald accent (always highlighted) */
 .chip--custom:not(.chip--active) {
   border-style: dashed;
-  border-color: var(--rule-strong);
-  color: var(--ink-2);
-  background: transparent;
+  border-color: var(--emr);
+  color: var(--emr);
+  background: var(--emr-soft);
+  font-weight: 600;
 }
 
 .chip--custom:not(.chip--active):hover {
-  border-color: var(--ink);
-  color: var(--ink);
-  background: var(--paper-2);
+  border-color: var(--emr);
+  color: var(--paper);
+  background: var(--emr);
 }
 
 .chip--muted {

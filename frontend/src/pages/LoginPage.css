@@ -38,16 +38,16 @@
 
 .login-topbar__brand .brand-name {
   font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.02em;
   color: var(--ink);
 }
 
 .login-topbar__brand .brand-name__sub {
   font-family: var(--font-mono);
   font-weight: 500;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--ink-3);
   text-transform: lowercase;
@@ -100,15 +100,70 @@
 }
 
 .login-hero__wordmark {
-  display: flex;
-  align-items: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
   margin-bottom: 4px;
-  filter: invert(1) hue-rotate(180deg);
 }
 
-.login-hero__wordmark svg text {
-  fill: var(--paper);
+.login-hero__brand {
+  font-family: var(--font-display, var(--font-body));
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: var(--paper);
+  line-height: 1;
 }
+.login-hero__brand span {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 16px;
+  color: rgba(233, 229, 218, 0.55);
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  margin-left: 6px;
+  vertical-align: 4px;
+}
+
+/* Language switch — brand pill */
+.login-lang {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--paper-3);
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+}
+.login-lang__btn {
+  padding: 7px 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+  line-height: 1;
+}
+.login-lang__btn:hover { color: var(--ink); }
+.login-lang__btn--on-emr {
+  background: var(--emr);
+  color: var(--paper);
+}
+.login-lang__btn--on-hi {
+  background: var(--hi);
+  color: var(--paper);
+}
+
+/* Black telegram/email icons inside the login block heads */
+.login-block__icon {
+  color: var(--ink);
+}
+.login-block__icon svg { display: block; }
 
 /* ── Layout grid (hero + card) ────────────────────────── */
 
@@ -608,26 +663,28 @@
 }
 .tg-widget-host iframe { border-radius: 8px; max-width: 100%; }
 
-/* Primary Telegram login button */
+/* Primary Telegram login button — accent green */
 .tg-login-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   width: 100%;
-  padding: 13px 20px;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  border: 1px solid var(--rule-strong);
-  color: var(--ink);
+  padding: 14px 20px;
+  border-radius: 999px;
+  background: var(--emr);
+  border: 1px solid var(--emr);
+  color: var(--paper);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   cursor: pointer;
   transition: background 120ms, border-color 120ms, transform 100ms;
 }
+.tg-login-btn svg { color: var(--paper); }
 .tg-login-btn:hover:not(:disabled) {
-  background: var(--paper-2);
-  border-color: var(--ink);
+  background: var(--emr-2, #0f7656);
+  border-color: var(--emr-2, #0f7656);
   transform: translateY(-1px);
 }
 .tg-login-btn:active:not(:disabled) { transform: none; }

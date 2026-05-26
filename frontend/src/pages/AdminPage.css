@@ -55,7 +55,7 @@
 .admin-panel {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--paper-3);
   padding: var(--space-5);
   display: grid;
   gap: 12px;
@@ -136,7 +136,7 @@
 }
 
 .admin-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--paper-3);
 }
 
 .admin-table__id { color: var(--muted); font-variant-numeric: tabular-nums; width: 40px; }
@@ -159,11 +159,11 @@
   letter-spacing: 0.03em;
 }
 
-.admin-pill--ok    { background: var(--hi-soft); color: #c5ff7c; }
-.admin-pill--admin { background: rgba(15, 93, 71, 0.16); color: #f1a8ff; }
-.admin-pill--warn  { background: rgba(255, 200, 60, 0.18); color: #ffd676; }
-.admin-pill--ban   { background: rgba(255, 80, 80, 0.18); color: #ff9b9b; }
-.admin-pill--off   { background: var(--paper-2); color: var(--muted); }
+.admin-pill--ok    { background: var(--emr-soft); color: var(--emr); }
+.admin-pill--admin { background: var(--hi-soft); color: var(--hi); }
+.admin-pill--warn  { background: rgba(200, 149, 58, 0.18); color: #8a6720; }
+.admin-pill--ban   { background: rgba(255, 80, 80, 0.18); color: #b22020; }
+.admin-pill--off   { background: var(--paper-2); color: var(--ink-3); }
 
 /* ─── Buttons ─────────────────────────────────────────────────────────── */
 
@@ -213,7 +213,7 @@
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   background: rgba(255, 80, 80, 0.14);
-  color: #ffb6b6;
+  color: #b22020;
   font-size: 12px;
 }
 
@@ -236,8 +236,9 @@
 .admin-drawer {
   width: min(640px, 100%);
   height: 100dvh;
-  background: rgba(14, 14, 22, 0.96);
-  border-left: 1px solid var(--border);
+  background: var(--paper);
+  color: var(--ink);
+  border-left: 1px solid var(--ink);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -290,7 +291,7 @@
   padding: var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--paper-3);
 }
 
 .admin-card h4 {
@@ -363,8 +364,8 @@
   margin-top: 10px;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  background: rgba(255, 200, 60, 0.10);
-  color: #f5d98a;
+  background: rgba(200, 149, 58, 0.14);
+  color: #8a6720;
   font-size: 12px;
 }
 

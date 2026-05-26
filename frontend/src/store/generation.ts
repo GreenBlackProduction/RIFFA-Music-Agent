@@ -54,6 +54,8 @@ export interface ActiveGeneration {
 
 interface GenerationStore {
   active: Record<string, ActiveGeneration>;
+  /** Dismissed generation ids — чтобы sync с сервера не возвращал их в сайдбар. */
+  dismissed: string[];
   /** Start tracking a new generation and open its WebSocket. */
   track: (id: string, wsUrl: string, type: string, title: string) => void;
   /** Remove a completed/failed generation from active state. */
@@ -138,6 +140,7 @@ export const useGenerationStore = create<GenerationStore>()(
   persist(
     (set, get) => ({
       active: {},
+      dismissed: [],
 
       track(id, wsUrl, type, title) {
         const gen: ActiveGeneration = {
@@ -162,7 +165,9 @@ export const useGenerationStore = create<GenerationStore>()(
         set((s) => {
           const next = { ...s.active };
           delete next[id];
-          return { active: next };
+          // Запоминаем последние ~50 dismissed id, чтобы sync с сервера их не возвращал.
+          const dismissed = [id, ...s.dismissed.filter((d) => d !== id)].slice(0, 50);
+          return { active: next, dismissed };
         });
       },
 
@@ -184,9 +189,11 @@ export const useGenerationStore = create<GenerationStore>()(
       async syncFromServer() {
         try {
           const list = await fetchActiveGenerations();
+          const dismissedSet = new Set(get().dismissed);
           for (const item of list) {
             const existing = get().active[item.id];
             if (existing) continue;
+            if (dismissedSet.has(item.id)) continue;
             const gen: ActiveGeneration = {
               id: item.id,
               wsUrl: "",
@@ -226,6 +233,7 @@ export const useGenerationStore = create<GenerationStore>()(
         active: Object.fromEntries(
           Object.entries(state.active).map(([id, gen]) => [id, { ...gen, ws: null }]),
         ),
+        dismissed: state.dismissed,
       }) as GenerationStore,
     },
   ),

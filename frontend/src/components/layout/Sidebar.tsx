@@ -166,7 +166,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         ) : (
           <NavLink
             to="/login"
-            className={({ isActive }) => `nav-item${isActive ? " nav-item--active" : ""}`}
+            className={({ isActive }) => `nav-item nav-item--signin${isActive ? " nav-item--active" : ""}`}
             onClick={onClose}
           >
             <span className="nav-icon" style={{ transform: "scaleX(-1)" }}><IconSignOut /></span>

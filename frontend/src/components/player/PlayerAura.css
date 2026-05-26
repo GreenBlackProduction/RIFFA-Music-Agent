@@ -6,13 +6,14 @@
   border-radius: inherit;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.82;
-  mix-blend-mode: screen;
+  opacity: 0.55;
+  /* mix-blend-mode убран — не выходит свечение за пределы плеера */
+  overflow: hidden;
   transition: opacity 420ms ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .player-aura {
-    opacity: 0.45;
+    opacity: 0.3;
   }
 }

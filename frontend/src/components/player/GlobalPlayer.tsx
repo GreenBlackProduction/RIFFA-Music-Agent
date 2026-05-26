@@ -635,19 +635,31 @@ export function GlobalPlayer() {
         )}
       </button>
 
-      {/* CENTER: controls + progress */}
+      {/* CENTER: controls + progress — play в геометрическом центре */}
       <div className="gp-center">
         <div className="gp-ctrl-row">
-          <button
-            type="button"
-            className="gp-ctrl"
-            onClick={prev}
-            disabled={!hasQueue}
-            aria-label={t("globalPlayer.prevAria")}
-            title={t("globalPlayer.prev")}
-          >
-            <IconPrev />
-          </button>
+          <div className="gp-ctrl-side gp-ctrl-side--left">
+            <button
+              type="button"
+              className={`gp-ctrl gp-ctrl--shuffle${shuffle ? " gp-ctrl--active" : ""}`}
+              onClick={() => setShuffle(!shuffle)}
+              aria-label={t("globalPlayer.shuffleAria")}
+              aria-pressed={shuffle}
+              title="Shuffle"
+            >
+              <IconShuffle />
+            </button>
+            <button
+              type="button"
+              className="gp-ctrl"
+              onClick={prev}
+              disabled={!hasQueue}
+              aria-label={t("globalPlayer.prevAria")}
+              title={t("globalPlayer.prev")}
+            >
+              <IconPrev />
+            </button>
+          </div>
           <button
             type="button"
             className="gp-ctrl gp-ctrl--play"
@@ -656,26 +668,20 @@ export function GlobalPlayer() {
           >
             {isPlaying ? <IconPause /> : <IconPlay />}
           </button>
-          <button
-            type="button"
-            className="gp-ctrl"
-            onClick={next}
-            disabled={!hasQueue}
-            aria-label={t("globalPlayer.nextAria")}
-            title={t("globalPlayer.next")}
-          >
-            <IconNext />
-          </button>
-          <button
-            type="button"
-            className={`gp-ctrl gp-ctrl--shuffle${shuffle ? " gp-ctrl--active" : ""}`}
-            onClick={() => setShuffle(!shuffle)}
-            aria-label={t("globalPlayer.shuffleAria")}
-            aria-pressed={shuffle}
-            title="Shuffle"
-          >
-            <IconShuffle />
-          </button>
+          <div className="gp-ctrl-side gp-ctrl-side--right">
+            <button
+              type="button"
+              className="gp-ctrl"
+              onClick={next}
+              disabled={!hasQueue}
+              aria-label={t("globalPlayer.nextAria")}
+              title={t("globalPlayer.next")}
+            >
+              <IconNext />
+            </button>
+            {/* Зеркальный пустой слот — чтобы play оставался строго в центре */}
+            <span className="gp-ctrl-spacer" aria-hidden />
+          </div>
         </div>
 
         <div
@@ -704,20 +710,9 @@ export function GlobalPlayer() {
           })}
         </div>
 
-        <div className="gp-bottom">
-          <span className="gp-time">
-            {fmt(progress)} / {fmt(duration)}
-          </span>
-          {currentSource && (
-            <span className="gp-source">
-              <span className="gp-source__dot" aria-hidden />
-              {currentSource === "library" ? t("globalPlayer.sourceLibrary", { defaultValue: "из библиотеки" })
-               : currentSource === "radio"   ? t("globalPlayer.sourceRadio",   { defaultValue: "из радио" })
-               : currentSource === "studio"  ? t("globalPlayer.sourceStudio",  { defaultValue: "из студии" })
-               : t("globalPlayer.sourceShare", { defaultValue: "по ссылке" })}
-            </span>
-          )}
-        </div>
+        <span className="gp-time">
+          {fmt(progress)} / {fmt(duration)}
+        </span>
       </div>
 
       {/* RIGHT: actions — flat single row */}
@@ -807,6 +802,17 @@ export function GlobalPlayer() {
           ×
         </button>
       </div>
+
+      {/* Source badge — закреплён в правом-нижнем углу плеера */}
+      {currentSource && (
+        <span className="gp-source">
+          <span className="gp-source__dot" aria-hidden />
+          {currentSource === "library" ? t("globalPlayer.sourceLibrary", { defaultValue: "из библиотеки" })
+           : currentSource === "radio"   ? t("globalPlayer.sourceRadio",   { defaultValue: "из радио" })
+           : currentSource === "studio"  ? t("globalPlayer.sourceStudio",  { defaultValue: "из студии" })
+           : t("globalPlayer.sourceShare", { defaultValue: "по ссылке" })}
+        </span>
+      )}
 
       {/*
         Аудио играет напрямую через HTML5 — без Web Audio API. Это даёт

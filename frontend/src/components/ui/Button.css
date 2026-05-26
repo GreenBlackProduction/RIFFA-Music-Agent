@@ -58,3 +58,21 @@
   background: var(--ink);
   color: var(--paper);
 }
+
+/* Emerald accent (login, sign-in, positive primary actions) */
+.btn--emr {
+  color: var(--paper);
+  background: var(--emr);
+  border-color: var(--emr);
+}
+.btn--emr:not(:disabled):hover {
+  background: var(--emr-2, #0f7656);
+  border-color: var(--emr-2, #0f7656);
+}
+
+/* Big size — used on login/register submit so they feel acted-upon */
+.btn--big {
+  padding: 14px 24px;
+  font-size: 14px;
+  font-weight: 700;
+}

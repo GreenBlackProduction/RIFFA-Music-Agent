@@ -132,8 +132,29 @@
   color: var(--paper);
 }
 
-.nav-item--signout { color: var(--ink-3); }
-.nav-item--signout:hover { color: var(--hi); background: var(--paper-2); }
+/* Sign out — orange accent (always visible cue) */
+.nav-item--signout {
+  color: var(--hi);
+  font-weight: 600;
+}
+.nav-item--signout .nav-icon { color: var(--hi); }
+.nav-item--signout:hover {
+  color: var(--paper);
+  background: var(--hi);
+}
+.nav-item--signout:hover .nav-icon { color: var(--paper); }
+
+/* Sign in — emerald accent */
+.nav-item--signin {
+  color: var(--emr);
+  font-weight: 600;
+}
+.nav-item--signin .nav-icon { color: var(--emr); }
+.nav-item--signin:hover {
+  color: var(--paper);
+  background: var(--emr);
+}
+.nav-item--signin:hover .nav-icon { color: var(--paper); }
 
 .nav-icon {
   width: 22px;
@@ -142,7 +163,10 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: var(--ink);
 }
+/* SVG-иконки используют currentColor, поэтому окрашиваются через .nav-icon */
+.nav-item--active .nav-icon { color: var(--paper); }
 
 .nav-label { flex: 1; min-width: 0; }
 

@@ -3,7 +3,6 @@ import { Navigate, useLocation, useNavigate, useSearchParams } from "react-route
 
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
-import { RiffaMark } from "@/components/brand/RiffaMark";
 import {
   loginWithEmail,
   loginWithTelegramInitData,
@@ -233,7 +232,7 @@ export function LoginPage() {
     <div className="login-page">
       <header className="login-topbar">
         <div className="login-topbar__brand">
-          <RiffaMark size={22} />
+          <PlayMark size={28} />
           <strong className="brand-name">RIFFA</strong>
           <span className="brand-name__sub">studio</span>
         </div>
@@ -244,11 +243,8 @@ export function LoginPage() {
         <section className="login-hero">
           <div className="login-hero__inner">
             <div className="login-hero__wordmark" aria-hidden="true">
-              <img
-                src="/brand/03-lockup/riffa-lockup-horizontal-on-dark.svg"
-                alt="RIFFA Studio"
-                style={{ height: 52, width: "auto" }}
-              />
+              <PlayMark size={64} />
+              <strong className="login-hero__brand">RIFFA <span>studio</span></strong>
             </div>
             <h1>{t.hero.title}</h1>
             <p className="login-hero__lead">{t.hero_lead}</p>
@@ -418,7 +414,7 @@ export function LoginPage() {
                   onChange={(e) => setPasswordValue(e.target.value)}
                   disabled={emailStatus === "sending"}
                 />
-                <Button type="submit" disabled={emailStatus === "sending"}>
+                <Button type="submit" disabled={emailStatus === "sending"} className="btn--emr btn--big">
                   {emailStatus === "sending" ? t.email.loginSubmitting : t.email.loginSubmit}
                 </Button>
               </form>
@@ -477,7 +473,7 @@ export function LoginPage() {
                   onChange={(e) => setConfirmValue(e.target.value)}
                   disabled={emailStatus === "sending"}
                 />
-                <Button type="submit" disabled={emailStatus === "sending"}>
+                <Button type="submit" disabled={emailStatus === "sending"} className="btn--emr btn--big">
                   {emailStatus === "sending" ? t.email.registerSubmitting : t.email.registerSubmit}
                 </Button>
               </form>
@@ -527,19 +523,21 @@ export function LoginPage() {
   );
 }
 
+/** Большой оранжевый play-треугольник, фирменный знак RIFFA. */
+function PlayMark({ size = 32 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" style={{ display: "block", flexShrink: 0 }}>
+      <polygon points="6,3.5 6,20.5 20,12" fill="var(--hi)" />
+    </svg>
+  );
+}
+
 function TelegramIcon() {
   return (
-    <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true">
-      <defs>
-        <linearGradient id="tg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#7cff1f" />
-          <stop offset="100%" stopColor="#0F5D47" />
-        </linearGradient>
-      </defs>
-      <circle cx="16" cy="16" r="14" fill="url(#tg-grad)" opacity="0.16" />
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
       <path
-        d="M7.4 15.3 L23.7 8.6 C24.5 8.3 25.2 8.8 24.9 10 L22.2 22.5 C22 23.4 21.4 23.6 20.7 23.2 L17 20.5 L15.2 22.2 C15 22.4 14.8 22.6 14.4 22.6 L14.7 18.8 L21.7 12.4 C22 12.1 21.7 12 21.2 12.2 L12.6 17.6 L9 16.5 C8.2 16.2 8.2 15.7 9 15.4 Z"
-        fill="#7cff1f"
+        d="M21.4 3.1 L2.6 10.3 C1.4 10.7 1.4 11.5 2.4 11.8 L7.2 13.3 L18.2 6.4 C18.7 6.1 19.2 6.3 18.8 6.6 L9.9 14.6 L9.9 17.6 C10.4 17.6 10.6 17.4 10.8 17.2 L13.2 14.9 L18.1 18.6 C19 19.1 19.6 18.8 19.8 17.8 L22.5 4.9 C22.8 3.6 22 3 21.4 3.1 Z"
+        fill="currentColor"
       />
     </svg>
   );
@@ -547,15 +545,9 @@ function TelegramIcon() {
 
 function EnvelopeIcon() {
   return (
-    <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true">
-      <defs>
-        <linearGradient id="env-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#ff5a00" />
-          <stop offset="100%" stopColor="#0F5D47" />
-        </linearGradient>
-      </defs>
-      <rect x="4" y="8" width="24" height="16" rx="3" fill="rgba(246,244,255,0.06)" stroke="rgba(246,244,255,0.4)" strokeWidth="1.5" />
-      <path d="M5 10 L16 18 L27 10" stroke="url(#env-grad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 7 l9 7 l9 -7" />
     </svg>
   );
 }
@@ -576,18 +568,21 @@ function LoginLangSwitch() {
   const current = (i18n.resolvedLanguage || i18n.language || "ru").startsWith("en") ? "en" : "ru";
   const set = (l: "ru" | "en") => { if (l !== current) void i18n.changeLanguage(l); };
   return (
-    <div style={{ display: "inline-flex", gap: 4, background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)", borderRadius: 999, padding: 2 }}>
-      <button type="button" onClick={() => set("ru")}
-        style={{ padding: "4px 10px", fontSize: 11, fontWeight: 600, borderRadius: 999,
-                 border: "none", cursor: "pointer",
-                 background: current === "ru" ? "rgba(124,255,31,0.16)" : "transparent",
-                 color: current === "ru" ? "#cfff9a" : "#9b95b6" }}>RU</button>
-      <button type="button" onClick={() => set("en")}
-        style={{ padding: "4px 10px", fontSize: 11, fontWeight: 600, borderRadius: 999,
-                 border: "none", cursor: "pointer",
-                 background: current === "en" ? "rgba(124,255,31,0.16)" : "transparent",
-                 color: current === "en" ? "#cfff9a" : "#9b95b6" }}>EN</button>
+    <div className="login-lang">
+      <button
+        type="button"
+        onClick={() => set("ru")}
+        className={`login-lang__btn${current === "ru" ? " login-lang__btn--on-emr" : ""}`}
+      >
+        RU
+      </button>
+      <button
+        type="button"
+        onClick={() => set("en")}
+        className={`login-lang__btn${current === "en" ? " login-lang__btn--on-hi" : ""}`}
+      >
+        EN
+      </button>
     </div>
   );
 }
