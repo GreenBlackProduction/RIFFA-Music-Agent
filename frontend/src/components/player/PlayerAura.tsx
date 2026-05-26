@@ -107,12 +107,21 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
         reactiveModeRef.current = true;
       };
 
-      if (ctx.state === "running") {
+      const connectAndWatch = () => {
         connect();
+        // Если браузер суспендит контекст mid-play (фоновая вкладка, экран выключен) —
+        // автоматически возобновляем, иначе звук пропадёт (audio захвачен графом).
+        ctx.addEventListener("statechange", () => {
+          if (ctx.state === "suspended") void ctx.resume();
+        });
+      };
+
+      if (ctx.state === "running") {
+        connectAndWatch();
       } else {
         ctx.resume().then(() => {
           if (ctx.state === "running") {
-            connect();
+            connectAndWatch();
           } else {
             ctx.close();
           }

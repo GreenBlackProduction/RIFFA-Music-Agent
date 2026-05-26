@@ -567,10 +567,10 @@
   gap: var(--space-5);
 }
 
-/* AgentChat внутри builder имеет min-height чтобы grid 1fr не схлопнулся */
+/* AgentChat внутри builder — фиксированная высота, не растягивается */
 .builder-panel .agent-chat {
-  min-height: 420px;
-  height: auto;
+  height: 360px;
+  max-height: 360px;
 }
 
 .builder-head {
@@ -678,12 +678,20 @@
   text-transform: uppercase;
 }
 
+.agent-cta__question {
+  font-family: var(--font-body);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
 .agent-cta__title {
   font-family: var(--font-body);
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--ink);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--ink-2);
 }
 
 .agent-cta__text {
@@ -714,8 +722,12 @@
     border-radius: var(--radius-lg);
   }
 
+  .agent-cta__question {
+    font-size: 20px;
+  }
+
   .agent-cta__title {
-    font-size: 18px;
+    font-size: 13px;
   }
 
   .agent-cta__text {

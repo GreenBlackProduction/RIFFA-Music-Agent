@@ -1725,6 +1725,7 @@ export function StudioPage() {
             <div className="agent-cta__glow" aria-hidden="true" />
             <div className="agent-cta__body">
               <span className="agent-cta__badge">{t("studio.agentCta.badge")}</span>
+              <strong className="agent-cta__question">{t("studio.agentCta.question")}</strong>
               <strong className="agent-cta__title">{t("studio.agentCta.title")}</strong>
               <p className="agent-cta__text">{t("studio.agentCta.text")}</p>
               {state.agentPrompt && (

@@ -310,6 +310,7 @@ export const en: TranslationKeys = {
     errSubmitFailed: "Failed to start generation. Try again.",
     agentCta: {
       badge: "AI agent",
+      question: "What are we creating today?",
       title: "Tell me your idea — I'll launch the generation",
       text: "Not sure what to pick? Just describe your idea — the agent asks clarifying questions only when needed, builds a detailed Suno prompt, and launches the right module.",
       briefReady: "Brief collected — it will be added to the final prompt below.",

@@ -37,7 +37,7 @@ body.agent-page-open .main {
 
 /* Контейнер чата — растягивается на всё оставшееся место */
 .agent-chat-wrap {
-  min-height: 0;
+  min-height: 520px;
   overflow: hidden;
   padding-bottom: 24px;
 }
