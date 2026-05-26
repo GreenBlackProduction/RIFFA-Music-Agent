@@ -88,7 +88,8 @@ function fmtTime(sec: number): string {
 const RADIO_QUERY_KEY = ["radio"] as const;
 
 export function RadioPage() {
-  const { t } = useTranslation();
+  const { t, i18n: i18nClient } = useTranslation();
+  const isEN = (i18nClient.resolvedLanguage || i18nClient.language || "ru").startsWith("en");
   const moodTranslated = (key: string) => {
     const v = t(`radio.moods.${key}`, { defaultValue: "" });
     return typeof v === "string" && v ? v : key;
@@ -344,6 +345,11 @@ export function RadioPage() {
 
   return (
     <div className="radio">
+      <div className="top-meta">
+        <div className="breadcrumb"><span>raw</span><span>/</span><b>{isEN ? "radio" : "радио"}</b></div>
+        <div>{isEN ? `${stats?.total_tracks ?? "—"} on air` : `в эфире: ${stats?.total_tracks ?? "—"} треков`}</div>
+      </div>
+
       {/* ── Hero ── */}
       <section className="radio-hero radio-hero--compact">
         <div className="radio-hero__body">
