@@ -61,13 +61,20 @@ const IconThumbDown = () => (
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 const INVALID_FILENAME_CHARS = new Set(["<", ">", ":", '"', "/", "\\", "|", "?", "*"]);
 
-// Псевдослучайные высоты столбиков waveform (40 баров, 18–100%).
-const WAVE_BARS = [
-  0.42, 0.68, 0.55, 0.82, 0.34, 0.71, 0.48, 0.92, 0.38, 0.61,
-  0.78, 0.52, 0.66, 0.45, 0.88, 0.32, 0.74, 0.58, 0.40, 0.86,
-  0.50, 0.72, 0.36, 0.64, 0.95, 0.43, 0.69, 0.54, 0.81, 0.39,
-  0.76, 0.46, 0.62, 0.84, 0.51, 0.30, 0.70, 0.57, 0.44, 0.79,
-];
+// Псевдослучайные высоты столбиков waveform (90 баров, 18–100%) — тоньше и чаще.
+const WAVE_BARS = (() => {
+  const arr: number[] = [];
+  for (let i = 0; i < 90; i++) {
+    // Детерминированный псевдо-шум: сочетание синусов на разных частотах.
+    const v =
+      0.5 +
+      0.3 * Math.sin(i * 0.7) +
+      0.15 * Math.sin(i * 1.9 + 1.3) +
+      0.1 * Math.sin(i * 3.1 + 2.7);
+    arr.push(Math.max(0.18, Math.min(1, v)));
+  }
+  return arr;
+})();
 
 function extractGenId(id: string | number): string | null {
   const s = String(id).split("#")[0];
@@ -119,6 +126,7 @@ export function GlobalPlayer() {
   const currentTitle = usePlayer((s) => s.current?.title ?? "");
   const currentAuthor = usePlayer((s) => s.current?.author ?? "");
   const currentMeta = usePlayer((s) => s.current?.meta ?? "");
+  const currentSource = usePlayer((s) => s.current?.source ?? null);
   const currentCover = usePlayer((s) => s.current?.cover ?? null);
   const currentCanRadio = usePlayer((s) => s.current?.canRadio ?? false);
   const currentIsMusicType = usePlayer((s) => s.current?.isMusicType ?? false);
@@ -696,9 +704,20 @@ export function GlobalPlayer() {
           })}
         </div>
 
-        <span className="gp-time">
-          {fmt(progress)} / {fmt(duration)}
-        </span>
+        <div className="gp-bottom">
+          <span className="gp-time">
+            {fmt(progress)} / {fmt(duration)}
+          </span>
+          {currentSource && (
+            <span className="gp-source">
+              <span className="gp-source__dot" aria-hidden />
+              {currentSource === "library" ? t("globalPlayer.sourceLibrary", { defaultValue: "из библиотеки" })
+               : currentSource === "radio"   ? t("globalPlayer.sourceRadio",   { defaultValue: "из радио" })
+               : currentSource === "studio"  ? t("globalPlayer.sourceStudio",  { defaultValue: "из студии" })
+               : t("globalPlayer.sourceShare", { defaultValue: "по ссылке" })}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* RIGHT: actions — flat single row */}

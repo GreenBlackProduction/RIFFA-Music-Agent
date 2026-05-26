@@ -28,6 +28,7 @@
   align-items: center;
 }
 .avatar-big {
+  position: relative;
   width: 110px;
   height: 110px;
   border-radius: 999px;
@@ -43,11 +44,20 @@
   cursor: pointer;
   overflow: hidden;
   flex-shrink: 0;
+  padding: 0;
   transition: opacity 150ms;
 }
 .avatar-big:hover { opacity: 0.85; }
 .avatar-big--loading { opacity: 0.6; cursor: default; }
-.avatar-big img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-big img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: inherit;
+}
 .avatar-block .name { font-size: 18px; font-weight: 600; margin-bottom: 4px; word-break: break-word; }
 .avatar-block .email { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); word-break: break-all; }
 .avatar-block .since { font-family: var(--font-mono); font-size: 10px; color: var(--ink-4); margin-top: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
@@ -744,7 +754,7 @@
 .balance-display__amount .riffa-coin {
   -webkit-text-fill-color: initial;
   filter: drop-shadow(0 0 14px rgba(255, 59, 31, 0.20))
-    drop-shadow(0 0 18px rgba(214, 0, 255, 0.2));
+    drop-shadow(0 0 18px rgba(15, 93, 71, 0.2));
 }
 
 .balance-display__label {
@@ -807,7 +817,7 @@
     135deg,
     var(--hi-soft),
     rgba(255, 90, 0, 0.1),
-    rgba(214, 0, 255, 0.12)
+    rgba(15, 93, 71, 0.12)
   );
   background-origin: border-box;
   box-shadow: 0 0 22px var(--hi-soft);
@@ -925,7 +935,7 @@
     135deg,
     var(--hi-soft),
     rgba(255, 90, 0, 0.1),
-    rgba(214, 0, 255, 0.12)
+    rgba(15, 93, 71, 0.12)
   );
   background-origin: border-box;
   box-shadow: 0 0 16px var(--hi-soft);

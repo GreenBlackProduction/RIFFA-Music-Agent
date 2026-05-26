@@ -160,7 +160,7 @@
 }
 
 .admin-pill--ok    { background: var(--hi-soft); color: #c5ff7c; }
-.admin-pill--admin { background: rgba(214, 0, 255, 0.16); color: #f1a8ff; }
+.admin-pill--admin { background: rgba(15, 93, 71, 0.16); color: #f1a8ff; }
 .admin-pill--warn  { background: rgba(255, 200, 60, 0.18); color: #ffd676; }
 .admin-pill--ban   { background: rgba(255, 80, 80, 0.18); color: #ff9b9b; }
 .admin-pill--off   { background: var(--paper-2); color: var(--muted); }

@@ -837,6 +837,7 @@ export function StudioPage() {
             isOwn: true,
             isMusicType: true,
             audioId: firstTrack.audio_id ?? undefined,
+            source: "studio",
           },
           gen.tracks
             .filter((t) => !!t.audio_url)
@@ -849,6 +850,7 @@ export function StudioPage() {
               isOwn: true,
               isMusicType: true,
               audioId: t.audio_id ?? undefined,
+              source: "studio" as const,
             })),
         );
       } catch {

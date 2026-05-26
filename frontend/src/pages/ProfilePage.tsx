@@ -634,7 +634,12 @@ export function ProfilePage() {
           <div className="doc-list">
             {localLegalDocs.map((d) => (
               <a key={d.id} href={d.href} className="doc-row" target="_blank" rel="noopener noreferrer">
-                <div className="icon">📄</div>
+                <div className="icon" aria-hidden>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+                    <polyline points="14 3 14 9 20 9" />
+                  </svg>
+                </div>
                 <div>
                   <div className="title">{d.title}</div>
                   <div className="hint">{d.hint}</div>

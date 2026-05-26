@@ -92,7 +92,7 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
         const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
         gradient.addColorStop(0, "rgba(124, 255, 31, 0.8)");
         gradient.addColorStop(0.5, "rgba(255, 90, 0, 0.6)");
-        gradient.addColorStop(1, "rgba(214, 0, 255, 0.4)");
+        gradient.addColorStop(1, "rgba(15, 93, 71, 0.4)");
 
         ctx.fillStyle = gradient;
         ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);

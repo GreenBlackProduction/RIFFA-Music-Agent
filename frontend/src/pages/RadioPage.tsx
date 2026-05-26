@@ -157,6 +157,7 @@ export function RadioPage() {
           canRadio: false,
           isMusicType: true,
           isPublic: true,
+          source: "radio",
         }, []);
         // Браузеры (особенно in-app webview Telegram, Safari, Chrome
         // Android) блокируют HTML5 audio autoplay без user gesture.
@@ -194,6 +195,7 @@ export function RadioPage() {
       canRadio: false, /* Радио-треки уже в эфире — кнопку не показываем */
       isMusicType: true,
       isPublic: true,
+      source: "radio" as const,
     };
   }
 

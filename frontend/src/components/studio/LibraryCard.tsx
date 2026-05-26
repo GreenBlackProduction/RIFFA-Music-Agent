@@ -19,9 +19,9 @@ import {
   type LibraryItemType,
   MUSIC_TYPES,
   RADIO_TYPES,
-  TYPE_ICONS,
   useLibraryItems,
 } from "@/lib/library";
+import { TypeIcon } from "@/components/ui/TypeIcon";
 import { usePlayer } from "@/store/player";
 import { FileActions } from "./FileActions";
 import { FileGhostsOverlay, useFileGhosts } from "./FileGhost";
@@ -187,6 +187,7 @@ export function LibraryCard() {
         isMusicType: MUSIC_TYPES.has(i.type),
         isPublic: i.isPublic,
         audioId: i.audioId,
+        source: "library" as const,
       }));
     const track = {
       id: item.id,
@@ -199,6 +200,7 @@ export function LibraryCard() {
       isMusicType: MUSIC_TYPES.has(item.type),
       isPublic: item.isPublic,
       audioId: item.audioId,
+      source: "library" as const,
     };
     playOrToggle(track, queue);
   };
@@ -330,7 +332,7 @@ export function LibraryCard() {
                   />
                 </span>
               ) : (
-                <span className="file-item__icon" aria-hidden>{TYPE_ICONS[it.type]}</span>
+                <span className="file-item__icon" aria-hidden><TypeIcon type={it.type} size={20} /></span>
               )}
 
               <div className="file-item__info">

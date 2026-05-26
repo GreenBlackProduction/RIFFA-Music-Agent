@@ -533,7 +533,7 @@ function TelegramIcon() {
       <defs>
         <linearGradient id="tg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#7cff1f" />
-          <stop offset="100%" stopColor="#d600ff" />
+          <stop offset="100%" stopColor="#0F5D47" />
         </linearGradient>
       </defs>
       <circle cx="16" cy="16" r="14" fill="url(#tg-grad)" opacity="0.16" />
@@ -551,7 +551,7 @@ function EnvelopeIcon() {
       <defs>
         <linearGradient id="env-grad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#ff5a00" />
-          <stop offset="100%" stopColor="#d600ff" />
+          <stop offset="100%" stopColor="#0F5D47" />
         </linearGradient>
       </defs>
       <rect x="4" y="8" width="24" height="16" rx="3" fill="rgba(246,244,255,0.06)" stroke="rgba(246,244,255,0.4)" strokeWidth="1.5" />

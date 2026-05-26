@@ -15,7 +15,8 @@
 import { createPortal } from "react-dom";
 import { useCallback, useState } from "react";
 
-import { TYPE_ICONS, type LibraryItem } from "@/lib/library";
+import { type LibraryItem } from "@/lib/library";
+import { TypeIcon } from "@/components/ui/TypeIcon";
 
 export interface FileGhost {
   id: string;
@@ -71,7 +72,7 @@ export function FileGhostsOverlay({ ghosts }: { ghosts: FileGhost[] }) {
               <img src={g.item.coverUrl} alt="" />
             </span>
           ) : (
-            <span className="file-item__icon">{TYPE_ICONS[g.item.type]}</span>
+            <span className="file-item__icon"><TypeIcon type={g.item.type} size={20} /></span>
           )}
           <div className="file-item__info">
             <strong className="file-item__title">{g.item.title}</strong>

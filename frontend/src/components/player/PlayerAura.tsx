@@ -29,11 +29,12 @@ interface Blob {
   speedY: number;
 }
 
-// Зелёный (emr ~ 165°) + белый (нулевая насыщенность) — два мягких свечения.
+// Только изумрудно-зелёный (~165°) и серый (saturation 0).
+// Никаких других цветов в фоне плеера.
 const BLOBS: ReadonlyArray<Blob> = [
-  { baseHue: 165, saturation: 75, radiusRatio: 0.66, phaseX: 0.0, phaseY: 0.8, speedX: 0.00042, speedY: 0.00058 },
+  { baseHue: 165, saturation: 80, radiusRatio: 0.66, phaseX: 0.0, phaseY: 0.8, speedX: 0.00042, speedY: 0.00058 },
   { baseHue: 0,   saturation: 0,  radiusRatio: 0.58, phaseX: 1.9, phaseY: 2.1, speedX: 0.00037, speedY: 0.00049 },
-  { baseHue: 165, saturation: 65, radiusRatio: 0.52, phaseX: 3.4, phaseY: 0.4, speedX: 0.00051, speedY: 0.00033 },
+  { baseHue: 165, saturation: 70, radiusRatio: 0.52, phaseX: 3.4, phaseY: 0.4, speedX: 0.00051, speedY: 0.00033 },
   { baseHue: 0,   saturation: 0,  radiusRatio: 0.48, phaseX: 5.0, phaseY: 3.2, speedX: 0.00046, speedY: 0.00061 },
 ];
 
@@ -168,7 +169,8 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
         : 0.55;
 
       // Общий сдвиг hue в зависимости от соотношения высоких/низких частот.
-      const hueBias = (prev.high - prev.low) * 90;
+      // Не сдвигаем hue от частотного баланса — цвета должны оставаться зелёным/серым.
+      const hueBias = 0;
 
       // Размеры blob'ов считаем от высоты (плеер — узкая полоса), чтобы их
       // яркие центры не улетали далеко за канвас.
@@ -187,7 +189,9 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
 
         const bandPulse =
           i === 0 ? prev.high : i === 1 ? prev.mid : i === 2 ? prev.low : prev.energy;
-        const hue = (b.baseHue + hueBias + (active ? t * 0.04 : 0)) % 360;
+        // hue фиксирован — без анимационного дрейфа во избежание других оттенков.
+        void hueBias;
+        const hue = b.baseHue;
         const lightness = 50 + prev.mid * 22;
         const pulse = 1 + 0.75 * bandPulse;
         const r = baseR * b.radiusRatio * breathe * pulse;

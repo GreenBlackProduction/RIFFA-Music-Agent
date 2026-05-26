@@ -98,9 +98,9 @@
   66% {
     filter:
       invert(1)
-      sepia(1) saturate(5) hue-rotate(260deg) brightness(1.05)
-      drop-shadow(0 0 8px  rgba(214, 0, 255, 0.65))
-      drop-shadow(0 0 20px rgba(214, 0, 255, 0.30));
+      sepia(1) saturate(5) hue-rotate(150deg) brightness(1.05)
+      drop-shadow(0 0 8px  rgba(15, 93, 71, 0.65))
+      drop-shadow(0 0 20px rgba(15, 93, 71, 0.30));
   }
 }
 
@@ -229,7 +229,7 @@
   z-index: 1;
   background:
     radial-gradient(35% 30% at 30% 30%, rgba(255, 59, 31, 0.20), transparent 70%),
-    radial-gradient(28% 26% at 80% 70%, rgba(214, 0, 255, 0.32), transparent 70%),
+    radial-gradient(28% 26% at 80% 70%, rgba(15, 93, 71, 0.32), transparent 70%),
     radial-gradient(22% 22% at 50% 90%, rgba(255, 90, 0, 0.28), transparent 70%);
   filter: blur(40px);
   opacity: 0.85;
@@ -950,7 +950,7 @@
   padding: var(--space-5);
   border: 1px dashed var(--border);
   border-radius: var(--radius-md);
-  background: rgba(214, 0, 255, 0.06);
+  background: rgba(15, 93, 71, 0.06);
 }
 
 .postponed-card strong {

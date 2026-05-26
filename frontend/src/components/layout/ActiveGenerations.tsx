@@ -13,6 +13,7 @@
 
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { createPortal } from "react-dom";
+import { TypeIcon } from "@/components/ui/TypeIcon";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -36,17 +37,17 @@ const TYPE_KEYS = [
   "occasion", "cover_art", "lyrics", "extend", "wav_convert",
 ] as const;
 
-const TYPE_ICONS: Record<string, string> = {
-  song: "🎤",
-  instrumental: "🎼",
-  sound_effect: "🔊",
-  cover: "🎚️",
-  cover_song: "🎚️",
-  occasion: "🎉",
-  cover_art: "🖼️",
-  lyrics: "✍️",
-  extend: "⏩",
-  wav_convert: "💿",
+const TYPE_TO_LIB: Record<string, "song" | "instrumental" | "cover" | "sfx" | "cover_art" | "wav"> = {
+  song: "song",
+  instrumental: "instrumental",
+  sound_effect: "sfx",
+  cover: "cover",
+  cover_song: "cover",
+  occasion: "song",
+  cover_art: "cover_art",
+  lyrics: "song",
+  extend: "song",
+  wav_convert: "wav",
 };
 
 const cardVariants: Variants = {
@@ -141,6 +142,7 @@ function CompletedActions({ gen, onOpenPreview }: CardActionsProps) {
       meta: typeLabel(gen.type),
       isMusicType,
       isOwn: true,
+      source: "studio",
       canRadio,
       audioId: track.audio_id || undefined,
     });
@@ -355,7 +357,7 @@ export function ActiveGenerations() {
           >
             <div className="active-gen__head">
               <span className="active-gen__icon" aria-hidden="true">
-                {TYPE_ICONS[gen.type] ?? "🎵"}
+                <TypeIcon type={TYPE_TO_LIB[gen.type] ?? "song"} size={18} />
               </span>
               <div className="active-gen__meta">
                 <strong className="active-gen__title">{gen.title || t("activeGen.genericTitle")}</strong>
