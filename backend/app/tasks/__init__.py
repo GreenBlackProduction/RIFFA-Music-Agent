@@ -23,6 +23,7 @@ from app.services.nanobanana import NanoBananaError, make_nanobanana_client
 from app.services.notifications import notify_generation_done
 from app.services.prompt_engineering import SongParams, build_suno_style, vocal_gender
 from app.services.suno import SunoError, make_suno_client
+from app.services.mirror import mirror_generation_result
 from app.services.wallet import InsufficientBalance, credit_tokens, deduct_tokens
 
 # ---------------------------------------------------------------------------
@@ -222,28 +223,42 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             if not gen.title:
                 gen.title = await lyrics_client.generate_title(params.get("description", ""))
 
+            # Agent-provided structured params override form fields
+            agent_mp = params.get("agent_music_params") or {}
+            agent_research = params.get("agent_research_notes", "")
+            agent_prompt_text = params.get("agent_prompt", "")
+
             song_params = SongParams(
                 user_description=params.get("description", ""),
-                genre=params.get("genre", ""),
-                custom_genre=params.get("custom_genre", ""),
-                mood=params.get("mood", ""),
-                tempo=params.get("tempo", ""),
-                vocal=params.get("vocal", ""),
+                genre=agent_mp.get("genre") or params.get("genre", ""),
+                custom_genre=agent_mp.get("custom_genre") or params.get("custom_genre", ""),
+                subgenre=agent_mp.get("subgenre", ""),
+                mood=agent_mp.get("mood") or params.get("mood", ""),
+                tempo=agent_mp.get("tempo") or params.get("tempo", ""),
+                vocal=agent_mp.get("vocal") or params.get("vocal", ""),
+                era=agent_mp.get("era", ""),
+                techniques=agent_mp.get("techniques", []),
+                constraints=agent_mp.get("constraints", ""),
+                suggested_bpm=agent_mp.get("suggested_bpm", ""),
+                style_prompt=(agent_research + "\n" + agent_prompt_text).strip(),
             )
-            preset_style, weight, constraint = build_suno_style(song_params)
+            preset_style, weight, constraint = build_suno_style(
+                song_params,
+                user_id=gen.user_id,
+            )
 
             # GPT-4o composes the adaptive Suno music prompt; falls back to preset on failure.
             await _publish(ctx, gen_id, {"status": "processing", "step": "enriching_music"})
             style = await lyrics_client.enrich_music_prompt(
                 user_description=params.get("description", ""),
-                genre=params.get("genre", ""),
-                custom_genre=params.get("custom_genre", ""),
-                mood=params.get("mood", ""),
-                tempo=params.get("tempo", ""),
-                vocal=params.get("vocal", ""),
+                genre=song_params.genre,
+                custom_genre=song_params.custom_genre,
+                mood=song_params.mood,
+                tempo=song_params.tempo,
+                vocal=song_params.vocal,
                 instrumental=False,
                 approved_lyrics=lyrics,
-                agent_prompt=params.get("agent_prompt", ""),
+                agent_prompt=agent_prompt_text,
                 preset_style_hint=preset_style,
             ) or preset_style
 
@@ -284,23 +299,37 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             }
 
         elif gen.type == GenerationType.instrumental:
+            agent_mp = params.get("agent_music_params") or {}
+            agent_research = params.get("agent_research_notes", "")
+            agent_prompt_text = params.get("agent_prompt", "")
+
             song_params = SongParams(
                 user_description=params.get("description", ""),
-                genre=params.get("genre", ""),
-                custom_genre=params.get("custom_genre", ""),
-                mood=params.get("mood", ""),
-                tempo=params.get("tempo", ""),
+                genre=agent_mp.get("genre") or params.get("genre", ""),
+                custom_genre=agent_mp.get("custom_genre") or params.get("custom_genre", ""),
+                subgenre=agent_mp.get("subgenre", ""),
+                mood=agent_mp.get("mood") or params.get("mood", ""),
+                tempo=agent_mp.get("tempo") or params.get("tempo", ""),
+                vocal="no_vocal",
+                era=agent_mp.get("era", ""),
+                techniques=agent_mp.get("techniques", []),
+                constraints=agent_mp.get("constraints", ""),
+                suggested_bpm=agent_mp.get("suggested_bpm", ""),
+                style_prompt=(agent_research + "\n" + agent_prompt_text).strip(),
             )
-            preset_style, weight, constraint = build_suno_style(song_params)
+            preset_style, weight, constraint = build_suno_style(
+                song_params,
+                user_id=gen.user_id,
+            )
             title = gen.title or params.get("description", "Instrumental")[:80]
 
             await _publish(ctx, gen_id, {"status": "processing", "step": "enriching_music"})
             style = await lyrics_client.enrich_music_prompt(
                 user_description=params.get("description", ""),
-                genre=params.get("genre", ""),
-                custom_genre=params.get("custom_genre", ""),
-                mood=params.get("mood", ""),
-                tempo=params.get("tempo", ""),
+                genre=song_params.genre,
+                custom_genre=song_params.custom_genre,
+                mood=song_params.mood,
+                tempo=song_params.tempo,
                 vocal="",
                 instrumental=True,
                 approved_lyrics="",
@@ -521,6 +550,13 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
     except Exception as exc:
         logger.exception("unexpected error for gen {}", gen_id)
         error_msg = f"Внутренняя ошибка: {type(exc).__name__}"
+
+    # ---- mirror CDN assets to MinIO (makes audio_url permanent) ----
+    if result and not error_msg:
+        try:
+            result = await mirror_generation_result(result, gen_id, get_settings())
+        except Exception as _mirror_err:
+            logger.warning("mirror_generation_result failed for {}: {}", gen_id, _mirror_err)
 
     # ---- save result or fail ----
     async with session_factory() as session:
