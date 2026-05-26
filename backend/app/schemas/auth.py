@@ -69,3 +69,6 @@ class CurrentUser(BaseModel):
     notice_kind: str | None = None  # 'ban' | 'warning'
     referral_code: str | None = None
     created_at: str | None = None
+    terms_accepted_at: str | None = None
+    terms_version: str | None = None
+    legal_version: str | None = None

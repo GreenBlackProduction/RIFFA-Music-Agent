@@ -1,4 +1,4 @@
-﻿"""Aggregate v1 router."""
+"""Aggregate v1 router."""
 
 from fastapi import APIRouter
 
@@ -9,6 +9,7 @@ from app.api.v1 import (
     generate,
     health,
     history,
+    legal,
     lyrics,
     models,
     payments,
@@ -37,4 +38,5 @@ api_router.include_router(payments.router)
 api_router.include_router(radio.router)
 api_router.include_router(share.router)
 api_router.include_router(tracks.router)
+api_router.include_router(legal.router)
 api_router.include_router(ws.router)

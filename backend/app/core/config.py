@@ -98,6 +98,9 @@ class Settings(BaseSettings):
     # Observability
     sentry_dsn: str = Field(default="")
 
+    # Legal
+    legal_terms_version: str = "1.0"
+
     @property
     def admin_id_set(self) -> set[int]:
         ids: set[int] = set()

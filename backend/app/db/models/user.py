@@ -44,6 +44,9 @@ class User(Base, TimestampMixin):
     bot_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    terms_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
     referral_code: Mapped[str | None] = mapped_column(
         String(32), unique=True, nullable=True, index=True
     )

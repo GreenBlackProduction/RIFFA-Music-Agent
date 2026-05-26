@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.email import hash_password, verify_password
+from app.core.config import Settings, get_settings
 from app.core.deps import current_user, current_user_loose, db_session
 from app.db.models import User
 from app.schemas.auth import CurrentUser
@@ -39,6 +40,8 @@ def read_current_user(user: User = Depends(current_user_loose)) -> CurrentUser:
     Uses the *loose* dep so even banned users can fetch their own profile
     (and therefore see the ban-banner). Sensitive endpoints still 403.
     """
+    from app.core.config import get_settings
+    settings = get_settings()
     return CurrentUser(
         id=user.id,
         display_name=user.display_name,
@@ -54,7 +57,26 @@ def read_current_user(user: User = Depends(current_user_loose)) -> CurrentUser:
         notice_kind=user.notice_kind,
         referral_code=user.referral_code,
         created_at=user.created_at.isoformat() if user.created_at else None,
+        terms_accepted_at=user.terms_accepted_at.isoformat() if user.terms_accepted_at else None,
+        terms_version=user.terms_version,
+        legal_version=settings.legal_terms_version,
     )
+
+
+@router.post("/accept-terms")
+async def accept_terms(
+    user: User = Depends(current_user),
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(db_session),
+) -> dict[str, str]:
+    """Record that the user accepted the current legal terms version."""
+    from datetime import datetime, timezone
+
+    user.terms_accepted_at = datetime.now(timezone.utc)
+    user.terms_version = settings.legal_terms_version
+    session.add(user)
+    await session.commit()
+    return {"status": "ok", "version": settings.legal_terms_version}
 
 
 class RedeemPromoRequest(BaseModel):
