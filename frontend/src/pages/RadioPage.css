@@ -118,17 +118,13 @@
 .radio-panel { display: grid; gap: var(--space-4); }
 .radio-panel--compact { gap: var(--space-2); padding: var(--space-3) var(--space-4); }
 
-/* Убираем «разметку»: на десктопе и больших iPad панели радио без жёсткой
-   рамки и без тяжёлой тени — они визуально сливаются с фоном страницы
-   вместо того, чтобы выглядеть как набор отдельных блоков с обводкой. */
-@media (min-width: 769px) {
-  .radio .panel.radio-panel,
-  .radio .panel.radio-panel--half,
-  .radio .panel.radio-panel--compact {
-    border: 1px solid var(--rule-soft);
-    box-shadow: none;
-    background: linear-gradient(180deg, rgba(22, 22, 36, 0.55), rgba(16, 16, 28, 0.7));
-  }
+/* v3 editorial: panels use paper-3 background, thin ink border, no shadow */
+.radio .panel.radio-panel,
+.radio .panel.radio-panel--half,
+.radio .panel.radio-panel--compact {
+  border: 1px solid var(--ink);
+  box-shadow: none;
+  background: var(--paper-3);
 }
 .radio-section-head { display: grid; gap: 4px; }
 .radio-section-head--compact { display: block; gap: 0; }
