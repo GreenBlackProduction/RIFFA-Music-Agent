@@ -20,7 +20,6 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { useTranslation } from "react-i18next";
 
-import { Coin } from "@/components/ui/Coin";
 import { useAuth } from "@/lib/auth";
 import { FileActions } from "@/components/studio/FileActions";
 import { FileGhostsOverlay, useFileGhosts } from "@/components/studio/FileGhost";
@@ -59,11 +58,6 @@ const TOKEN_PACKAGES: readonly TokenPackage[] = [
   { id: "premium", name: "Премиум",      tokens: 150, gens: 75, priceRub: 900, discount: 40 },
 ];
 
-const PAYMENT_METHODS: readonly { id: string; label: string; hint: string }[] = [
-  { id: "card", label: "Карта РФ", hint: "Robokassa · мгновенно" },
-  { id: "stars", label: "Telegram Stars", hint: "Без комиссии · в боте" },
-  { id: "crypto", label: "Крипта", hint: "USDT TRC-20 · скоро" },
-];
 
 interface GenStats {
   type: string;
@@ -85,46 +79,6 @@ const STAT_COLORS: Record<string, string> = {
 // через useLibraryItems(). Разные фильтры — один и тот же файл видимый в обоих
 // местах одинаковым (обложка, название, «в эфире»).
 
-interface Review {
-  id: string;
-  author: string;
-  rating: number;
-  text: string;
-  date: string;
-}
-
-const SEED_REVIEWS_RU: readonly Review[] = [
-  {
-    id: "r1",
-    author: "Алексей",
-    rating: 5,
-    text: "Кавер моей старой песни в стиле synthwave — ровно то что нужно было. Без студии за 2 минуты.",
-    date: "2026-04-20",
-  },
-  {
-    id: "r2",
-    author: "Мария",
-    rating: 4,
-    text: "Агент неплохо собирает промпт, но иногда теряется на настроении. Звук хороший.",
-    date: "2026-04-15",
-  },
-];
-const SEED_REVIEWS_EN: readonly Review[] = [
-  {
-    id: "r1",
-    author: "Alex",
-    rating: 5,
-    text: "Cover of my old song in synthwave style — exactly what I needed. Done in 2 minutes without a studio.",
-    date: "2026-04-20",
-  },
-  {
-    id: "r2",
-    author: "Maria",
-    rating: 4,
-    text: "The agent builds the prompt well, but occasionally gets confused on mood. The sound quality is good.",
-    date: "2026-04-15",
-  },
-];
 
 const PROFILE_DOCS: readonly { id: string; title: string; hint: string; href: string }[] = [
   { id: "offer", title: "Пользовательское соглашение", hint: "Публичная оферта", href: "/docs/offer.txt" },
@@ -224,12 +178,6 @@ function FilterSelect({
         )}
     </div>
   );
-}
-
-// ─────────── Вспомогательные иконки ────────────
-
-function Icon({ name }: { name: string }) {
-  return <span className="profile-card__icon" aria-hidden>{name}</span>;
 }
 
 // ─────────── ProfilePage ────────────
@@ -582,27 +530,6 @@ export function ProfilePage() {
     playOrToggle(toPlayerTrack(item), queue);
   };
 
-  // ── Reviews ──
-  const [reviews, setReviews] = useState<Review[]>(() => [...(isEN ? SEED_REVIEWS_EN : SEED_REVIEWS_RU)]);
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewText, setReviewText] = useState("");
-
-  const submitReview = (e: React.FormEvent) => {
-    e.preventDefault();
-    const text = reviewText.trim();
-    if (!text) return;
-    const next: Review = {
-      id: `local-${Date.now()}`,
-      author: displayName,
-      rating: reviewRating,
-      text,
-      date: new Date().toISOString().slice(0, 10),
-    };
-    setReviews((prev) => [next, ...prev]);
-    setReviewText("");
-    setReviewRating(5);
-  };
-
   // ── Referral ──
   const referralCode = user?.referral_code ?? (user?.id ? `R${user.id}` : "RGUEST");
   const referralLink = `https://riffastudio.site/r/${referralCode}`;
@@ -649,210 +576,379 @@ export function ProfilePage() {
   }, [libraryItems]);
 
   const totalGens = genStats.reduce((acc, s) => acc + s.count, 0);
-  const maxStat = Math.max(...genStats.map((s) => s.count), 1);
 
-  // ── Favourite genres / moods from real library items ──
-  const favouriteGenres = useMemo<{ name: string; count: number }[]>(() => {
-    const counts: Record<string, number> = {};
-    for (const it of libraryItems) {
-      if (it.genre) counts[it.genre] = (counts[it.genre] ?? 0) + 1;
-    }
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .map(([name, count]) => ({ name, count }));
-  }, [libraryItems]);
-
-  const favouriteMoods = useMemo<{ name: string; count: number }[]>(() => {
-    const counts: Record<string, number> = {};
-    for (const it of libraryItems) {
-      if (it.mood) counts[it.mood] = (counts[it.mood] ?? 0) + 1;
-    }
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 8)
-      .map(([name, count]) => ({ name, count }));
+  const uniqueGenreCount = useMemo(() => {
+    return new Set(libraryItems.map((f) => f.genre).filter(Boolean)).size;
   }, [libraryItems]);
 
   return (
-    <div className="profile-container">
-      {/* Hero-шапка пользователя */}
-      <section className="profile-hero">
-        <div className="user-info">
+    <div className="profile">
+      {/* top-meta */}
+      <div className="top-meta">
+        <div className="breadcrumb">
+          <span>raw</span><span>/</span><b>{isEN ? "profile" : "профиль"}</b>
+        </div>
+        <div>{joinDate}</div>
+      </div>
+
+      <h1 className="h-page">{isEN ? <>Profile and <em>tokens</em>.</> : <>Профиль и <em>токены</em>.</>}</h1>
+
+      {/* ── profile-grid: avatar | stats + name ── */}
+      <div className="profile-grid">
+        <div className="avatar-block">
           <button
             type="button"
-            className={`user-info__avatar user-info__avatar--btn${
-              avatarUploading ? " user-info__avatar--loading" : ""
-            }`}
+            className={`avatar-big${avatarUploading ? " avatar-big--loading" : ""}`}
             onClick={() => avatarInputRef.current?.click()}
-            title={t("profile.avatarAria")}
-            aria-label={t("profile.avatarAria")}
             disabled={avatarUploading}
+            title={t("profile.avatarAria")}
           >
-            {user?.avatar_url && !avatarFailed ? (
-              <img src={user.avatar_url} alt="" onError={() => setAvatarFailed(true)} />
-            ) : (
-              <span className="user-info__avatar-initial">{userInitial}</span>
-            )}
-            <span className="user-info__avatar-overlay" aria-hidden>
-              {avatarUploading ? "…" : "📷"}
-            </span>
+            {user?.avatar_url && !avatarFailed
+              ? <img src={user.avatar_url} alt="" onError={() => setAvatarFailed(true)} />
+              : userInitial}
           </button>
-          <input
-            ref={avatarInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            style={{ display: "none" }}
-            onChange={handleAvatarChange}
-          />
-          {avatarError && (
-            <span className="user-info__avatar-error">{avatarError}</span>
-          )}
+          <input ref={avatarInputRef} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: "none" }} onChange={handleAvatarChange} />
+          {avatarError && <span className="profile-avatar-error">{avatarError}</span>}
 
-          <div className="user-info__details">
-            {/* Редактируемый никнейм */}
+          <div className="name">
             {editingName ? (
-              <form className="name-edit-form" onSubmit={handleSaveName}>
-                <input
-                  ref={nameInputRef}
-                  className="name-edit-input"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  disabled={nameSaving}
-                  maxLength={64}
-                  onKeyDown={(e) => e.key === "Escape" && setEditingName(false)}
-                />
-                <button type="submit" className="name-edit-btn name-edit-btn--ok" disabled={nameSaving} aria-label={t("common.save")}>✓</button>
-                <button type="button" className="name-edit-btn name-edit-btn--cancel" onClick={() => { setEditingName(false); setNameInput(displayName); }} aria-label={t("common.cancel")}>✕</button>
-              </form>
+              <div className="name-edit-row">
+                <input ref={nameInputRef} type="text" value={nameInput} onChange={(e) => setNameInput(e.target.value)} disabled={nameSaving} maxLength={64} onKeyDown={(e) => e.key === "Escape" && setEditingName(false)} />
+                <button type="button" className="btn btn-ink btn-sm" onClick={handleSaveName} disabled={nameSaving}>✓</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEditingName(false); setNameInput(displayName); }}>✕</button>
+              </div>
             ) : (
-              <h1 className="user-info__name user-info__name--editable" onClick={() => { setNameInput(displayName); setEditingName(true); }}>
-                {displayName}
-                <span className="name-edit-icon" aria-hidden>✏</span>
-              </h1>
+              <span className="name-inline" onClick={() => { setNameInput(displayName); setEditingName(true); }}>
+                {displayName} <span className="name-inline__edit">✏</span>
+              </span>
             )}
-            <div className="user-info__meta">
-              {userEmail} · {joinDate}
-              {!user && <span className="profile-hero__demo">{t("profile.demoLabel")}</span>}
-            </div>
           </div>
+          <div className="email">{userEmail || (isEN ? "not logged in" : "не авторизован")}</div>
+          <button type="button" className="btn btn-soft btn-sm" style={{ marginTop: 14 }} onClick={() => avatarInputRef.current?.click()}>
+            {isEN ? "change avatar" : "сменить аватар"}
+          </button>
+          <div className="since">{joinDate}</div>
 
-          {/* Действия в шапке: смена пароля и корзина */}
-          <div className="user-info__actions">
-            <button
-              type="button"
-              className={`pw-toggle pw-toggle--trash${trashOpen ? " pw-toggle--open" : ""}`}
-              onClick={() => setTrashOpen(true)}
-              title={t("profile.trashTitle")}
-              aria-label={t("profile.trashOpenAria")}
-            >
-              {t("profile.trashOpenBtn")}
-            </button>
           {user?.email && (
-            <div className="user-info__pw-wrap">
-              <button
-                type="button"
-                className={`pw-toggle${showPw ? " pw-toggle--open" : ""}`}
-                onClick={() => { setShowPw((v) => !v); setPwError(null); }}
-              >
+            <div style={{ marginTop: 16, width: "100%" }}>
+              <button type="button" className="btn btn-ghost btn-sm btn-block" onClick={() => { setShowPw((v) => !v); setPwError(null); }}>
                 🔑 {showPw ? t("profile.pwHide") : t("profile.pwToggle")}
               </button>
-
               {showPw && (
-                <form className="hero-pw-form" onSubmit={handleChangePassword}>
-                  <input
-                    type="password"
-                    placeholder={t("profile.pwCurrentPlaceholder")}
-                    value={pwCurrent}
-                    onChange={(e) => setPwCurrent(e.target.value)}
-                    disabled={pwStatus === "saving"}
-                    required
-                    autoComplete="current-password"
-                  />
-                  <input
-                    type="password"
-                    placeholder={t("profile.pwNewPlaceholder")}
-                    value={pwNew}
-                    onChange={(e) => setPwNew(e.target.value)}
-                    disabled={pwStatus === "saving"}
-                    required
-                    autoComplete="new-password"
-                  />
-                  <input
-                    type="password"
-                    placeholder={t("profile.pwConfirmPlaceholder")}
-                    value={pwConfirm}
-                    onChange={(e) => setPwConfirm(e.target.value)}
-                    disabled={pwStatus === "saving"}
-                    required
-                    autoComplete="new-password"
-                  />
-                  {pwError && <p className="hero-pw-form__msg hero-pw-form__msg--error">{pwError}</p>}
-                  {pwStatus === "ok" && <p className="hero-pw-form__msg hero-pw-form__msg--ok">{t("profile.pwChanged")}</p>}
-                  <button type="submit" className="btn btn--primary" disabled={pwStatus === "saving" || !pwCurrent || !pwNew || !pwConfirm}>
+                <form onSubmit={handleChangePassword} style={{ marginTop: 10, display: "grid", gap: 8 }}>
+                  <input type="password" placeholder={t("profile.pwCurrentPlaceholder")} value={pwCurrent} onChange={(e) => setPwCurrent(e.target.value)} disabled={pwStatus === "saving"} required autoComplete="current-password" style={{ padding: "10px 12px", border: "1px solid var(--rule)", borderRadius: 10, font: "inherit", fontSize: 13, background: "var(--paper)", outline: "none" }} />
+                  <input type="password" placeholder={t("profile.pwNewPlaceholder")} value={pwNew} onChange={(e) => setPwNew(e.target.value)} disabled={pwStatus === "saving"} required autoComplete="new-password" style={{ padding: "10px 12px", border: "1px solid var(--rule)", borderRadius: 10, font: "inherit", fontSize: 13, background: "var(--paper)", outline: "none" }} />
+                  <input type="password" placeholder={t("profile.pwConfirmPlaceholder")} value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} disabled={pwStatus === "saving"} required autoComplete="new-password" style={{ padding: "10px 12px", border: "1px solid var(--rule)", borderRadius: 10, font: "inherit", fontSize: 13, background: "var(--paper)", outline: "none" }} />
+                  {pwError && <p style={{ color: "var(--hi)", fontSize: 12, margin: 0 }}>{pwError}</p>}
+                  {pwStatus === "ok" && <p style={{ color: "var(--emr)", fontSize: 12, margin: 0 }}>{t("profile.pwChanged")}</p>}
+                  <button type="submit" className="btn btn-ink btn-sm btn-block" disabled={pwStatus === "saving" || !pwCurrent || !pwNew || !pwConfirm}>
                     {pwStatus === "saving" ? t("profile.pwSaving") : t("profile.pwSave")}
                   </button>
                 </form>
               )}
             </div>
           )}
+          <div style={{ marginTop: 12, width: "100%" }}>
+            <button type="button" className="btn btn-ghost btn-sm btn-block" onClick={() => setTrashOpen(true)}>
+              {t("profile.trashOpenBtn")}
+            </button>
           </div>
         </div>
-      </section>
 
-      {/* ── Trash drawer (всплывающее окно над страницей) ── */}
+        <div>
+          {/* 4 stat tiles */}
+          <div className="stats" style={{ marginBottom: 24 }}>
+            <div className="stat">
+              <div className="label">{isEN ? "balance" : "баланс"}</div>
+              <div className="val">{userBalance}<small>ⓡ</small></div>
+              <div className="delta">{isEN ? "available" : "доступно"}</div>
+            </div>
+            <div className="stat">
+              <div className="label">{isEN ? "total created" : "всего создано"}</div>
+              <div className="val">{totalGens}<small>{isEN ? "tr." : "трек."}</small></div>
+              <div className="delta">{joinDate || (isEN ? "since registration" : "с регистрации")}</div>
+            </div>
+            <div className="stat">
+              <div className="label">{isEN ? "genres" : "жанров"}</div>
+              <div className="val">{uniqueGenreCount}</div>
+              <div className="delta">{isEN ? "unique" : "уникальных"}</div>
+            </div>
+            <div className="stat">
+              <div className="label">{isEN ? "invited" : "приглашено"}</div>
+              <div className="val">0<small>{isEN ? "fr." : "др."}</small></div>
+              <div className="delta">+0 ⓡ {isEN ? "bonus" : "бонус"}</div>
+            </div>
+          </div>
+
+          {/* display name field */}
+          <div className="field">
+            <label>{isEN ? "display name" : "имя для отображения"}</label>
+            {editingName ? (
+              <div style={{ display: "flex", gap: 8 }}>
+                <input type="text" value={nameInput} onChange={(e) => setNameInput(e.target.value)} disabled={nameSaving} maxLength={64} onKeyDown={(e) => e.key === "Escape" && setEditingName(false)} autoFocus />
+                <button type="button" className="btn btn-ink btn-sm" onClick={handleSaveName} disabled={nameSaving}>✓</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEditingName(false); setNameInput(displayName); }}>✕</button>
+              </div>
+            ) : (
+              <input type="text" value={displayName} readOnly onClick={() => { setNameInput(displayName); setEditingName(true); }} />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── 01 · купить токены ── */}
+      <div className="h-section">
+        <div className="tag"><span className="num">01</span> · {isEN ? "top up" : "пополнить"}</div>
+        <h2>{isEN ? "buy tokens" : "купить токены"}</h2>
+        <div className="right">{isEN ? "from ₽100 · card / stars" : "от 100 ₽ · картой / stars"}</div>
+      </div>
+
+      <div className="pricing">
+        {localPackages.map((p) => {
+          const isFeatured = p.id === "basic";
+          const perks = isEN
+            ? [`${p.tokens} ⓡ to balance`, `${Math.floor(p.tokens / 2)} songs`, `WAV export`, `priority queue`]
+            : [`${p.tokens} ⓡ на баланс`, `${Math.floor(p.tokens / 2)} песен с вокалом`, `экспорт в WAV`, `приоритет очереди`];
+          return (
+            <div key={p.id} className={`price-tile${isFeatured ? " is-featured" : ""}${selectedPack === p.id ? " is-selected" : ""}`} onClick={() => setSelectedPack(p.id)}>
+              <div className="tier">{p.name}{isFeatured ? ` · ${isEN ? "popular" : "популярный"}` : ""}</div>
+              <div className="price">{p.priceRub}<small>₽</small></div>
+              <div className="tokens-meta">{p.tokens} {isEN ? "tokens" : "токенов"} · ~{Math.floor(p.tokens / 2)} {isEN ? "tracks" : "треков"}</div>
+              {p.discount !== undefined && (
+                <div className="discount">{isEN ? `save ${p.discount}%` : `выгода ${p.discount}%`}</div>
+              )}
+              <ul className="perks">
+                {perks.map((pk, j) => <li key={j}>{pk}</li>)}
+              </ul>
+              <button
+                type="button"
+                className={`btn ${isFeatured ? "btn-primary" : "btn-ghost"} btn-block`}
+                onClick={(e) => { e.stopPropagation(); setSelectedPack(p.id); handleBuyPack(); }}
+                disabled={payStatus === "loading"}
+              >
+                {payStatus === "loading" && selectedPack === p.id ? "..." : (isEN ? "buy →" : "купить →")}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="pill-row" style={{ margin: "20px 0 0" }}>
+        <button className={`pill${payMethod === "card" ? " on-hi" : ""}`} onClick={() => setPayMethod("card")}>
+          {isEN ? "Card RF · Robokassa · instant" : "Карта РФ · Robokassa · мгновенно"}
+        </button>
+        <button className={`pill${payMethod === "stars" ? " on" : ""}`} onClick={() => setPayMethod("stars")}>
+          {isEN ? "Telegram Stars · no fee" : "Telegram Stars · без комиссии"}
+        </button>
+        <button className="pill" style={{ opacity: 0.6 }} disabled>
+          {isEN ? "Crypto · USDT · soon" : "Крипта · USDT TRC-20 · скоро"}
+        </button>
+      </div>
+      {payError && <p style={{ color: "var(--hi)", fontSize: 13, margin: "8px 0 0" }}>{payError}</p>}
+
+      {/* ── 02 · промокод ── */}
+      <div className="h-section">
+        <div className="tag"><span className="num">02</span> · {isEN ? "promo" : "промокод"}</div>
+        <h2>{isEN ? "have a promo code?" : "есть промокод?"}</h2>
+        <div className="right">{isEN ? "bonus tokens" : "бонусные токены"}</div>
+      </div>
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <input
+          type="text"
+          className="studio-quick__input"
+          placeholder={t("profile.promoInputPlaceholder")}
+          value={promoCode}
+          onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); if (promoStatus !== "idle") { setPromoStatus("idle"); setPromoMessage(null); } }}
+          maxLength={32}
+          spellCheck={false}
+          autoCapitalize="characters"
+          disabled={promoStatus === "saving"}
+        />
+        <button type="button" className="btn btn-emr" onClick={handleRedeemPromo} disabled={promoStatus === "saving" || !promoCode.trim()}>
+          {promoStatus === "saving" ? "..." : (isEN ? "activate" : "активировать")}
+        </button>
+      </div>
+      {promoMessage && (
+        <p style={{ color: promoStatus === "ok" ? "var(--emr)" : "var(--hi)", fontSize: 13, margin: "8px 0 0" }}>
+          {promoMessage}
+        </p>
+      )}
+
+      {/* ── 03 · реферальная программа ── */}
+      <div className="h-section">
+        <div className="tag"><span className="num">03</span> · {isEN ? "referral" : "реферальная программа"}</div>
+        <h2>{isEN ? "invite friends" : "приглашай друзей"}</h2>
+        <div className="right">{isEN ? "10 ⓡ you + 4 ⓡ friend" : "10 ⓡ тебе + 4 ⓡ другу"}</div>
+      </div>
+
+      <div className="p-panel">
+        <div className="stats" style={{ border: "none", background: "transparent" }}>
+          <div className="stat" style={{ background: "var(--paper-3)" }}>
+            <div className="label">{isEN ? "invited" : "приглашено"}</div>
+            <div className="val">0<small>{isEN ? "fr." : "др."}</small></div>
+          </div>
+          <div className="stat" style={{ background: "var(--paper-3)" }}>
+            <div className="label">{isEN ? "bonus tokens" : "бонусных на баланс"}</div>
+            <div className="val">0<small>ⓡ</small></div>
+          </div>
+          <div className="stat" style={{ background: "var(--paper-3)" }}>
+            <div className="label">{isEN ? "from refs" : "от оплат рефералов"}</div>
+            <div className="val">0<small>ⓡ</small></div>
+          </div>
+          <div className="stat" style={{ background: "var(--paper-3)" }}>
+            <div className="label">{isEN ? "total earned" : "всего заработано"}</div>
+            <div className="val">0<small>ⓡ</small></div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 10, marginTop: 20, alignItems: "center" }}>
+          <div style={{ flex: 1, padding: "12px 16px", background: "var(--paper)", border: "1px solid var(--rule)", borderRadius: 999, fontFamily: "var(--font-mono)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {referralLink}
+          </div>
+          <button type="button" className="btn btn-ink" onClick={copyReferral}>
+            {copied ? t("common.copied") : (isEN ? "copy →" : "скопировать →")}
+          </button>
+        </div>
+      </div>
+
+      {/* ── 04 · документы ── */}
+      <div className="h-section">
+        <div className="tag"><span className="num">04</span> · {isEN ? "documents" : "документы"}</div>
+        <h2>{isEN ? "legal information" : "правовая информация"}</h2>
+        <div className="right">{isEN ? "for reference" : "для справки"}</div>
+      </div>
+
+      <div className="doc-list">
+        {localLegalDocs.map((d) => (
+          <a key={d.id} href={d.href} className="doc-row" target="_blank" rel="noopener noreferrer">
+            <div className="icon">📄</div>
+            <div>
+              <div className="title">{d.title}</div>
+              <div className="hint">{d.hint}</div>
+            </div>
+            <span className="chevron">→</span>
+          </a>
+        ))}
+      </div>
+
+      {/* ── 05 · мои файлы ── */}
+      <div className="h-section">
+        <div className="tag"><span className="num">05</span> · {isEN ? "files" : "мои файлы"}</div>
+        <h2>{t("profile.myFiles")}</h2>
+        <div className="right">{filteredFiles.length} / {libraryItems.length}</div>
+      </div>
+
+      <div className="pill-row" style={{ marginBottom: 16 }}>
+        {(["all", "song", "instrumental", "cover", "sfx", "cover_art"] as Array<"all" | LibraryItemType>).map((ft) => (
+          <button key={ft} type="button" className={`pill${filterType === ft ? " on" : ""}`} onClick={() => setFilterType(ft)}>
+            {ft === "all" ? t("profile.filesAll") : typeLabel(ft)}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        <FilterSelect options={moodOptions} value={filterMood} onChange={setFilterMood} />
+        <FilterSelect options={genreOptions} value={filterGenre} onChange={setFilterGenre} />
+        <FilterSelect options={sortOptions} value={filterSort} onChange={(v) => setFilterSort(v as "newest" | "oldest")} />
+      </div>
+
+      <div className="generations-list">
+        {filesAuthError ? (
+          <div className="empty-state"><div className="empty-state__icon">🔒</div><div className="empty-state__text">{t("profile.filesNeedAuth")}</div></div>
+        ) : filesLoading ? (
+          Array.from({ length: 5 }).map((_, i) => (
+            <div key={`skel-${i}`} className="file-skeleton" aria-hidden="true">
+              <div className="file-skeleton__icon" />
+              <div className="file-skeleton__lines">
+                <div className="file-skeleton__line" style={{ width: `${60 + ((i * 17) % 40)}%` }} />
+                <div className="file-skeleton__line file-skeleton__line--short" />
+              </div>
+              <div className="file-skeleton__action" />
+            </div>
+          ))
+        ) : filteredFiles.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state__icon">📂</div>
+            <div className="empty-state__text">{libraryItems.length === 0 ? t("profile.filesEmptyFirst") : t("profile.filesNoMatch")}</div>
+          </div>
+        ) : (
+          <AnimatePresence initial={false}>
+            {filteredFiles.map((f) => {
+              const isActive = currentId === f.id;
+              const canRadio = RADIO_TYPES.has(f.type) && f.isOwn;
+              const canBolt = MUSIC_TYPES.has(f.type);
+              const radioPending = radioMutation.isPending && radioMutation.variables?.itemId === f.id;
+              return (
+                <motion.div
+                  key={f.id}
+                  role="button"
+                  tabIndex={0}
+                  className={`file-item${isActive ? " file-item--active" : ""}`}
+                  onClick={() => handlePlayItem(f)}
+                  onKeyDown={(e) => e.key === "Enter" && handlePlayItem(f)}
+                  initial={{ opacity: 0, x: -16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.22, ease: "easeOut" }}
+                >
+                  {f.coverUrl ? (
+                    <span className="file-item__icon file-item__icon--cover" aria-hidden onClick={(e) => { e.stopPropagation(); setViewerImage({ url: f.coverUrl!, title: f.title }); }} style={{ cursor: "zoom-in" }}>
+                      <img src={f.coverUrl} alt="" loading="lazy" />
+                    </span>
+                  ) : (
+                    <span className="file-item__icon" aria-hidden>{TYPE_ICONS[f.type]}</span>
+                  )}
+                  <div className="file-item__info">
+                    <span className="file-item__title">{f.title}</span>
+                    <span className="file-item__meta">{typeLabel(f.type)} · {f.genre} · {f.mood} · {f.duration}</span>
+                  </div>
+                  <FileActions
+                    audioUrl={f.audioUrl}
+                    downloadUrl={f.trackIndex !== null ? trackDownloadUrl(f.generationId, f.trackIndex) : undefined}
+                    title={f.title}
+                    isMusicType={canBolt}
+                    canRadio={canRadio}
+                    fileId={f.id}
+                    isPublic={f.isPublic}
+                    generationId={f.generationId}
+                    audioId={f.audioId}
+                    onToggleRadio={canRadio ? (next) => radioMutation.mutateAsync({ itemId: f.id, generationId: f.generationId, trackIndex: f.trackIndex, isPublic: next }) : undefined}
+                    radioPending={radioPending}
+                    isActive={isActive}
+                    isPlaying={isPlaying}
+                    onPlayPause={f.audioUrl ? () => handlePlayItem(f) : undefined}
+                    onDelete={(rect) => { showFileGhost(f, rect); deleteFileMutation.mutate(f.generationId); }}
+                  />
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        )}
+      </div>
+
+      {/* Trash modal */}
       {trashOpen &&
         createPortal(
           <div className="trash-modal-backdrop" onClick={() => setTrashOpen(false)}>
-            <div
-              className="trash-modal"
-              role="dialog"
-              aria-modal="true"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="trash-modal" role="dialog" aria-modal={true} onClick={(e) => e.stopPropagation()}>
               <header className="trash-modal__head">
                 <div>
                   <h3>{t("profile.trashTitle")}</h3>
                   <p className="muted">{t("profile.trashDesc")}</p>
                 </div>
-                <button
-                  type="button"
-                  className="trash-modal__close"
-                  onClick={() => setTrashOpen(false)}
-                  aria-label={t("profile.trashCloseAria")}
-                >
-                  ✕
-                </button>
+                <button type="button" className="trash-modal__close" onClick={() => setTrashOpen(false)} aria-label={t("profile.trashCloseAria")}>✕</button>
               </header>
               <div className="trash-modal__list">
-                {trashQuery.isLoading && (
-                  <p className="muted">{t("profile.trashLoading")}</p>
-                )}
-                {!trashQuery.isLoading && (trashQuery.data?.items ?? []).length === 0 && (
-                  <p className="muted">{t("profile.trashEmptyMsg")}</p>
-                )}
+                {trashQuery.isLoading && <p className="muted">{t("profile.trashLoading")}</p>}
+                {!trashQuery.isLoading && (trashQuery.data?.items ?? []).length === 0 && <p className="muted">{t("profile.trashEmptyMsg")}</p>}
                 {(trashQuery.data?.items ?? []).map((it) => {
-                  const restoring =
-                    restoreFileMutation.isPending &&
-                    restoreFileMutation.variables === it.id;
+                  const restoring = restoreFileMutation.isPending && restoreFileMutation.variables === it.id;
                   return (
                     <div key={it.id} className="trash-modal__item">
                       <div>
                         <strong>{it.title || it.type}</strong>
-                        <span className="muted">
-                          {it.type}
-                          {it.deleted_at
-                            ? ` · ${new Date(it.deleted_at).toLocaleDateString(isEN ? "en-US" : "ru-RU")}`
-                            : ""}
-                        </span>
+                        <span className="muted">{it.type}{it.deleted_at ? ` · ${new Date(it.deleted_at).toLocaleDateString(isEN ? "en-US" : "ru-RU")}` : ""}</span>
                       </div>
-                      <button
-                        type="button"
-                        className="filter-chip"
-                        title={t("profile.trashRestoreBtn")}
-                        onClick={() => restoreFileMutation.mutate(it.id)}
-                        disabled={restoring}
-                      >
+                      <button type="button" className="filter-chip" onClick={() => restoreFileMutation.mutate(it.id)} disabled={restoring}>
                         {restoring ? "…" : t("profile.trashRestoreBtn")}
                       </button>
                     </div>
@@ -860,15 +956,7 @@ export function ProfilePage() {
                 })}
               </div>
               <footer className="trash-modal__foot">
-                <button
-                  type="button"
-                  className="filter-chip filter-chip--danger"
-                  disabled={
-                    purgeTrashMutation.isPending ||
-                    (trashQuery.data?.items ?? []).length === 0
-                  }
-                  onClick={() => purgeTrashMutation.mutate()}
-                >
+                <button type="button" className="filter-chip filter-chip--danger" disabled={purgeTrashMutation.isPending || (trashQuery.data?.items ?? []).length === 0} onClick={() => purgeTrashMutation.mutate()}>
                   {purgeTrashMutation.isPending ? t("profile.trashPurging") : t("profile.trashPurge")}
                 </button>
                 <span className="muted">{t("profile.trashAutoClear")}</span>
@@ -878,497 +966,9 @@ export function ProfilePage() {
           document.body,
         )}
 
-      {/* Сетка виджетов */}
-      <div className="profile-grid">
-
-        {/* ─── Баланс и пакеты ─── */}
-        <section className="profile-card profile-card--tokens">
-          <div className="profile-card__header">
-            <span className="profile-card__icon" aria-hidden>
-              <Coin size={22} className="riffa-coin--lg" />
-            </span>
-            <h2 className="profile-card__title">{t("profile.balanceHeader")}</h2>
-          </div>
-          <div className="balance-display">
-            <p className="balance-display__amount">
-              {userBalance}
-              <Coin size={32} className="riffa-coin--lg riffa-coin--after" />
-            </p>
-            <div className="balance-display__label">{t("profile.balanceAvail")}</div>
-            <div className="balance-display__conversions">
-              <span>≈ {Math.floor(userBalance / 2)} {isEN ? "songs" : "песен"}</span>
-              <span>≈ {Math.floor(userBalance / 0.5)} SFX</span>
-              <span>≈ {Math.floor(userBalance / 1)} {isEN ? "covers" : "обложек"}</span>
-
-            </div>
-          </div>
-
-          <div className="token-packages">
-            {localPackages.map((p) => {
-              const packName = p.name;
-              const packCounts = isEN
-                ? `${Math.floor(p.tokens / 2)} songs · ${Math.floor(p.tokens / 0.5)} SFX · ${p.tokens} covers`
-                : `${Math.floor(p.tokens / 2)} песен · ${Math.floor(p.tokens / 0.5)} SFX · ${p.tokens} обложек`;
-
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  className={`token-pack${selectedPack === p.id ? " token-pack--active" : ""}`}
-                  onClick={() => setSelectedPack(p.id)}
-                >
-                  {p.discount !== undefined && (
-                    <span className="token-pack__badge">{t("profile.packDiscountBadge", { percent: p.discount })}</span>
-                  )}
-                  <span className="token-pack__name">{packName}</span>
-                  <strong className="token-pack__amount">
-                    {p.tokens}
-                    <Coin size={18} className="riffa-coin--after" />
-                  </strong>
-                  <span className="token-pack__gens">{packCounts}</span>
-                  <div className="token-pack__price">
-                    <span className="token-pack__price-label">{t("profile.packPriceLabel")}</span>
-                    <span className="token-pack__price-value">{isEN ? `₽${p.priceRub}` : `${p.priceRub}₽`}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="payment-methods">
-            <span className="payment-methods__label">{t("profile.paymentMethod")}</span>
-            <div className="payment-methods__grid">
-              {PAYMENT_METHODS.map((m) => {
-                const label = m.id === "card" ? t("profile.paymentCard")
-                            : m.id === "stars" ? t("profile.paymentStars")
-                            : t("profile.paymentCrypto");
-                const hint  = m.id === "card" ? t("profile.paymentCardHint")
-                            : m.id === "stars" ? t("profile.paymentStarsHint")
-                            : t("profile.paymentCryptoHint");
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className={`pay-method${payMethod === m.id ? " pay-method--active" : ""}`}
-                    onClick={() => setPayMethod(m.id)}
-                    disabled={m.id === "crypto"}
-                  >
-                    <strong>{label}</strong>
-                    <small>{hint}</small>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="btn btn--primary btn--wide"
-            onClick={handleBuyPack}
-            disabled={payStatus === "loading" || payMethod === "crypto"}
-          >
-            {payStatus === "loading" ? t("profile.paymentLoading") : t("profile.buyTokens")}
-          </button>
-          {payError && (
-            <p style={{ color: "var(--error, #ff6b6b)", fontSize: 13, margin: "4px 0 0" }}>
-              {payError}
-            </p>
-          )}
-
-          {/* ─── Промокод ─── */}
-          <div className="promo-redeem">
-            <label className="promo-redeem__label" htmlFor="promo-input">
-              {t("profile.promoHave")}
-            </label>
-            <input
-              id="promo-input"
-              type="text"
-              className="promo-redeem__input"
-              placeholder={t("profile.promoInputPlaceholder")}
-              value={promoCode}
-              onChange={(e) => {
-                setPromoCode(e.target.value.toUpperCase());
-                if (promoStatus !== "idle") {
-                  setPromoStatus("idle");
-                  setPromoMessage(null);
-                }
-              }}
-              maxLength={32}
-              spellCheck={false}
-              autoCapitalize="characters"
-              disabled={promoStatus === "saving"}
-            />
-            <button
-              type="button"
-              className="btn btn--secondary btn--wide"
-              onClick={handleRedeemPromo}
-              disabled={promoStatus === "saving" || !promoCode.trim()}
-            >
-              {promoStatus === "saving" ? "..." : t("profile.promoActivate")}
-            </button>
-            {promoMessage && (
-              <div
-                className={`promo-redeem__msg promo-redeem__msg--${
-                  promoStatus === "ok" ? "ok" : "err"
-                }`}
-                role={promoStatus === "ok" ? "status" : "alert"}
-              >
-                {promoMessage}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* ─── Файлы ─── */}
-        <section className="profile-card profile-card--files">
-          <div className="profile-card__header">
-            <Icon name="📁" />
-            <h2 className="profile-card__title">{t("profile.myFiles")}</h2>
-            <span className="profile-card__meta">{filteredFiles.length} / {libraryItems.length}</span>
-          </div>
-
-          {/* Тип файла — чипы */}
-          <div className="file-type-chips">
-            {(["all", "song", "instrumental", "cover", "sfx", "cover_art"] as Array<"all" | LibraryItemType>).map((ft) => (
-              <button
-                key={ft}
-                type="button"
-                className={`filter-chip${filterType === ft ? " filter-chip--active" : ""}`}
-                onClick={() => setFilterType(ft)}
-              >
-                {ft === "all" ? t("profile.filesAll") : typeLabel(ft)}
-              </button>
-            ))}
-          </div>
-
-          {/* Настроение / Жанр / Сортировка — кастомный брендированный дропдаун */}
-          <div className="file-filters">
-            <div className="file-filters__label">
-              <span className="file-filters__label-text">{t("profile.filterMoodLabel")}</span>
-              <FilterSelect options={moodOptions} value={filterMood} onChange={setFilterMood} />
-            </div>
-            <div className="file-filters__label">
-              <span className="file-filters__label-text">{t("profile.filterGenreLabel")}</span>
-              <FilterSelect options={genreOptions} value={filterGenre} onChange={setFilterGenre} />
-            </div>
-            <div className="file-filters__label">
-              <span className="file-filters__label-text">{t("profile.filterSortLabel")}</span>
-              <FilterSelect
-                options={sortOptions}
-                value={filterSort}
-                onChange={(v) => setFilterSort(v as "newest" | "oldest")}
-              />
-            </div>
-          </div>
-
-          <div className="generations-list">
-            {filesAuthError ? (
-              <div className="empty-state">
-                <div className="empty-state__icon">🔒</div>
-                <div className="empty-state__text">{t("profile.filesNeedAuth")}</div>
-              </div>
-            ) : filesLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <div key={`skel-${i}`} className="file-skeleton" aria-hidden="true">
-                  <div className="file-skeleton__icon" />
-                  <div className="file-skeleton__lines">
-                    <div className="file-skeleton__line" style={{ width: `${60 + ((i * 17) % 40)}%` }} />
-                    <div className="file-skeleton__line file-skeleton__line--short" />
-                  </div>
-                  <div className="file-skeleton__action" />
-                </div>
-              ))
-            ) : filteredFiles.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-state__icon">📂</div>
-                <div className="empty-state__text">
-                  {libraryItems.length === 0
-                    ? t("profile.filesEmptyFirst")
-                    : t("profile.filesNoMatch")}
-                </div>
-              </div>
-            ) : (
-              <AnimatePresence initial={false}>
-                {filteredFiles.map((f) => {
-                  const isActive = currentId === f.id;
-                  const canRadio = RADIO_TYPES.has(f.type) && f.isOwn;
-                  const canBolt = MUSIC_TYPES.has(f.type);
-                  const radioPending =
-                    radioMutation.isPending && radioMutation.variables?.itemId === f.id;
-                  return (
-                    <motion.div
-                      key={f.id}
-                      role="button"
-                      tabIndex={0}
-                      className={`file-item${isActive ? " file-item--active" : ""}`}
-                      onClick={() => handlePlayItem(f)}
-                      onKeyDown={(e) => e.key === "Enter" && handlePlayItem(f)}
-                      initial={{ opacity: 0, x: -16 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.22, ease: "easeOut" }}
-                    >
-                      {f.coverUrl ? (
-                        <span
-                          className="file-item__icon file-item__icon--cover"
-                          aria-hidden
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setViewerImage({ url: f.coverUrl!, title: f.title });
-                          }}
-                          style={{ cursor: "zoom-in" }}
-                          title={t("profile.openFullscreen")}
-                        >
-                          <img src={f.coverUrl} alt="" loading="lazy" />
-                        </span>
-                      ) : (
-                        <span className="file-item__icon" aria-hidden>{TYPE_ICONS[f.type]}</span>
-                      )}
-                      <div className="file-item__info">
-                        <span className="file-item__title">{f.title}</span>
-                        <span className="file-item__meta">
-                          {typeLabel(f.type)} · {f.genre} · {f.mood} · {f.duration}
-                        </span>
-                      </div>
-                      <FileActions
-                        audioUrl={f.audioUrl}
-                        downloadUrl={
-                          f.trackIndex !== null
-                            ? trackDownloadUrl(f.generationId, f.trackIndex)
-                            : undefined
-                        }
-                        title={f.title}
-                        isMusicType={canBolt}
-                        canRadio={canRadio}
-                        fileId={f.id}
-                        isPublic={f.isPublic}
-                        generationId={f.generationId}
-                        audioId={f.audioId}
-                        onToggleRadio={
-                          canRadio
-                            ? (next) =>
-                                radioMutation.mutateAsync({
-                                  itemId: f.id,
-                                  generationId: f.generationId,
-                                  trackIndex: f.trackIndex,
-                                  isPublic: next,
-                                })
-                            : undefined
-                        }
-                        radioPending={radioPending}
-                        isActive={isActive}
-                        isPlaying={isPlaying}
-                        onPlayPause={f.audioUrl ? () => handlePlayItem(f) : undefined}
-                        onDelete={(rect) => {
-                          showFileGhost(f, rect);
-                          deleteFileMutation.mutate(f.generationId);
-                        }}
-                      />
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            )}
-          </div>
-        </section>
-
-        {/* ─── Статистика + Любимые стили ─── */}
-        <section className="profile-card profile-card--insights">
-          <div className="insights-grid">
-            <div>
-              <div className="profile-card__header">
-                <h2 className="profile-card__title">{t("profile.statsHeader")}</h2>
-              </div>
-              <div className="stat-summary">
-                <strong>{totalGens}</strong>
-                <span>{totalGens === 0 ? t("profile.statsNone") : totalGens === 1 ? t("profile.statsOne") : totalGens < 5 ? t("profile.statsFew") : t("profile.statsMany")}</span>
-              </div>
-              <div className="stat-bars">
-                {genStats.map((s) => (
-                  <div key={s.type} className="stat-bar">
-                    <div className="stat-bar__head">
-                      <span>{s.label}</span>
-                      <strong>{s.count}</strong>
-                    </div>
-                    <div className="stat-bar__track">
-                      <div
-                        className="stat-bar__fill"
-                        style={{ width: `${(s.count / maxStat) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-                {genStats.length === 0 && (
-                  <p className="muted">{t("profile.statsEmpty")}</p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <div className="profile-card__header">
-                <h2 className="profile-card__title">{t("profile.tastesHeader")}</h2>
-              </div>
-
-              <div className="taste-group">
-                <h3 className="taste-group__title">{t("profile.tastesGenres")}</h3>
-                {favouriteGenres.length > 0 ? (
-                  <div className="taste-chips">
-                    {favouriteGenres.map((g) => (
-                      <span key={g.name} className="taste-chip">
-                        {g.name}
-                        <small>{g.count}</small>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="muted">{t("profile.tastesNoGenres")}</p>
-                )}
-              </div>
-
-              <div className="taste-group">
-                <h3 className="taste-group__title">{t("profile.tastesMoods")}</h3>
-                {favouriteMoods.length > 0 ? (
-                  <div className="taste-chips">
-                    {favouriteMoods.map((m) => (
-                      <span key={m.name} className="taste-chip">
-                        {m.name}
-                        <small>{m.count}</small>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="muted">{t("profile.tastesNoMoods")}</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ─── Документы ─── */}
-        <section className="profile-card profile-card--docs">
-          <div className="profile-card__header">
-            <Icon name="📄" />
-            <h2 className="profile-card__title">{t("profile.docsHeader")}</h2>
-          </div>
-          <ul className="docs-list">
-            {localLegalDocs.map((d) => (
-              <li key={d.id}>
-                <a href={d.href} className="doc-row" target="_blank" rel="noopener noreferrer">
-                  <div>
-                    <strong>{d.title}</strong>
-                    <small>{d.hint}</small>
-                  </div>
-                  <span aria-hidden>→</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* ─── Отзывы ─── */}
-        <section className="profile-card profile-card--reviews">
-          <div className="profile-card__header">
-            <Icon name="💬" />
-            <h2 className="profile-card__title">{t("profile.reviewsHeader")}</h2>
-            <span className="profile-card__meta">{reviews.length}</span>
-          </div>
-
-          <form className="review-form" onSubmit={submitReview}>
-            <div className="review-form__stars">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  type="button"
-                  key={n}
-                  className={`star${n <= reviewRating ? " star--on" : ""}`}
-                  onClick={() => setReviewRating(n)}
-                  aria-label={t("profile.reviewStarsAria", { n })}
-                >
-                  ★
-                </button>
-              ))}
-            </div>
-            <textarea
-              rows={3}
-              value={reviewText}
-              onChange={(e) => setReviewText(e.target.value)}
-              placeholder={t("profile.reviewPlaceholder")}
-            />
-            <button
-              type="submit"
-              className="btn btn--primary"
-              disabled={!reviewText.trim()}
-            >
-              {t("profile.reviewSubmit")}
-            </button>
-          </form>
-
-          <div className="review-list">
-            {reviews.map((r) => (
-              <article key={r.id} className="review-item">
-                <header>
-                  <strong>{r.author}</strong>
-                  <span className="review-item__stars">
-                    {"★".repeat(r.rating)}
-                    {"☆".repeat(5 - r.rating)}
-                  </span>
-                  <small>{r.date}</small>
-                </header>
-                <p>{r.text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        {/* ─── Реферальная программа ─── */}
-        <section className="profile-card profile-card--referral">
-          <div className="profile-card__header">
-            <Icon name="🎁" />
-            <h2 className="profile-card__title">{t("profile.referralHeader")}</h2>
-          </div>
-
-          <div className="referral-stats">
-            <div className="referral-stat">
-              <strong>0</strong>
-              <span>{t("profile.referralInvited")}</span>
-            </div>
-            <div className="referral-stat">
-              <strong className="referral-stat__amount">
-                0
-                <Coin size={18} className="riffa-coin--after" />
-              </strong>
-              <span>{t("profile.referralBonus")}</span>
-            </div>
-            <div className="referral-stat">
-              <strong>—</strong>
-              <span>{t("profile.referralFromRefs")}</span>
-            </div>
-          </div>
-
-          <div className="referral-perks">
-            <h3>{t("profile.referralHowTitle")}</h3>
-            <ul>
-              <li><strong>4 <Coin /></strong> {t("profile.referralFriendGets")}</li>
-              <li><strong>10 <Coin /></strong> {t("profile.referralYouGet")}</li>
-            </ul>
-          </div>
-
-          <div className="referral-link">
-            <span className="referral-link__text">{referralLink}</span>
-            <button type="button" className="referral-link__copy" onClick={copyReferral}>
-              {copied ? t("common.copied") : t("common.copy")}
-            </button>
-          </div>
-        </section>
-      </div>
-
-      {/* Floating ghosts that play the explosion animation while the grid
-       *  magnetises remaining files upward. */}
       <FileGhostsOverlay ghosts={fileGhosts} />
       {viewerImage && (
-        <ImageViewer
-          imageUrl={viewerImage.url}
-          title={viewerImage.title}
-          onClose={() => setViewerImage(null)}
-        />
+        <ImageViewer imageUrl={viewerImage.url} title={viewerImage.title} onClose={() => setViewerImage(null)} />
       )}
     </div>
   );

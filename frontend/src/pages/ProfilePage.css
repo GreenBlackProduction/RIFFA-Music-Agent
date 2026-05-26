@@ -1,10 +1,223 @@
 /* ═══════════════════════════════════════════════════════
-   ProfilePage — полностью адаптивный CSS
-   Правило: все grid используют minmax(0,1fr), все flex-дети
-   имеют min-width:0 чтобы контент не растягивал контейнер.
+   ProfilePage — prototype structure
    ═══════════════════════════════════════════════════════ */
 
-/* ─────────── Контейнер страницы ─────────── */
+/* ── Outer container ── */
+.profile { min-width: 0; width: 100%; }
+
+/* ── Profile grid: 280px avatar | 1fr content ── */
+.profile-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 28px;
+  margin-bottom: 0;
+}
+@media (max-width: 860px) {
+  .profile-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Avatar block ── */
+.avatar-block {
+  text-align: center;
+  padding: 28px;
+  background: var(--paper-3);
+  border: 1px solid var(--ink);
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.avatar-big {
+  width: 110px;
+  height: 110px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--emr) 0%, var(--ink) 100%);
+  color: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 600;
+  margin: 0 auto 16px;
+  border: none;
+  cursor: pointer;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: opacity 150ms;
+}
+.avatar-big:hover { opacity: 0.85; }
+.avatar-big--loading { opacity: 0.6; cursor: default; }
+.avatar-big img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-block .name { font-size: 18px; font-weight: 600; margin-bottom: 4px; word-break: break-word; }
+.avatar-block .email { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); word-break: break-all; }
+.avatar-block .since { font-family: var(--font-mono); font-size: 10px; color: var(--ink-4); margin-top: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+.profile-avatar-error { display: block; font-size: 12px; color: var(--hi); margin-top: 6px; }
+
+/* ── Name edit inline ── */
+.name-inline { cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.name-inline__edit { font-size: 11px; color: var(--ink-4); }
+.name-edit-row { display: flex; gap: 6px; align-items: center; justify-content: center; }
+.name-edit-row input { padding: 6px 10px; border: 1px solid var(--rule); border-radius: 8px; background: var(--paper); font: inherit; font-size: 14px; width: 140px; outline: none; }
+.name-edit-row input:focus { border-color: var(--hi); }
+
+/* ── Field (form inputs) ── */
+.field { display: grid; gap: 8px; margin-bottom: 18px; }
+.field label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+.field input, .field textarea {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 13px 14px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 120ms, box-shadow 120ms;
+  width: 100%;
+}
+.field input:focus, .field textarea:focus {
+  border-color: var(--hi);
+  box-shadow: 0 0 0 3px var(--hi-soft);
+}
+.field input[readonly] { cursor: pointer; }
+
+/* ── Pricing grid ── */
+.pricing {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border: 1px solid var(--ink);
+  border-radius: 14px;
+  background: var(--paper-3);
+  overflow: hidden;
+}
+@media (max-width: 860px) {
+  .pricing { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 540px) {
+  .pricing { grid-template-columns: 1fr; }
+}
+
+.price-tile {
+  padding: 26px 22px;
+  border-right: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.price-tile:last-child { border-right: none; }
+.price-tile:hover { background: var(--paper-4); }
+.price-tile.is-featured { background: var(--ink); color: var(--paper); }
+.price-tile.is-featured:hover { background: var(--ink); }
+.price-tile.is-selected { box-shadow: inset 0 0 0 2px var(--hi); }
+.price-tile.is-featured.is-selected { box-shadow: inset 0 0 0 2px var(--hi); }
+
+.price-tile .tier {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+.price-tile.is-featured .tier { color: var(--hi); }
+
+.price-tile .price {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 48px;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  margin: 14px 0 4px;
+}
+.price-tile .price small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-3);
+  margin-left: 4px;
+}
+.price-tile.is-featured .price small { color: rgba(233,229,218,0.6); }
+
+.price-tile .tokens-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  margin-bottom: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.price-tile.is-featured .tokens-meta { color: rgba(233,229,218,0.5); }
+
+.price-tile .discount {
+  display: inline-block;
+  margin-top: 2px;
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--emr-soft);
+  color: var(--emr);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.price-tile.is-featured .discount { background: var(--emr); color: var(--paper); }
+
+.price-tile .perks {
+  list-style: none;
+  margin: 8px 0 18px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  flex: 1;
+}
+.price-tile.is-featured .perks { color: rgba(233,229,218,0.85); }
+.price-tile .perks li::before { content: "→ "; font-family: var(--font-mono); color: var(--emr); font-weight: 600; }
+.price-tile.is-featured .perks li::before { color: var(--hi); }
+
+/* ── Doc list ── */
+.doc-list { display: grid; gap: 0; border: 1px solid var(--ink); border-radius: 14px; background: var(--paper-3); overflow: hidden; }
+.doc-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  transition: background 120ms;
+  align-items: center;
+  color: var(--ink);
+  text-decoration: none;
+}
+.doc-row:last-child { border-bottom: none; }
+.doc-row:hover { background: var(--paper-4); }
+.doc-row .icon {
+  width: 28px;
+  height: 28px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+.doc-row .title { font-weight: 600; font-size: 14px; }
+.doc-row .hint { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.doc-row .chevron { font-family: var(--font-mono); color: var(--ink-4); }
+
+/* ─────────── Legacy container (kept for modals/trash) ─────────── */
 
 .profile-container {
   display: flex;
@@ -14,54 +227,7 @@
   width: 100%;
 }
 
-/* ─────────── Сетка виджетов ─────────── */
-
-.profile-grid {
-  display: grid;
-  grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: var(--space-4);
-}
-
-/* Шапка → токены слева, файлы сразу справа (на одной линии).
- * Под ними: статистика и любимые стили — компактно, span 4+4+4 (или 6+6).
- * Реферал и документы на одной строке. Отзывы — снизу на всю ширину. */
-.profile-card--tokens   { grid-column: span 6; }
-.profile-card--files    { grid-column: span 6; }
-.profile-card--insights { grid-column: span 12; }
-.profile-card--referral { grid-column: span 6; order: 5; }
-.profile-card--docs     { grid-column: span 6; order: 6; }
-.profile-card--reviews  { grid-column: span 12; order: 10; }
-
-/* Сетка внутри блока Статистика + Стили */
-.insights-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-6);
-}
-@media (max-width: 720px) {
-  .insights-grid { grid-template-columns: minmax(0, 1fr); }
-}
-
-@media (max-width: 960px) {
-  .profile-grid { grid-template-columns: minmax(0, 1fr); }
-  /* Все карточки: 1 колонка, сброс grid-row span */
-  .profile-card--tokens,
-  .profile-card--insights,
-  .profile-card--files,
-  .profile-card--docs,
-  .profile-card--reviews,
-  .profile-card--referral {
-    grid-column: 1 / -1;
-    grid-row: auto;
-  }
-  /* Мобильный порядок: tokens → files → insights → referral → docs → reviews */
-  .profile-card--tokens   { order: 1; }
-  .profile-card--files    { order: 2; }
-  .profile-card--insights { order: 3; }
-  .profile-card--referral { order: 4; }
-  .profile-card--docs     { order: 5; }
-  .profile-card--reviews  { order: 6; }
-}
+/* ─────────── Legacy card span rules (unused in v3) ─────────── */
 
 /* ─────────── Карточка ─────────── */
 

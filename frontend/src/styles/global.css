@@ -353,8 +353,6 @@ body.page-hidden * {
 /* ── Typography ───────────────────────────────────── */
 
 h1, h2, h3, h4 {
-  font-family: var(--font-display);
-  font-weight: 900;
   letter-spacing: -0.025em;
   margin: 0;
   overflow-wrap: break-word;
@@ -1010,7 +1008,7 @@ a {
 
 /* ── Page headline + lead ── */
 .h-page {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: clamp(36px, 5.5vw, 64px);
   font-weight: 500;
   letter-spacing: -0.035em;
@@ -1048,6 +1046,7 @@ a {
 }
 .h-section .tag .num { color: var(--ink); font-weight: 600; }
 .h-section h2 {
+  font-family: var(--font-body);
   font-size: 22px;
   font-weight: 500;
   letter-spacing: -0.015em;
@@ -1136,6 +1135,7 @@ a {
 }
 .module-badge.is-soon { background: var(--paper-2); }
 .module h3 {
+  font-family: var(--font-body);
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.015em;
@@ -1283,11 +1283,11 @@ a {
   color: var(--ink-4);
 }
 .stat .val {
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   line-height: 1;
-  font-family: var(--font-display);
+  margin-top: 4px;
 }
 .stat .val small { font-size: 14px; font-weight: 400; color: var(--ink-3); margin-left: 3px; }
 .stat .delta {
