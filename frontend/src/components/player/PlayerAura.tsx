@@ -88,25 +88,37 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
       const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AC) return;
       const ctx = new AC();
-      const source = ctx.createMediaElementSource(el);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;       // 128 бинов — достаточно для low/mid/high.
-      analyser.smoothingTimeConstant = 0.78;
-      source.connect(analyser);
-      analyser.connect(ctx.destination);  // звук идёт дальше в колонки.
 
-      audioCtxRef.current = ctx;
-      analyserRef.current = analyser;
-      freqDataRef.current = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
-      sourceConnectedRef.current = true;
-      reactiveModeRef.current = true;
+      // Если AudioContext создался в suspended-состоянии (это бывает, когда
+      // useEffect запускается вне прямого user gesture), пытаемся его
+      // возобновить. Если resume не удался — НЕ захватываем аудиоэлемент,
+      // иначе звук пропадёт (audio уйдёт в граф, но граф заморожен).
+      const connect = () => {
+        const source = ctx.createMediaElementSource(el);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.78;
+        source.connect(analyser);
+        analyser.connect(ctx.destination);
+        audioCtxRef.current = ctx;
+        analyserRef.current = analyser;
+        freqDataRef.current = new Uint8Array(new ArrayBuffer(analyser.frequencyBinCount));
+        sourceConnectedRef.current = true;
+        reactiveModeRef.current = true;
+      };
 
-      if (ctx.state === "suspended") {
-        void ctx.resume();
+      if (ctx.state === "running") {
+        connect();
+      } else {
+        ctx.resume().then(() => {
+          if (ctx.state === "running") {
+            connect();
+          } else {
+            ctx.close();
+          }
+        }).catch(() => ctx.close());
       }
     } catch (err) {
-      // Если что-то пошло не так (CORS на audio, повторный source и т.п.) —
-      // тихо падаем на синусоидную имитацию, не ломая воспроизведение.
       console.warn("[PlayerAura] Web Audio unavailable, falling back to idle animation:", err);
       reactiveModeRef.current = false;
     }

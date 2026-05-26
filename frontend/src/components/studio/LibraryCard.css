@@ -1,10 +1,5 @@
 .library-card {
-  grid-column: 1 / -1;
-  grid-row: 3;
-  padding: var(--space-5);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(20, 20, 32, 0.82), rgba(14, 14, 24, 0.94));
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -20,8 +15,8 @@
 
 .library-card__title {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: 22px;
+  font-family: var(--font-body);
+  font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.01em;
   display: flex;
@@ -36,7 +31,7 @@
 
 .library-card__hint {
   margin: 4px 0 0;
-  color: var(--muted);
+  color: var(--ink-3);
   font-size: 13px;
 }
 
@@ -44,7 +39,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--muted);
+  color: var(--ink-3);
 }
 
 .library-card__hint--loading::before {
@@ -52,8 +47,8 @@
   display: inline-block;
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(124, 255, 31, 0.25);
-  border-top-color: var(--accent);
+  border: 2px solid var(--rule);
+  border-top-color: var(--hi);
   border-radius: 50%;
   flex-shrink: 0;
   animation: lib-spin 0.8s linear infinite;
@@ -69,66 +64,93 @@
   gap: 6px;
 }
 
-/* .library-chip → используется глобальный .filter-chip из global.css */
+/* ── Фильтры — дропдауны ── */
+.library-filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
 
-/* ── grid: 2 колонки, окно на 2 ряда со скроллом ── */
+.library-select {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--paper-3);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  appearance: auto;
+  min-width: 150px;
+}
 
+.library-select:focus {
+  border-color: var(--rule-strong);
+}
+
+.library-select--sort {
+  min-width: 140px;
+  margin-left: auto;
+}
+
+/* ── Adaptive grid — cards fill available width ── */
 .library-card__grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: 52px;            /* каждый ряд — строго 52px */
-  /* Видимая область — 4 ряда (2×4 = 8 файлов). При большем
-     количестве включается прокрутка внутри блока. */
-  max-height: 238px;               /* окно показа: 52×4 + 10×3 = 238px */
-  overflow-y: auto;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 10px;
-  align-content: start;            /* короткий список лепится к верху */
+  align-content: start;
 }
 
-/* ── item — базовые стили в global.css (.file-item) ── */
-
-/* Незначительный override: hover чуть ярче зеленее для LibraryCard */
-.library-card .file-item:hover {
-  border-color: rgba(124, 255, 31, 0.35);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-/* ── встроенный плеер (legacy, не используется) ── */
-
-.library-player {
-  display: grid;
-  grid-template-columns: 48px 1fr auto auto;
+/* Bigger file-item cards in library context */
+.library-card__grid .file-item {
+  height: auto;
+  min-height: 80px;
+  padding: 14px 16px;
+  gap: 14px;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(124, 255, 31, 0.35);
-  background:
-    radial-gradient(120% 100% at 0% 0%, rgba(124, 255, 31, 0.1), transparent 55%),
-    radial-gradient(120% 100% at 100% 100%, rgba(214, 0, 255, 0.12), transparent 55%),
-    linear-gradient(180deg, rgba(20, 20, 32, 0.92), rgba(14, 14, 24, 0.96));
 }
 
-.library-player--idle {
-  border-color: var(--border);
-  background: rgba(255, 255, 255, 0.02);
+.library-card__grid .file-item:has(.file-item__right) {
+  grid-template-columns: 56px minmax(0, 1fr) auto auto;
 }
 
-/* ── Адаптивность ── */
-
-@media (max-width: 960px) {
-  .library-card {
-    grid-row: auto;
-  }
+.library-card__grid .file-item__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  font-size: 26px;
 }
 
-@media (max-width: 720px) {
-  .library-card__grid {
-    grid-template-columns: 1fr;
-  }
+.library-card__grid .file-item__icon img {
+  border-radius: 10px;
 }
 
-/* ── Trash filter chip ──────────────────────────────────── */
+.library-card__grid .file-item__title {
+  font-size: 14px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.library-card__grid .file-item__meta {
+  font-size: 10.5px;
+  margin-top: 2px;
+}
+
+.library-card .file-item:hover {
+  border-color: var(--rule-strong);
+  background: var(--paper-2);
+}
+
+/* ── Trash filter chip ── */
 .filter-chip--trash {
   opacity: 0.65;
   font-size: 14px;
@@ -137,16 +159,13 @@
 .filter-chip--trash.filter-chip--active { opacity: 1; }
 
 .filter-chip--danger {
-  border-color: rgba(255, 80, 60, 0.5);
-  background: rgba(255, 80, 60, 0.08);
-  color: #ff8b6b;
+  border-color: rgba(255, 59, 31, 0.4);
+  background: var(--hi-soft);
+  color: var(--hi);
 }
-.filter-chip--danger:hover { background: rgba(255, 80, 60, 0.18); }
+.filter-chip--danger:hover { background: rgba(255, 59, 31, 0.18); }
 
-/* Старая «крестик-в-углу» кнопка удалена — теперь внутри FileActions
- * (красная круглая кнопка в общем ряду действий, см. global.css). */
-
-/* ── Trash section ──────────────────────────────────────── */
+/* ── Trash section ── */
 .library-trash {
   display: flex;
   flex-direction: column;
@@ -175,33 +194,43 @@
   gap: 12px;
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 80, 60, 0.2);
-  background: rgba(255, 80, 60, 0.04);
+  border: 1px solid rgba(255, 59, 31, 0.2);
+  background: var(--hi-soft);
 }
 
 .trash-item__info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .trash-item__title {
   font-size: 13px;
-  color: var(--text);
+  color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.trash-item__meta { font-size: 11px; color: var(--muted); }
+.trash-item__meta { font-size: 11px; color: var(--ink-3); }
 
-/* На самых узких экранах — стек, элементы могут переноситься на 2 строки */
-@media (max-width: 540px) {
+/* ── Responsive ── */
+@media (max-width: 960px) {
   .library-card__grid {
-    display: flex;
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .library-filter-row {
     flex-direction: column;
-    min-height: 0;
-    max-height: 320px; /* ~4 развёрнутых элемента × 78px */
-    overflow-y: auto;
-    gap: 10px;
+    gap: 6px;
+  }
+  .library-filter-label {
+    min-width: unset;
+    padding-top: 0;
   }
   .library-card__grid .file-item {
-    height: auto;
-    min-height: 52px;
-    flex-shrink: 0;
+    min-height: 68px;
+    padding: 10px 12px;
+  }
+  .library-card__grid .file-item__icon {
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
   }
 }

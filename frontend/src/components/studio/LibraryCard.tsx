@@ -33,9 +33,10 @@ type FilterType = "all" | LibraryItemType | "trash";
 export function LibraryCard() {
   const { t } = useTranslation();
   const [filter, setFilter] = useState<FilterType>("all");
+  const [genreFilter, setGenreFilter] = useState<string>("");
+  const [moodFilter, setMoodFilter] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const typeLabel = (k: LibraryItemType) => t(`library.types.${k}`);
-  // Помним id треков, чьи обложки не смогли загрузиться (битый URL, истёкший
-  // CDN-токен), чтобы не показывать «битую картинку» — переключаемся на эмодзи.
   const [failedCovers, setFailedCovers] = useState<Set<string>>(new Set());
   const { ghosts, showGhost } = useFileGhosts();
   const queryClient = useQueryClient();
@@ -52,12 +53,38 @@ export function LibraryCard() {
 
   const { items, isLoading, authError } = useLibraryItems();
 
+  // Unique genres and moods extracted from actual items (non-empty, sorted)
+  const uniqueGenres = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of items) {
+      if (it.genre && it.genre.trim()) set.add(it.genre.trim());
+    }
+    return Array.from(set).sort();
+  }, [items]);
+
+  const uniqueMoods = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of items) {
+      if (it.mood && it.mood.trim()) set.add(it.mood.trim());
+    }
+    return Array.from(set).sort();
+  }, [items]);
+
   const visibleItems = useMemo(() => {
     if (filter === "trash") return [];
-    return filter === "all" ? items : items.filter((i) => i.type === filter);
-  }, [items, filter]);
+    let list = filter === "all" ? items : items.filter((i) => i.type === filter);
+    if (genreFilter) list = list.filter((i) => i.genre === genreFilter);
+    if (moodFilter)  list = list.filter((i) => i.mood  === moodFilter);
+    if (sortOrder === "oldest") list = [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return list;
+  }, [items, filter, genreFilter, moodFilter, sortOrder]);
 
-  // Trash tab — fetch deleted items separately.
+  // Reset secondary filters when type filter changes
+  useEffect(() => {
+    setGenreFilter("");
+    setMoodFilter("");
+  }, [filter]);
+
   const { data: trashData } = useQuery({
     queryKey: ["history", "trash"],
     queryFn: () => fetchTrash(),
@@ -73,7 +100,6 @@ export function LibraryCard() {
     },
   });
 
-  // Restore a single item from trash → moves back to library.
   const restoreMutation = useMutation({
     mutationFn: (generationId: string) => restoreGeneration(generationId),
     onSuccess: async () => {
@@ -82,31 +108,21 @@ export function LibraryCard() {
     },
   });
 
-  // Sync the global player's "В эфире" state with backend whenever items change.
-  // Keyed by item id (`gen.id#index` for multi-variant) so V1/V2 are independent.
   useEffect(() => {
     for (const it of items) {
       setRadioState(it.id, it.isPublic);
     }
   }, [items, setRadioState]);
 
-  // Delete with OPTIMISTIC cache update — file disappears from the list
-  // immediately. If the API call fails, we rollback.
   const deleteMutation = useMutation({
     mutationFn: ({ generationId, trackIndex }: { generationId: string; trackIndex: number | null }) =>
       deleteGeneration(generationId, trackIndex),
     onMutate: async ({ generationId, trackIndex }) => {
-      // Cancel any in-flight refetches so they don't overwrite our optimistic update.
       await queryClient.cancelQueries({ queryKey: HISTORY_QUERY_KEY });
-      // Snapshot all current history caches so we can roll back on error.
-      const snapshots = queryClient.getQueriesData<HistoryPage>({
-        queryKey: HISTORY_QUERY_KEY,
-      });
-      // Filter the deleted generation/track out of every cached page.
+      const snapshots = queryClient.getQueriesData<HistoryPage>({ queryKey: HISTORY_QUERY_KEY });
       queryClient.setQueriesData<HistoryPage>({ queryKey: HISTORY_QUERY_KEY }, (old) => {
         if (!old?.items) return old;
         if (trackIndex !== null) {
-          // Per-track: remove only that track from the generation's result.
           return {
             ...old,
             items: old.items.map((g: GenerationOut) => {
@@ -125,7 +141,6 @@ export function LibraryCard() {
       return { snapshots };
     },
     onError: (_err, _id, ctx) => {
-      // Restore previous state on failure so the user sees the item come back.
       if (ctx?.snapshots) {
         for (const [key, data] of ctx.snapshots) {
           queryClient.setQueryData(key, data);
@@ -133,12 +148,8 @@ export function LibraryCard() {
       }
     },
     onSettled: async () => {
-      // Sync with server state regardless of outcome.
       await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: ["history", "trash"] });
-      // Soft-delete also un-publishes the track from the public Radio
-      // (handled server-side); refresh radio caches so the playlist/chart
-      // reflect the change immediately.
       await queryClient.invalidateQueries({ queryKey: ["radio"] });
     },
   });
@@ -163,7 +174,6 @@ export function LibraryCard() {
 
   const handleClick = (item: LibraryItem) => {
     if (!item.audioUrl) return;
-    // Build the full playable queue from visible items so prev/next work.
     const queue = visibleItems
       .filter((i) => !!i.audioUrl)
       .map((i) => ({
@@ -190,8 +200,6 @@ export function LibraryCard() {
       isPublic: item.isPublic,
       audioId: item.audioId,
     };
-    // Unified play/pause logic: re-clicking the active row pauses/resumes;
-    // any other row starts a new playback with the freshly-built queue.
     playOrToggle(track, queue);
   };
 
@@ -207,6 +215,8 @@ export function LibraryCard() {
             {t("library.recentSubtitle")}
           </p>
         </div>
+
+        {/* Тип файла */}
         <div className="library-card__filters">
           {(["all", "song", "instrumental", "cover", "sfx", "wav", "cover_art"] as Exclude<FilterType, "trash">[]).map((f) => (
             <button
@@ -229,23 +239,57 @@ export function LibraryCard() {
         </div>
       </header>
 
+      {/* Фильтры — дропдауны */}
+      {filter !== "trash" && (
+        <div className="library-filters-bar">
+          {uniqueMoods.length > 0 && (
+            <select
+              className="library-select"
+              value={moodFilter}
+              onChange={(e) => setMoodFilter(e.target.value)}
+            >
+              <option value="">{t("library.moodAll", { defaultValue: "Любое настроение" })}</option>
+              {uniqueMoods.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          )}
+          {uniqueGenres.length > 0 && (
+            <select
+              className="library-select"
+              value={genreFilter}
+              onChange={(e) => setGenreFilter(e.target.value)}
+            >
+              <option value="">{t("library.genreAll", { defaultValue: "Любой жанр" })}</option>
+              {uniqueGenres.map((g) => <option key={g} value={g}>{g}</option>)}
+            </select>
+          )}
+          <select
+            className="library-select library-select--sort"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")}
+          >
+            <option value="newest">{t("library.sortNewest", { defaultValue: "Сначала новые" })}</option>
+            <option value="oldest">{t("library.sortOldest", { defaultValue: "Сначала старые" })}</option>
+          </select>
+        </div>
+      )}
+
       {isLoading && (
         <p className="library-card__hint library-card__hint--loading">
           {t("library.loadingFiles")}
         </p>
       )}
       {!isLoading && authError && (
-        <p className="library-card__hint" style={{ color: "var(--muted)" }}>
+        <p className="library-card__hint" style={{ color: "var(--ink-3)" }}>
           {t("library.signInPrompt")}
         </p>
       )}
       {!isLoading && !authError && visibleItems.length === 0 && filter !== "trash" && (
-        <p className="library-card__hint" style={{ color: "var(--muted)" }}>
+        <p className="library-card__hint" style={{ color: "var(--ink-3)" }}>
           {t("library.emptyStart")}
         </p>
       )}
       {!isLoading && filter === "trash" && visibleItems.length === 0 && (
-        <p className="library-card__hint" style={{ color: "var(--muted)" }}>
+        <p className="library-card__hint" style={{ color: "var(--ink-3)" }}>
           {t("library.trashEmpty")}
         </p>
       )}
@@ -341,7 +385,7 @@ export function LibraryCard() {
       </div>
       <FileGhostsOverlay ghosts={ghosts} />
 
-      {/* ── Trash section ─────────────────────────────────────────── */}
+      {/* ── Trash section ── */}
       {filter === "trash" && (
         <div className="library-trash">
           {(trashData?.items ?? []).length > 0 && (
