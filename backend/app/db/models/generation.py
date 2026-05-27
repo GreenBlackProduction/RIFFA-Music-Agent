@@ -117,6 +117,13 @@ class Generation(Base, TimestampMixin):
     dislike_count: Mapped[int] = mapped_column(
         Integer, default=0, nullable=False, server_default="0"
     )
+    # Per-track stats for Radio: {"0": {"likes": N, "dislikes": N, "plays": N}, "1": {...}}.
+    # Keys are stringified track indices (JSON limitation). The gen-level
+    # like_count / dislike_count / play_count above remain as legacy mirrors —
+    # the sum across all keys here.
+    track_stats: Mapped[dict[str, Any]] = mapped_column(
+        JSON, default=dict, nullable=False, server_default="{}"
+    )
 
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -140,6 +147,11 @@ class RadioVote(Base):
         nullable=False,
         index=True,
     )
+    # Which track variant (0 = V1, 1 = V2) of the generation this vote
+    # applies to. A user can vote V1 and V2 independently.
+    track_index: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -152,5 +164,8 @@ class RadioVote(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("generation_id", "user_id", name="uq_radio_votes_generation_user"),
+        UniqueConstraint(
+            "generation_id", "user_id", "track_index",
+            name="uq_radio_votes_generation_user_track",
+        ),
     )

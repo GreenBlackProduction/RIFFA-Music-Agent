@@ -46,7 +46,8 @@ _TYPE_TO_KIND: dict[GenerationType, str] = {
 
 
 class RadioTrackOut(BaseModel):
-    id: str
+    id: str  # generation_id (kept for backward compat — frontend uses this for vote URL)
+    track_index: int = 0  # which variant of the generation (0 = V1, 1 = V2)
     kind: str  # song | instrumental | cover
     title: str
     author: str  # @username or display name
@@ -83,6 +84,52 @@ class RadioStats(BaseModel):
 
 class VoteRequest(BaseModel):
     rating: Literal["like", "dislike", "remove"]
+    track_index: int = 0
+
+
+class PlayRequest(BaseModel):
+    track_index: int = 0
+
+
+def _track_stats(gen: Generation, idx: int) -> tuple[int, int, int]:
+    """Return (likes, dislikes, plays) for the given variant of a gen."""
+    stats = gen.track_stats if isinstance(gen.track_stats, dict) else {}
+    entry = stats.get(str(idx)) or {}
+    likes = int(entry.get("likes") or 0)
+    dislikes = int(entry.get("dislikes") or 0)
+    plays = int(entry.get("plays") or 0)
+    return likes, dislikes, plays
+
+
+def _published_indices(gen: Generation) -> list[int]:
+    """Resolve which track indices are published, honouring both columns."""
+    raw = gen.published_track_indices
+    if isinstance(raw, list) and raw:
+        return [int(i) for i in raw]
+    if gen.published_track_index is not None:
+        return [int(gen.published_track_index)]
+    return []
+
+
+def _bump_track_stat(gen: Generation, idx: int, field: str, delta: int) -> None:
+    """Increment one counter in track_stats and the legacy gen-level mirror."""
+    stats = dict(gen.track_stats) if isinstance(gen.track_stats, dict) else {}
+    key = str(idx)
+    entry = dict(stats.get(key) or {})
+    entry[field] = max(0, int(entry.get(field) or 0) + delta)
+    stats[key] = entry
+    gen.track_stats = stats
+    # Keep gen-level mirrors in sync (sum across all tracks). They're
+    # convenient for "user dashboard" totals and existing code that
+    # reads them directly.
+    totals = {"likes": 0, "dislikes": 0, "plays": 0}
+    for v in stats.values():
+        if isinstance(v, dict):
+            for k in totals:
+                totals[k] += int(v.get(k) or 0)
+    gen.like_count = totals["likes"]
+    gen.dislike_count = totals["dislikes"]
+    gen.play_count = totals["plays"]
 
 
 # ---------------------------------------------------------------------------
@@ -90,35 +137,20 @@ class VoteRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _first_track(gen: Generation) -> tuple[str, str | None, int]:
-    """Return (audio_url, image_url, duration) of the variant published on Radio.
-
-    Each generation may have multiple variants (V1/V2). When the user publishes
-    on Radio, ``published_track_index`` records *which* variant they want
-    broadcast — only that one should appear in the public feed. Falls back to
-    the first track with audio if the index is missing or out of range
-    (legacy generations / corrupt result blobs).
-    """
+def _track_at(gen: Generation, idx: int) -> tuple[str, str | None, int]:
+    """Return (audio_url, image_url, duration) for the given variant of a gen."""
     result: dict[str, Any] = gen.result or {}
     raw_tracks = result.get("tracks", []) or []
-    target_idx = gen.published_track_index
-    if isinstance(target_idx, int) and 0 <= target_idx < len(raw_tracks):
-        t = raw_tracks[target_idx]
-        url = t.get("audio_url") if isinstance(t, dict) else None
-        if url:
-            return (
-                str(url),
-                t.get("image_url"),
-                int(t.get("duration", 0) or 0),
-            )
-    for t in raw_tracks:
-        url = t.get("audio_url") if isinstance(t, dict) else None
-        if url:
-            return (
-                str(url),
-                t.get("image_url"),
-                int(t.get("duration", 0) or 0),
-            )
+    if 0 <= idx < len(raw_tracks):
+        t = raw_tracks[idx]
+        if isinstance(t, dict):
+            url = t.get("audio_url")
+            if url:
+                return (
+                    str(url),
+                    t.get("image_url"),
+                    int(t.get("duration", 0) or 0),
+                )
     return ("", None, 0)
 
 
@@ -134,23 +166,21 @@ def _author(user: User | None) -> str:
 
 def _to_out(
     gen: Generation,
+    track_index: int,
     author_user: User | None,
     my_vote: str | None,
     is_own: bool,
 ) -> RadioTrackOut | None:
-    raw_audio_url, image_url, duration = _first_track(gen)
+    """Compose a single radio row for one published variant of one generation."""
+    raw_audio_url, image_url, duration = _track_at(gen, track_index)
     if not raw_audio_url:
         return None
-    # Determine which track index is published for the public-stream proxy URL
-    result: dict[str, Any] = gen.result or {}
-    raw_tracks = result.get("tracks", []) or []
-    pub_idx = gen.published_track_index
-    if not (isinstance(pub_idx, int) and 0 <= pub_idx < len(raw_tracks) and raw_tracks[pub_idx].get("audio_url")):
-        pub_idx = next((i for i, t in enumerate(raw_tracks) if t.get("audio_url")), 0)
-    audio_url = f"/api/v1/tracks/{gen.id}/{pub_idx}/public-stream"
+    audio_url = f"/api/v1/tracks/{gen.id}/{track_index}/public-stream"
     kind = _TYPE_TO_KIND.get(gen.type, "song")
+    likes, dislikes, plays = _track_stats(gen, track_index)
     return RadioTrackOut(
         id=str(gen.id),
+        track_index=track_index,
         kind=kind,
         title=gen.title or "Без названия",
         author=_author(author_user),
@@ -161,10 +191,10 @@ def _to_out(
         audio_url=audio_url,
         image_url=image_url,
         duration=duration,
-        play_count=gen.play_count,
-        like_count=gen.like_count,
-        dislike_count=gen.dislike_count,
-        score=gen.like_count - gen.dislike_count,
+        play_count=plays,
+        like_count=likes,
+        dislike_count=dislikes,
+        score=likes - dislikes,
         my_vote=my_vote,
         published_at=(gen.published_at or gen.created_at).isoformat(),
         is_own=is_own,
@@ -219,29 +249,50 @@ async def list_radio(
     if threshold is not None:
         stmt = stmt.where(Generation.published_at >= threshold)
 
-    # Total count
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await session.execute(count_stmt)).scalar_one()
+    # Order generations first (sort is approximate when sorting by per-track stats;
+    # we re-sort flattened rows in Python after expansion).
+    stmt = stmt.order_by(desc(Generation.published_at))
+    # Pull a generous slice so the per-track expansion can still fill `limit`.
+    fetch_limit = max(limit * 3, limit)
+    fetch_offset = (page - 1) * limit
+    gens = list(
+        (await session.execute(stmt.offset(fetch_offset).limit(fetch_limit)))
+        .scalars()
+        .all()
+    )
 
-    # Sort
+    # Expand each generation into one row per published track index.
+    expanded: list[tuple[Generation, int]] = []
+    for g in gens:
+        for idx in _published_indices(g):
+            expanded.append((g, idx))
+
+    if not expanded:
+        return RadioListResponse(items=[], total=0, page=page, limit=limit)
+
+    # Sort the expanded rows.
+    def _key_score(pair: tuple[Generation, int]) -> tuple[int, str]:
+        g, idx = pair
+        likes, dislikes, _ = _track_stats(g, idx)
+        return (-(likes - dislikes), (g.published_at or g.created_at).isoformat())
+
+    def _key_plays(pair: tuple[Generation, int]) -> tuple[int, str]:
+        g, idx = pair
+        _, _, plays = _track_stats(g, idx)
+        return (-plays, (g.published_at or g.created_at).isoformat())
+
     if sort == "score":
-        stmt = stmt.order_by(
-            desc(Generation.like_count - Generation.dislike_count),
-            desc(Generation.published_at),
-        )
+        expanded.sort(key=_key_score)
     elif sort == "plays":
-        stmt = stmt.order_by(desc(Generation.play_count), desc(Generation.published_at))
-    else:  # recent
-        stmt = stmt.order_by(desc(Generation.published_at))
+        expanded.sort(key=_key_plays)
+    # else "recent" — already by published_at via SQL.
 
-    stmt = stmt.offset((page - 1) * limit).limit(limit)
-    gens = list((await session.execute(stmt)).scalars().all())
-
-    if not gens:
-        return RadioListResponse(items=[], total=total, page=page, limit=limit)
+    # Pagination over expanded rows.
+    total = len(expanded)
+    expanded = expanded[: limit]
 
     # Fetch authors in one query
-    user_ids = {g.user_id for g in gens}
+    user_ids = {g.user_id for g, _ in expanded}
     authors_map: dict[int, User] = {
         u.id: u
         for u in (
@@ -251,26 +302,30 @@ async def list_radio(
         .all()
     }
 
-    # Fetch my votes in one query
-    my_votes: dict[uuid.UUID, str] = {}
+    # Fetch my votes in one query — keyed by (generation_id, track_index).
+    my_votes: dict[tuple[uuid.UUID, int], str] = {}
     if me is not None:
-        gen_ids = [g.id for g in gens]
+        gen_ids = [g.id for g, _ in expanded]
         rows = (
             await session.execute(
-                select(RadioVote.generation_id, RadioVote.vote).where(
+                select(RadioVote.generation_id, RadioVote.track_index, RadioVote.vote)
+                .where(
                     RadioVote.user_id == me.id,
                     RadioVote.generation_id.in_(gen_ids),
                 )
             )
         ).all()
-        my_votes = {gid: v.value if hasattr(v, "value") else str(v) for gid, v in rows}
+        my_votes = {
+            (gid, int(idx)): v.value if hasattr(v, "value") else str(v)
+            for gid, idx, v in rows
+        }
 
     items: list[RadioTrackOut] = []
-    for g in gens:
+    for g, idx in expanded:
         author = authors_map.get(g.user_id)
-        my_vote = my_votes.get(g.id)
+        my_vote = my_votes.get((g.id, idx))
         is_own = me is not None and g.user_id == me.id
-        out = _to_out(g, author, my_vote, is_own)
+        out = _to_out(g, idx, author, my_vote, is_own)
         if out is not None:
             items.append(out)
 
@@ -430,13 +485,35 @@ async def my_collection(
         else {}
     )
 
+    # Which track indices did I like? For community radio votes that's the
+    # specific track_index; for own-rated gens it falls back to the published
+    # index list (or [0] if nothing was published).
+    radio_liked_pairs: dict[uuid.UUID, list[int]] = {}
+    rows = (
+        await session.execute(
+            select(RadioVote.generation_id, RadioVote.track_index).where(
+                RadioVote.user_id == me.id,
+                RadioVote.vote == GenerationRating.like,
+            )
+        )
+    ).all()
+    for gid, idx in rows:
+        radio_liked_pairs.setdefault(gid, []).append(int(idx))
+
     items: list[RadioTrackOut] = []
     for g in gens:
         author = authors_map.get(g.user_id)
         is_own = g.user_id == me.id
-        out = _to_out(g, author, "like", is_own)
-        if out is not None:
-            items.append(out)
+        # Decide which tracks to emit for this generation in the collection.
+        if g.id in radio_liked_pairs:
+            indices = sorted(set(radio_liked_pairs[g.id]))
+        else:
+            # own_liked path — emit the published variants (or 0 if none).
+            indices = _published_indices(g) or [0]
+        for idx in indices:
+            out = _to_out(g, idx, author, "like", is_own)
+            if out is not None:
+                items.append(out)
 
     return RadioListResponse(items=items, total=total, page=page, limit=limit)
 
@@ -450,7 +527,10 @@ async def vote_track(
 ) -> dict[str, int | str | None]:
     """Like, dislike or remove vote on a public Radio track.
 
-    Updates denormalised counters atomically.
+    Per-track: ``track_index`` in the body selects which variant
+    (0 = V1, 1 = V2) the vote applies to. Counters are stored in
+    ``Generation.track_stats``; the gen-level mirrors (like_count etc.)
+    are recomputed as the sum across variants.
     """
     try:
         gid = uuid.UUID(gen_id)
@@ -458,6 +538,8 @@ async def vote_track(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="not found"
         ) from exc
+
+    track_index = int(body.track_index or 0)
 
     gen = (
         await session.execute(
@@ -479,6 +561,7 @@ async def vote_track(
             select(RadioVote).where(
                 RadioVote.generation_id == gid,
                 RadioVote.user_id == me.id,
+                RadioVote.track_index == track_index,
             )
         )
     ).scalar_one_or_none()
@@ -497,6 +580,7 @@ async def vote_track(
                 RadioVote(
                     generation_id=gid,
                     user_id=me.id,
+                    track_index=track_index,
                     vote=new_enum,
                     created_at=datetime.now(UTC),
                 )
@@ -504,38 +588,46 @@ async def vote_track(
         else:
             existing.vote = new_enum
 
-    # Update denormalised counters.
+    # Update per-track counters.
     if prev == "like":
-        gen.like_count = max(0, gen.like_count - 1)
+        _bump_track_stat(gen, track_index, "likes", -1)
     elif prev == "dislike":
-        gen.dislike_count = max(0, gen.dislike_count - 1)
+        _bump_track_stat(gen, track_index, "dislikes", -1)
 
     if new_vote == "like":
-        gen.like_count = gen.like_count + 1
+        _bump_track_stat(gen, track_index, "likes", +1)
     elif new_vote == "dislike":
-        gen.dislike_count = gen.dislike_count + 1
+        _bump_track_stat(gen, track_index, "dislikes", +1)
 
     await session.commit()
 
+    likes, dislikes, _ = _track_stats(gen, track_index)
     return {
         "my_vote": new_vote,
-        "like_count": gen.like_count,
-        "dislike_count": gen.dislike_count,
+        "like_count": likes,
+        "dislike_count": dislikes,
     }
 
 
 @router.post("/{gen_id}/play", status_code=status.HTTP_204_NO_CONTENT)
 async def record_play(
     gen_id: str,
+    body: PlayRequest | None = None,
     session: AsyncSession = Depends(db_session),
 ) -> Response:
-    """Increment the play counter for a public track. Anonymous-friendly."""
+    """Increment the per-track play counter. Anonymous-friendly.
+
+    Accepts a JSON body with ``track_index`` (defaults to 0 if omitted) so
+    the legacy /play call without a body still works for the first variant.
+    """
     try:
         gid = uuid.UUID(gen_id)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="not found"
         ) from exc
+
+    track_index = int(body.track_index) if body is not None else 0
 
     gen = (
         await session.execute(
@@ -552,6 +644,6 @@ async def record_play(
             status_code=status.HTTP_404_NOT_FOUND, detail="track not found"
         )
 
-    gen.play_count = gen.play_count + 1
+    _bump_track_stat(gen, track_index, "plays", +1)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
