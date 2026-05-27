@@ -182,8 +182,9 @@ export function RadioPage() {
   function toPlayerTrack(track: RadioTrackOut) {
     const moodLabel = moodTranslated(track.mood ?? "");
     const meta = [track.genre, moodLabel, track.tempo].filter(Boolean).join(" · ");
+    // Composite id so V1/V2 of the same generation are distinct in the queue.
     return {
-      id: track.id,
+      id: `${track.id}#${track.track_index}`,
       title: track.title,
       url: track.audio_url ?? "",
       author: track.author,
@@ -239,15 +240,17 @@ export function RadioPage() {
 
   // ── Mutations ────────────────────────────────────────────
   const voteMutation = useMutation({
-    mutationFn: ({ id, rating }: { id: string; rating: "like" | "dislike" | "remove" }) =>
-      voteRadioTrack(id, rating),
+    mutationFn: ({ id, trackIndex, rating }: {
+      id: string; trackIndex: number; rating: "like" | "dislike" | "remove";
+    }) => voteRadioTrack(id, rating, trackIndex),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: RADIO_QUERY_KEY });
     },
   });
 
   const playMutation = useMutation({
-    mutationFn: (id: string) => recordRadioPlay(id),
+    mutationFn: ({ id, trackIndex }: { id: string; trackIndex: number }) =>
+      recordRadioPlay(id, trackIndex),
     onSuccess: async () => {
       // Increment is reflected in stats/playlist on next refetch; do it lazily.
       await queryClient.invalidateQueries({
@@ -285,13 +288,13 @@ export function RadioPage() {
       .map(toPlayerTrack);
     playOrToggle(toPlayerTrack(track), queue);
     // Only count a fresh play — toggling pause should not increment plays.
-    if (wasNew) playMutation.mutate(track.id);
+    if (wasNew) playMutation.mutate({ id: track.id, trackIndex: track.track_index });
   }
 
   function toggleVote(track: RadioTrackOut, next: "like" | "dislike") {
     const current = track.my_vote;
     const rating = current === next ? "remove" : next;
-    voteMutation.mutate({ id: track.id, rating });
+    voteMutation.mutate({ id: track.id, trackIndex: track.track_index, rating });
   }
 
   const authError =
@@ -380,10 +383,11 @@ export function RadioPage() {
         {!playlistLoading && authError && <p className="chart-empty">{t("errors.unauthorized")}</p>}
         {!playlistLoading && !authError && playlistError && <p className="chart-empty">{t("errors.generic")}</p>}
         {!playlistLoading && !authError && !playlistError && playlistTracks.map((track, i) => {
-          const isActive = currentId === track.id;
+          const rowId = `${track.id}#${track.track_index}`;
+          const isActive = currentId === rowId;
           const cc = coverColor(track.id);
           return (
-            <div key={track.id}
+            <div key={rowId}
               className={`chart-row${isActive ? " chart-row--active" : ""}`}
               onClick={() => play(track, playlistTracks)}
             >
@@ -451,10 +455,11 @@ export function RadioPage() {
       <div className="chart-list">
         {chartQuery.isLoading && <p className="chart-empty">{t("radio.loadingChart")}</p>}
         {chartTracks.map((ct, i) => {
-          const isActive = currentId === ct.id;
+          const ctRowId = `${ct.id}#${ct.track_index}`;
+          const isActive = currentId === ctRowId;
           const cc = coverColor(ct.id);
           return (
-            <div key={ct.id}
+            <div key={ctRowId}
               className={`chart-row${isActive ? " chart-row--active" : ""}`}
               onClick={() => play(ct, chartTracks)}
             >

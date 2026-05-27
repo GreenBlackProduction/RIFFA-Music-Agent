@@ -766,6 +766,7 @@ export type RadioVote = "like" | "dislike" | null;
 
 export interface RadioTrackOut {
   id: string;
+  track_index: number;
   kind: RadioKind;
   title: string;
   author: string;
@@ -857,15 +858,19 @@ export interface RadioVoteResponse {
 export function voteRadioTrack(
   id: string,
   rating: "like" | "dislike" | "remove",
+  trackIndex: number = 0,
 ): Promise<RadioVoteResponse> {
   return apiFetch(`/api/v1/radio/${id}/vote`, {
     method: "POST",
-    body: JSON.stringify({ rating }),
+    body: JSON.stringify({ rating, track_index: trackIndex }),
   });
 }
 
-export function recordRadioPlay(id: string): Promise<void> {
-  return apiFetch(`/api/v1/radio/${id}/play`, { method: "POST" });
+export function recordRadioPlay(id: string, trackIndex: number = 0): Promise<void> {
+  return apiFetch(`/api/v1/radio/${id}/play`, {
+    method: "POST",
+    body: JSON.stringify({ track_index: trackIndex }),
+  });
 }
 
 /** Admin-only: remove a track from public Radio. */

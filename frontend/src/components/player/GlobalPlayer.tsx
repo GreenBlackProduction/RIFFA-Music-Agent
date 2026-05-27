@@ -452,12 +452,13 @@ export function GlobalPlayer() {
       nextLocal === null ? "remove" : nextLocal;
 
     const tryOwn = currentIsOwn !== false;
+    const trackIndex = extractTrackIndex(currentId) ?? 0;
     let succeeded = false;
     try {
       if (tryOwn) {
         await rateGeneration(genId, apiRating);
       } else {
-        await voteRadioTrack(genId, apiRating);
+        await voteRadioTrack(genId, apiRating, trackIndex);
       }
       succeeded = true;
     } catch (err) {
@@ -468,7 +469,7 @@ export function GlobalPlayer() {
       if (status === 404 || status === 403) {
         try {
           if (tryOwn) {
-            await voteRadioTrack(genId, apiRating);
+            await voteRadioTrack(genId, apiRating, trackIndex);
           } else {
             await rateGeneration(genId, apiRating);
           }
