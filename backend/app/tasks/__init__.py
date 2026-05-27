@@ -22,6 +22,7 @@ from app.services.lyrics import make_lyrics_client
 from app.services.nanobanana import NanoBananaError, make_nanobanana_client
 from app.services.notifications import notify_generation_done
 from app.services.prompt_engineering import SongParams, build_suno_style, vocal_gender
+from app.services.track_naming import resolve_artist, compose_track_title
 from app.services.suno import SunoError, make_suno_client
 from app.services.mirror import mirror_generation_result
 from app.services.wallet import InsufficientBalance, credit_tokens, deduct_tokens
@@ -206,6 +207,14 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
     result: dict[str, Any] = {}
     error_msg: str | None = None
 
+    # Resolve the user's artist nickname once so the worker can prefix
+    # auto-generated titles ("Artist — Track Name").
+    async with session_factory() as _session:
+        _user_obj = (
+            await _session.execute(select(User).where(User.id == gen.user_id))
+        ).scalar_one_or_none()
+    track_artist: str = resolve_artist(_user_obj) if _user_obj else "RIFFA"
+
     try:
         if gen.type == GenerationType.song:
             await _publish(ctx, gen_id, {"status": "processing", "step": "lyrics"})
@@ -221,7 +230,8 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 lyrics = params.get("lyrics", "")
 
             if not gen.title:
-                gen.title = await lyrics_client.generate_title(params.get("description", ""))
+                short_title = await lyrics_client.generate_title(params.get("description", ""))
+                gen.title = compose_track_title(track_artist, short_title)
 
             # Agent-provided structured params override form fields
             agent_mp = params.get("agent_music_params") or {}
@@ -323,7 +333,10 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 song_params,
                 user_id=gen.user_id,
             )
-            title = gen.title or params.get("description", "Instrumental")[:80]
+            if not gen.title:
+                short_title = (params.get("description", "") or "Instrumental")[:60]
+                gen.title = compose_track_title(track_artist, short_title)
+            title = gen.title
 
             await _publish(ctx, gen_id, {"status": "processing", "step": "enriching_music"})
             style = await lyrics_client.enrich_music_prompt(
@@ -416,6 +429,9 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
 
             final_style = ", ".join(style_parts)[:1000]  # Suno limit
 
+            if not gen.title:
+                gen.title = compose_track_title(track_artist, "Cover")
+            cover_title = gen.title
             _dump_payload(gen_id, "cover_song", {
                 "upload_url": upload_url,
                 "genre": genre,
@@ -423,7 +439,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 "tempo": params.get("tempo", ""),
                 "style": final_style,
                 "lyrics": params.get("lyrics", ""),
-                "title": gen.title or "Cover",
+                "title": cover_title,
                 "instrumental": params.get("instrumental", False),
                 "vocal_gender": params.get("vocal_gender"),
             })
@@ -431,7 +447,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 upload_url=upload_url,
                 style=final_style,
                 prompt=params.get("lyrics", ""),
-                title=gen.title or "Cover",
+                title=cover_title,
                 instrumental=params.get("instrumental", False),
                 vocal_gender=params.get("vocal_gender"),
                 style_weight=params.get("style_weight"),

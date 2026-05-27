@@ -1,0 +1,49 @@
+"""Shared helpers for composing track titles with the user's artist nickname.
+
+The artist resolution rule (priority: explicit override > telegram_username >
+display_name > email-local > "RIFFA") is mirrored by `app/api/v1/tracks.py`
+for download ID3 tags. Keep them in sync if the rule changes.
+"""
+
+from __future__ import annotations
+
+from app.db.models import User
+
+
+def resolve_artist(user: User, override: str = "") -> str:
+    """Pick the artist label shown on the user's tracks."""
+    if override and override.strip():
+        return override.strip()[:60]
+    if user.telegram_username:
+        return user.telegram_username[:60]
+    if user.display_name and user.display_name != "RIFFA user":
+        return user.display_name[:60]
+    if user.email:
+        return user.email.split("@", 1)[0][:60]
+    return "RIFFA"
+
+
+def compose_track_title(artist: str, short_title: str, max_len: int = 80) -> str:
+    """Format `{artist} — {short_title}` honouring the Suno 80-char title cap.
+
+    Trims the short title first so the artist remains intact. Falls back to the
+    short title alone if artist is missing or the result still doesn't fit.
+    """
+    artist = (artist or "").strip()
+    short_title = (short_title or "").strip()
+    if not artist:
+        return short_title[:max_len]
+    if not short_title:
+        return artist[:max_len]
+    full = f"{artist} — {short_title}"
+    if len(full) <= max_len:
+        return full
+    # Try shrinking the short_title (preserve artist).
+    budget = max_len - len(artist) - 3  # 3 chars for " — "
+    if budget >= 8:
+        return f"{artist} — {short_title[:budget].rstrip(' .,;:-—')}"
+    # Artist alone is already too long — last resort, truncate the artist.
+    return full[:max_len]
+
+
+__all__ = ["resolve_artist", "compose_track_title"]

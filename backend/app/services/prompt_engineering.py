@@ -110,8 +110,10 @@ def build_suno_style(
     weight = max(0.70, min(1.0, weight + rng.uniform(-0.05, 0.05)))
     constraint = max(0.10, min(0.60, constraint + rng.uniform(-0.05, 0.05)))
 
-    # Step 3: deep mood influence
-    mood_key = _normalize(params.mood)
+    # Step 3: deep mood influence (canonicalise so freeform agent moods still match)
+    from app.services.mood_canonical import canonical_mood as _canonical_mood
+    raw_mood = _normalize(params.mood)
+    mood_key = _canonical_mood(raw_mood) or raw_mood
     mood_data = MOOD_PROFILES.get(mood_key)
     if mood_data:
         style_parts.append(mood_data["description"])

@@ -20,6 +20,7 @@ from app.core.config import Settings, get_settings
 from app.core.deps import current_user, db_session
 from app.core.limiter import limiter
 from app.db.models import Generation, GenerationStatus, GenerationType, User
+from app.services.mood_canonical import canonical_mood
 
 router = APIRouter(prefix="/generate", tags=["generate"])
 
@@ -179,6 +180,11 @@ async def _create_generation(
             detail=f"Недостаточно токенов: нужно {cost}, есть {user.balance_tokens}",
         )
 
+    # Canonicalise mood at write-time so Radio filters can find the track.
+    # Falls back to the raw value when no alias matches — the track stays
+    # visible in "all" view, just not under a specific mood category.
+    normalised_mood = canonical_mood(mood) or mood
+
     gen = Generation(
         id=uuid.uuid4(),
         user_id=user.id,
@@ -188,7 +194,7 @@ async def _create_generation(
         params=params,
         cost_tokens=cost,
         genre=genre or None,
-        mood=mood or None,
+        mood=normalised_mood or None,
         tempo=tempo or None,
         vocal=vocal or None,
     )
