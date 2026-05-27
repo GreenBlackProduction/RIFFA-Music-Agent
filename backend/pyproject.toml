@@ -5,6 +5,7 @@ description = "RIFFA Web backend (FastAPI + SQLAlchemy + Arq)"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.115.12",
+    "starlette>=0.40,<0.41",
     "uvicorn[standard]==0.34.2",
     "pydantic[email]==2.11.3",
     "pydantic-settings==2.6.1",
@@ -12,7 +13,7 @@ dependencies = [
     "asyncpg==0.30.0",
     "alembic==1.14.0",
     "httpx==0.28.1",
-    "redis==5.2.0",
+    "redis[hiredis]>=4.2,<5.3",
     "arq==0.26.1",
     "python-jose[cryptography]==3.3.0",
     "passlib[bcrypt]==1.7.4",
@@ -25,6 +26,8 @@ dependencies = [
     "aiofiles==24.1.0",
     "tenacity==9.0.0",
     "slowapi==0.1.9",
+    "limits<4",
+    "anyio>=3.5,<4.10",
 ]
 
 [project.optional-dependencies]
