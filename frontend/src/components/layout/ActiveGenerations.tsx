@@ -27,6 +27,18 @@ import { usePlayer } from "@/store/player";
 
 import "./ActiveGenerations.css";
 
+const IconPlay = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M6 4.5v15a1 1 0 0 0 1.5.87l13-7.5a1 1 0 0 0 0-1.74l-13-7.5A1 1 0 0 0 6 4.5z" />
+  </svg>
+);
+const IconPause = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <rect x="5" y="4" width="5" height="16" rx="1.5" />
+    <rect x="14" y="4" width="5" height="16" rx="1.5" />
+  </svg>
+);
+
 const STEP_KEYS = [
   "start", "lyrics", "enriching_music", "music",
   "submitting", "queued", "generating", "submitting_wav", "converting_wav",
@@ -169,7 +181,9 @@ function CompletedActions({ gen, onOpenPreview }: CardActionsProps) {
             aria-pressed={isCurrent}
             title={trk.title || label}
           >
-            <span aria-hidden="true">{isThisPlaying ? "⏸" : "▶"}</span>
+            <span aria-hidden="true" className="active-gen__icon">
+              {isThisPlaying ? <IconPause /> : <IconPlay />}
+            </span>
             <span>{label}</span>
           </button>
         );

@@ -161,6 +161,34 @@ function AgentAvatar({ thinking }: { thinking?: boolean }) {
   );
 }
 
+const IconCheck = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+);
+const IconClose = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+);
+const IconPencil = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </svg>
+);
+const IconRefresh = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 12a9 9 0 0 1 15.5-6.36L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.36L3 16M3 21v-5h5" />
+  </svg>
+);
+const IconWarn = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
 // ─── Props / result types ──────────────────────────────────────────────────
 
 export interface AgentChatProps {
@@ -385,10 +413,10 @@ export function AgentChat({
     });
   }
 
-  // Called when user clicks "✓ Accept lyrics"
+  // Called when user clicks "Accept lyrics"
   function handleAcceptLyrics() {
     addLocalPair(
-      isEn ? "✓ Accept lyrics" : "✓ Принимаю текст",
+      isEn ? "Accept lyrics" : "Принимаю текст",
       isEn ? "Great, lyrics accepted! Now pick a music genre:" : "Отлично, текст принят! Теперь выбери жанр музыки:",
       chips.genreChips,
     );
@@ -668,11 +696,12 @@ export function AgentChat({
               title="Начать новый диалог"
               aria-label="Новый чат"
             >
-              ↺ Новый чат
+              <IconRefresh />
+              <span>Новый чат</span>
             </button>
           )}
           <button type="button" className="agent-chat__close" onClick={onCancel} aria-label="Закрыть чат">
-            <span aria-hidden="true">✕</span>
+            <IconClose />
             <span className="agent-chat__close-text">закрыть чат</span>
           </button>
         </div>
@@ -703,14 +732,14 @@ export function AgentChat({
                     className="agent-lyrics-btn agent-lyrics-btn--accept"
                     onClick={handleAcceptLyrics}
                   >
-                    ✓ Принять текст
+                    <IconCheck /> Принять текст
                   </button>
                   <button
                     type="button"
                     className="agent-lyrics-btn agent-lyrics-btn--edit"
                     onClick={handleEditLyrics}
                   >
-                    ✏ Редактировать
+                    <IconPencil /> Редактировать
                   </button>
                 </div>
               )}
@@ -746,7 +775,7 @@ export function AgentChat({
               <span className="agent-typing"><span /><span /><span /></span>
               <span className="agent-thinking__status">{thinkingStatus}</span>
               {showLyricsIndicator && (
-                <span className="agent-thinking__lyrics-badge">✍ Генерирую текст</span>
+                <span className="agent-thinking__lyrics-badge"><IconPencil /> Генерирую текст</span>
               )}
               {thinkingElapsed >= 5 && (
                 <span className="agent-thinking__elapsed">{thinkingElapsed}с</span>
@@ -757,7 +786,7 @@ export function AgentChat({
 
         {error && (
           <div className="agent-chat__error">
-            <p>⚠ {error}</p>
+            <p><IconWarn /> {error}</p>
             {needsAuth && (
               <Button variant="secondary" onClick={() => navigate("/login")}>
                 Войти в аккаунт

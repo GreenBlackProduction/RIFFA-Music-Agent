@@ -25,6 +25,22 @@ import {
 import { Coin } from "@/components/ui/Coin";
 import "./ProfilePage.css";
 
+const IconCheck = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+);
+const IconClose = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+);
+const IconPencil = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </svg>
+);
+
 // ─────────── Токен-пакеты и способы оплаты ────────────
 
 interface TokenPackage {
@@ -379,12 +395,12 @@ export function ProfilePage() {
             {editingName ? (
               <div className="name-edit-row">
                 <input ref={nameInputRef} type="text" value={nameInput} onChange={(e) => setNameInput(e.target.value)} disabled={nameSaving} maxLength={64} onKeyDown={(e) => e.key === "Escape" && setEditingName(false)} />
-                <button type="button" className="btn btn-ink btn-sm" onClick={handleSaveName} disabled={nameSaving}>✓</button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEditingName(false); setNameInput(displayName); }}>✕</button>
+                <button type="button" className="btn btn-ink btn-sm" onClick={handleSaveName} disabled={nameSaving} aria-label="save"><IconCheck /></button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEditingName(false); setNameInput(displayName); }} aria-label="cancel"><IconClose /></button>
               </div>
             ) : (
               <span className="name-inline" onClick={() => { setNameInput(displayName); setEditingName(true); }}>
-                {displayName} <span className="name-inline__edit">✏</span>
+                {displayName} <span className="name-inline__edit"><IconPencil /></span>
               </span>
             )}
           </div>
@@ -451,8 +467,8 @@ export function ProfilePage() {
             {editingName ? (
               <div style={{ display: "flex", gap: 8 }}>
                 <input type="text" value={nameInput} onChange={(e) => setNameInput(e.target.value)} disabled={nameSaving} maxLength={64} onKeyDown={(e) => e.key === "Escape" && setEditingName(false)} autoFocus />
-                <button type="button" className="btn btn-ink btn-sm" onClick={handleSaveName} disabled={nameSaving}>✓</button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEditingName(false); setNameInput(displayName); }}>✕</button>
+                <button type="button" className="btn btn-ink btn-sm" onClick={handleSaveName} disabled={nameSaving} aria-label="save"><IconCheck /></button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEditingName(false); setNameInput(displayName); }} aria-label="cancel"><IconClose /></button>
               </div>
             ) : (
               <input type="text" value={displayName} readOnly onClick={() => { setNameInput(displayName); setEditingName(true); }} />
@@ -661,7 +677,7 @@ export function ProfilePage() {
                   <h3>{t("profile.trashTitle")}</h3>
                   <p className="muted">{t("profile.trashDesc")}</p>
                 </div>
-                <button type="button" className="trash-modal__close" onClick={() => setTrashOpen(false)} aria-label={t("profile.trashCloseAria")}>✕</button>
+                <button type="button" className="trash-modal__close" onClick={() => setTrashOpen(false)} aria-label={t("profile.trashCloseAria")}><IconClose /></button>
               </header>
               <div className="trash-modal__list">
                 {trashQuery.isLoading && <p className="muted">{t("profile.trashLoading")}</p>}
