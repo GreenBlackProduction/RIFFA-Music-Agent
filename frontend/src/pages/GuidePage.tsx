@@ -42,35 +42,42 @@ export function GuidePage() {
                 <span className="guide-step-num">1</span>
                 <div>
                   <strong>{isEN ? "Open the Studio" : "Открой Студию"}</strong>
-                  <p>{isEN ? "Go to Studio → make sure the \"Song\" tab is selected (it's the first one, active by default)." : "Перейди в Студию → убедись, что выбрана вкладка «Песня» (первая, активна по умолчанию)."}</p>
+                  <p>{isEN ? "On the Studio page click the \"Create a song\" tile — the main module. The track builder opens." : "На странице Студии нажми на плитку «Создать песню» — главный модуль. Открывается конструктор трека."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">2</span>
                 <div>
-                  <strong>{isEN ? "Describe the idea" : "Опиши идею"}</strong>
-                  <p>{isEN ? "In the text field write what you want. For example: \"sad song about autumn, piano, female voice\" or \"energetic hip-hop for a workout\". The more detail, the better the result." : "В текстовое поле напиши, что хочешь. Например: «грустная песня про осень, фортепиано, женский голос» или «энергичный хип-хоп для тренировки». Чем конкретнее описание, тем лучше результат."}</p>
+                  <strong>{isEN ? "Choose the lyrics mode" : "Выбери режим текста"}</strong>
+                  <p>{isEN ? "Three options: AI writes lyrics + vocals (default), your own lyrics (paste any text), or instrumental — no vocals at all." : "Три варианта: ИИ пишет текст + вокал (по умолчанию), свой текст (вставь любой), или инструментал — совсем без вокала."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">3</span>
                 <div>
-                  <strong>{isEN ? "Set parameters (optional)" : "Настрой параметры (необязательно)"}</strong>
-                  <p>{isEN ? "Below the text field are chips: genre, voice, tempo, duration. Leave them empty — the model will guess from the description. Or set them to narrow the result." : "Под текстовым полем — чипы: жанр, голос, темп, длительность. Оставь пустыми — модель угадает из описания. Или задай, чтобы сузить результат."}</p>
+                  <strong>{isEN ? "Describe the idea" : "Опиши идею"}</strong>
+                  <p>{isEN ? "In the description field write what you want: \"sad song about autumn, piano, female voice\" or \"energetic hip-hop for a workout\". The more detail, the better the result." : "В поле описания напиши, что хочешь: «грустная песня про осень, фортепиано, женский голос» или «энергичный хип-хоп для тренировки». Чем конкретнее, тем лучше результат."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">4</span>
                 <div>
-                  <strong>{isEN ? "Click \"Create Track\"" : "Нажми «Создать трек»"}</strong>
-                  <p>{isEN ? "The red button at the bottom right. Costs tokens — the exact price is shown above the button. Generation takes 25–40 seconds." : "Красная кнопка справа снизу. Списывает токены — точная цена видна над кнопкой. Генерация занимает 25–40 секунд."}</p>
+                  <strong>{isEN ? "Tune parameters (optional)" : "Настрой параметры (необязательно)"}</strong>
+                  <p>{isEN ? "Chips for genre, mood, tempo, vocal gender, timbre. Leave them empty — RIFFA infers from your description. Or pick a few to narrow the result." : "Чипы жанра, настроения, темпа, пола вокала, тембра. Оставь пустыми — RIFFA угадает из описания. Или выбери несколько, чтобы сузить результат."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">5</span>
                 <div>
-                  <strong>{isEN ? "Listen and download" : "Прослушай и скачай"}</strong>
-                  <p>{isEN ? "The finished track appears in the player at the bottom of the screen. Download MP3 for social media or WAV for editing in a DAW." : "Готовый трек появляется в плеере внизу экрана. Скачай MP3 для соцсетей или WAV для монтажа в DAW."}</p>
+                  <strong>{isEN ? "Click \"Create\"" : "Нажми «Создать»"}</strong>
+                  <p>{isEN ? "The emerald-coloured action button at the bottom of the form. Cost: 2 tokens. Suno returns TWO variants (V1 and V2) — usually within 30–60 seconds." : "Изумрудная кнопка-действие внизу формы. Цена: 2 токена. Suno возвращает ДВА варианта (V1 и V2) — обычно за 30–60 секунд."}</p>
+                </div>
+              </div>
+              <div className="guide-step">
+                <span className="guide-step-num">6</span>
+                <div>
+                  <strong>{isEN ? "Listen, pick a variant, download" : "Послушай, выбери вариант, скачай"}</strong>
+                  <p>{isEN ? "Both variants appear in your library card. Each variant is independent — you can like one, share another, publish only the V1 you prefer to Radio. Download MP3 for social media, WAV for DAW editing." : "Оба варианта появятся в карточке библиотеки. Каждый вариант независим — можно лайкнуть один, поделиться другим, выложить на Радио только тот, что больше понравился. Скачать MP3 для соцсетей, WAV для монтажа в DAW."}</p>
                 </div>
               </div>
             </div>
@@ -78,9 +85,9 @@ export function GuidePage() {
             <div className="guide-tips">
               <div className="guide-tips-head">{isEN ? "Tips" : "Советы"}</div>
               <ul>
-                <li>{isEN ? "Specify the mood and scene: \"a slow song about departure at dawn, city sounds in the background\" works much better than just \"sad song\"." : "Указывай настроение и сцену: «медленная песня о расставании на рассвете, городские звуки на фоне» работает намного лучше, чем просто «грустная песня»."}</li>
-                <li>{isEN ? "You can generate multiple variants in parallel — press the button again without waiting for the first to finish." : "Можно генерировать несколько вариантов параллельно — нажми кнопку ещё раз, не дожидаясь окончания первой."}</li>
-                <li>{isEN ? "Don't like the result? Tweak the description and regenerate — it's cheap." : "Результат не понравился? Подправь описание и пересоздай — это дёшево."}</li>
+                <li>{isEN ? "Specify mood and scene: \"a slow song about departure at dawn, city sounds in the background\" works much better than just \"sad song\"." : "Указывай настроение и сцену: «медленная песня о расставании на рассвете, городские звуки на фоне» работает гораздо лучше, чем просто «грустная песня»."}</li>
+                <li>{isEN ? "You always get two variants from one click — Suno generates a pair. Pick the better one, ignore the other or save both." : "За одно нажатие получишь два варианта — Suno всегда выдаёт пару. Выбери лучший, второй можно проигнорировать или сохранить."}</li>
+                <li>{isEN ? "Don't like the result? Tweak the description and regenerate — cheaper than starting from scratch." : "Результат не нравится? Подкрути описание и сгенерируй заново — это дешевле, чем начинать с нуля."}</li>
               </ul>
             </div>
           </div>
@@ -152,29 +159,29 @@ export function GuidePage() {
               <div className="guide-step">
                 <span className="guide-step-num">1</span>
                 <div>
-                  <strong>{isEN ? "Select the \"Instrumental\" tab" : "Выбери вкладку «Инструментал»"}</strong>
-                  <p>{isEN ? "In Studio, the second tab after Song. The form becomes simpler — no lyrics settings." : "В Студии — вторая вкладка после Песни. Форма становится проще — без настроек текста."}</p>
+                  <strong>{isEN ? "Open the Instrumental tile" : "Открой плитку «Инструментал»"}</strong>
+                  <p>{isEN ? "On the Studio page click the \"Instrumental\" tile. The builder is simpler than for Song — no lyrics fields, no vocal options." : "На странице Студии нажми плитку «Инструментал». Конструктор проще, чем у песни — нет полей текста и вокала."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">2</span>
                 <div>
                   <strong>{isEN ? "Describe the mood and style" : "Опиши настроение и стиль"}</strong>
-                  <p>{isEN ? "Write: \"epic cinematic orchestral music for a battle scene\" or \"calm jazz for a coffee shop, piano and double bass\". Name instruments, tempo, atmosphere." : "Напиши: «эпическая кинематографическая оркестровая музыка для батальной сцены» или «спокойный джаз для кофейни, фортепиано и контрабас». Называй инструменты, темп, атмосферу."}</p>
+                  <p>{isEN ? "Write: \"epic cinematic orchestral music for a battle scene\" or \"calm jazz for a coffee shop, piano and double bass\". Name instruments, tempo, atmosphere — Suno needs vocabulary." : "Напиши: «эпическая кинематографическая оркестровая музыка для батальной сцены» или «спокойный джаз для кофейни, фортепиано и контрабас». Называй инструменты, темп, атмосферу — Suno нужны конкретные слова."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">3</span>
                 <div>
-                  <strong>{isEN ? "Set duration" : "Задай длительность"}</strong>
-                  <p>{isEN ? "Via the chip below the text field. Options: 0:30, 1:00, 2:00, 3:00. For a video clip — pick exactly the right duration." : "Через чип под текстовым полем. Варианты: 0:30, 1:00, 2:00, 3:00. Под видеоролик — подбери нужную длительность точно."}</p>
+                  <strong>{isEN ? "Pick genre, mood, tempo" : "Выбери жанр, настроение, темп"}</strong>
+                  <p>{isEN ? "Chips below the description. Tempo ranges from very slow (60–80 BPM) to very fast (140–180 BPM). RIFFA doesn't expose a duration knob — Suno picks ~2 minutes by default." : "Чипы под описанием. Темп — от очень медленного (60–80 BPM) до очень быстрого (140–180 BPM). Длительность RIFFA не настраивает — Suno сам выбирает ~2 минуты."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">4</span>
                 <div>
-                  <strong>{isEN ? "Generate and check" : "Сгенерируй и проверь"}</strong>
-                  <p>{isEN ? "Click \"Create Track\". When done, listen carefully: does the dynamic fit, is the ending smooth? If not — clarify the description and regenerate." : "Нажми «Создать трек». Когда готово, прослушай внимательно: подходит ли динамика, плавно ли завершение? Нет — уточни описание и пересоздай."}</p>
+                  <strong>{isEN ? "Generate and check both variants" : "Сгенерируй и проверь оба варианта"}</strong>
+                  <p>{isEN ? "Click the action button. Cost: 2 tokens. Two variants come back — sometimes the second one is the winner. Listen end-to-end before deciding." : "Нажми кнопку-действие. Цена: 2 токена. Возвращается два варианта — иногда второй оказывается лучше первого. Послушай оба до конца перед выбором."}</p>
                 </div>
               </div>
             </div>
@@ -182,9 +189,9 @@ export function GuidePage() {
             <div className="guide-tips">
               <div className="guide-tips-head">{isEN ? "Tips" : "Советы"}</div>
               <ul>
-                <li>{isEN ? "Specify the purpose: \"for a product video\" or \"for a podcast intro\" helps the model understand what sound is needed." : "Указывай назначение: «для продуктового видео» или «для интро подкаста» помогает модели понять, какой звук нужен."}</li>
-                <li>{isEN ? "Write what instruments you want to hear. \"Acoustic guitar and strings, without drums\" is better than \"calm music\"." : "Пиши, какие инструменты хочешь слышать. «Акустическая гитара и струнные, без ударных» лучше, чем «спокойная музыка»."}</li>
-                <li>{isEN ? "BPM chip: if you know the tempo of your video edit, set it to match — the music will sync better in editing." : "Чип BPM: если знаешь темп монтажа видео, задай его — музыка лучше ляжет на монтаж."}</li>
+                <li>{isEN ? "Specify the purpose: \"for a product video\" or \"for a podcast intro\" helps the model nail the energy." : "Указывай назначение: «для продуктового видео» или «для интро подкаста» помогает модели подобрать правильную энергетику."}</li>
+                <li>{isEN ? "Write what instruments you want. \"Acoustic guitar and strings, no drums\" beats \"calm music\"." : "Пиши, какие инструменты хочешь. «Акустическая гитара и струнные, без ударных» лучше «спокойной музыки»."}</li>
+                <li>{isEN ? "Tempo chip: if you know your edit BPM, set it — the music will sit on the cut more naturally." : "Чип темпа: если знаешь BPM монтажа, задай его — музыка ляжет на склейки естественнее."}</li>
               </ul>
             </div>
           </div>
@@ -244,37 +251,37 @@ export function GuidePage() {
           <div className="guide-text">
             <p className="guide-lead-text">
               {isEN
-                ? "Take an existing song and reimagine it in a new style. Make a jazz version of a pop hit, or transfer a classical theme into electronic."
-                : "Возьми существующую песню и переосмысли её в новом стиле. Сделай джазовую версию поп-хита или перенеси классическую тему в электронику."}
+                ? "Take YOUR OWN audio — a hummed melody, an instrument recording, a sketch — and let Suno rebuild it into a full produced track in a chosen style. Copyrighted hits won't work: Suno automatically rejects audio that matches known recordings."
+                : "Возьми СВОЁ аудио — напев, запись инструмента, заготовку — и Suno соберёт из него полноценный продакшн в выбранном стиле. Чужие хиты не получится: Suno автоматически отклоняет аудио, совпадающее с известными записями."}
             </p>
 
             <div className="guide-steps">
               <div className="guide-step">
                 <span className="guide-step-num">1</span>
                 <div>
-                  <strong>{isEN ? "Select the \"Cover\" tab" : "Выбери вкладку «Кавер»"}</strong>
-                  <p>{isEN ? "In Studio, the fourth tab. The form has a dedicated field for the original." : "В Студии — четвёртая вкладка. Форма содержит отдельное поле для оригинала."}</p>
+                  <strong>{isEN ? "Open the Cover tile" : "Открой плитку «Кавер»"}</strong>
+                  <p>{isEN ? "On the Studio page click the \"Cover\" tile. The form opens with an audio uploader instead of a description-only field." : "На странице Студии нажми плитку «Кавер». Откроется форма, где сверху — загрузчик аудио, а не одно текстовое поле."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">2</span>
                 <div>
-                  <strong>{isEN ? "Specify the original" : "Укажи оригинал"}</strong>
-                  <p>{isEN ? "Enter the name of the song and artist. For example: \"Bohemian Rhapsody — Queen\" or \"Yesterday — The Beatles\". RIFFA will look up the track structure." : "Введи название песни и исполнителя. Например: «Bohemian Rhapsody — Queen» или «Yesterday — The Beatles». RIFFA найдёт структуру трека."}</p>
+                  <strong>{isEN ? "Upload audio or record your voice" : "Загрузи аудио или запиши голос"}</strong>
+                  <p>{isEN ? "Two options: upload a file (mp3/m4a/wav) or click the microphone to record straight in the browser. Length: up to ~3 minutes. Suno will detect tempo, key and structure automatically." : "Два варианта: загрузить файл (mp3/m4a/wav) или нажать «микрофон» и записать прямо в браузере. Длительность — до ~3 минут. Suno сам определит темп, тональность и структуру."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">3</span>
                 <div>
-                  <strong>{isEN ? "Describe the new style" : "Опиши новый стиль"}</strong>
-                  <p>{isEN ? "In the description field explain what you want to transform. \"In the style of lo-fi hip-hop, slowed down, with vinyl crackle\" or \"acoustic version, only guitar and voice\"." : "В поле описания объясни, что хочешь изменить. «В стиле lo-fi hip-hop, замедленная, с потрескиванием винила» или «акустическая версия, только гитара и голос»."}</p>
+                  <strong>{isEN ? "Describe the target style" : "Опиши целевой стиль"}</strong>
+                  <p>{isEN ? "In the style field explain how to transform it. \"Lo-fi hip-hop, slowed down, vinyl crackle\" or \"acoustic version with only guitar and voice\". Add lyrics if you want vocals." : "В поле стиля объясни, во что превратить. «Lo-fi hip-hop, замедленный, с потрескиванием винила» или «акустическая версия только гитара и голос». Добавь текст, если хочешь вокал."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">4</span>
                 <div>
-                  <strong>{isEN ? "Choose voice (optional)" : "Выбери голос (необязательно)"}</strong>
-                  <p>{isEN ? "If the original has a male voice but you want female — select the voice chip. Or leave it as is to preserve the original character." : "Если оригинал с мужским голосом, но хочешь женский — выбери чип голоса. Или оставь как есть, чтобы сохранить оригинальный характер."}</p>
+                  <strong>{isEN ? "Pick mood, tempo, vocal — optional" : "Выбери настроение, темп, вокал — опционально"}</strong>
+                  <p>{isEN ? "Chips work the same way as for Song / Instrumental. \"Instrumental only\" disables vocals entirely. Cost: 2 tokens; you get two variants back." : "Чипы работают так же, как у Песни / Инструментала. «Только инструментал» полностью отключает вокал. Цена: 2 токена; в ответ — два варианта."}</p>
                 </div>
               </div>
             </div>
@@ -282,9 +289,9 @@ export function GuidePage() {
             <div className="guide-tips">
               <div className="guide-tips-head">{isEN ? "Tips" : "Советы"}</div>
               <ul>
-                <li>{isEN ? "Stylistic leap works best: pop → jazz, rock → classical, folk → electronic. Slight changes within the same genre are less noticeable." : "Стилевой прыжок работает лучше: поп → джаз, рок → классика, фолк → электроника. Небольшие изменения внутри одного жанра менее заметны."}</li>
-                <li>{isEN ? "You can specify a specific instrument combination: \"only violin and piano, no drums, slow tempo\"." : "Можно указать конкретный состав инструментов: «только скрипка и фортепиано, без ударных, медленный темп»."}</li>
-                <li>{isEN ? "If you know the key — specify it. \"Transposed to minor\" significantly changes the emotional color." : "Если знаешь тональность — указывай её. «Перенесена в минор» существенно меняет эмоциональную окраску."}</li>
+                <li>{isEN ? "Stylistic leap works best: hummed melody → trap, voice memo → orchestral. The bigger the gap, the more dramatic the result." : "Стилевой прыжок работает лучше всего: напев → trap, голосовая заметка → оркестр. Чем больше разница, тем эффектнее результат."}</li>
+                <li>{isEN ? "Clean source = clean cover. Record close to the mic, mute background noise. Bad audio in → muddier result out." : "Чистый исходник = чистый кавер. Записывай близко к микрофону, убирай фоновый шум. Грязное аудио на входе → мутнее результат."}</li>
+                <li>{isEN ? "Cover is great for personal voice memos — turn a humming idea into a full demo without engineering skills." : "Кавер отлично работает с личными голосовыми заметками — превращает идею-напев в полноценное демо без навыков продакшна."}</li>
               </ul>
             </div>
           </div>
@@ -340,29 +347,29 @@ export function GuidePage() {
               <div className="guide-step">
                 <span className="guide-step-num">1</span>
                 <div>
-                  <strong>{isEN ? "Select the \"SFX\" tab" : "Выбери вкладку «SFX»"}</strong>
-                  <p>{isEN ? "The last tab in the Studio. The form is the most minimal — only a description and duration." : "Последняя вкладка в Студии. Форма самая минимальная — только описание и длительность."}</p>
+                  <strong>{isEN ? "Open the SFX tile" : "Открой плитку «Звуковой эффект»"}</strong>
+                  <p>{isEN ? "On the Studio page click the SFX tile (lightning bolt icon). The form is the most minimal — pick source, environment, duration, style." : "На странице Студии нажми плитку «Звуковой эффект» (иконка молнии). Форма самая минимальная — выбери источник, среду, длительность, стиль."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">2</span>
                 <div>
                   <strong>{isEN ? "Describe the sound precisely" : "Опиши звук точно"}</strong>
-                  <p>{isEN ? "The more precise, the more accurate the result. \"Wooden door creaking and closing\" is better than \"door sound\". \"App notification with metallic resonance, 0.5 seconds\" is better than \"notification\"." : "Чем точнее, тем точнее результат. «Скрип деревянной двери и её закрытие» лучше, чем «звук двери». «Уведомление приложения с металлическим резонансом, 0.5 секунды» лучше, чем «уведомление»."}</p>
+                  <p>{isEN ? "The more precise, the more accurate the result. \"Wooden door creaking and closing\" beats \"door sound\". \"App notification with metallic resonance, 0.5 seconds\" beats \"notification\"." : "Чем точнее, тем точнее результат. «Скрип деревянной двери и её закрытие» лучше «звука двери». «Уведомление приложения с металлическим резонансом, 0.5 секунды» лучше «уведомления»."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">3</span>
                 <div>
-                  <strong>{isEN ? "Set duration" : "Задай длительность"}</strong>
-                  <p>{isEN ? "For SFX, short durations are available: 0:02, 0:05, 0:10, 0:30. Most UI sounds — 2–5 seconds. Atmospheric ones — up to 30." : "Для SFX доступны короткие длительности: 0:02, 0:05, 0:10, 0:30. Большинство UI-звуков — 2–5 секунд. Атмосферные — до 30."}</p>
+                  <strong>{isEN ? "Pick source · environment · duration · style" : "Выбери источник · среду · длительность · стиль"}</strong>
+                  <p>{isEN ? "Source (impact, glitch, nature, mechanical, whoosh, custom), environment (studio, room, street, forest, space), length (short 1–2s, medium 3–6s, long 10+s ambience), style (cinematic, realistic, clean)." : "Источник (удар, glitch, природа, механика, whoosh, свой), среда (студия, комната, улица, лес, космос), длительность (короткий 1–2 c, средний 3–6 c, длинный амбиент 10+ c), стиль (киношный, реалистичный, чистый)."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">4</span>
                 <div>
-                  <strong>{isEN ? "Generate and check on your project" : "Сгенерируй и проверь на проекте"}</strong>
-                  <p>{isEN ? "Download WAV — it preserves lossless quality, which is important for professional audio editors." : "Скачай WAV — он сохраняет потери при сжатии, что важно для профессиональных аудиоредакторов."}</p>
+                  <strong>{isEN ? "Generate and download" : "Сгенерируй и скачай"}</strong>
+                  <p>{isEN ? "Cost: 1 token (cheaper than music). Download MP3 (compatible everywhere) or WAV (lossless for editing in a DAW / game engine)." : "Цена: 1 токен (дешевле музыки). Скачай MP3 (играет везде) или WAV (без потерь, для DAW / игрового движка)."}</p>
                 </div>
               </div>
             </div>
@@ -370,9 +377,9 @@ export function GuidePage() {
             <div className="guide-tips">
               <div className="guide-tips-head">{isEN ? "Tips" : "Советы"}</div>
               <ul>
-                <li>{isEN ? "For game sounds write the context: \"laser shot in a sci-fi game, medium power\" or \"coin pick-up in a 2D platformer\"." : "Для игровых звуков пиши контекст: «выстрел лазером в sci-fi игре, средней мощности» или «подбор монеты в 2D-платформере»."}</li>
-                <li>{isEN ? "Describe the texture: \"dry\", \"with echo\", \"muffled\", \"crispy\" — these words precisely shift the result." : "Описывай текстуру: «сухой», «с эхом», «приглушённый», «резкий» — эти слова точно сдвигают результат."}</li>
-                <li>{isEN ? "SFX generation is cheaper than a full track — don't be afraid to generate 3–5 variants at once." : "SFX-генерация дешевле полного трека — не бойся создавать 3–5 вариантов сразу."}</li>
+                <li>{isEN ? "For game sounds add context: \"laser shot in a sci-fi game, medium power\" or \"coin pick-up in a 2D platformer\"." : "Для игровых звуков добавляй контекст: «выстрел лазером в sci-fi игре, средней мощности» или «подбор монеты в 2D-платформере»."}</li>
+                <li>{isEN ? "Texture words shift the result hard: \"dry\", \"reverberant\", \"muffled\", \"crisp\", \"glitchy\", \"organic\"." : "Слова текстуры сильно сдвигают результат: «сухой», «с реверберацией», «приглушённый», «резкий», «глитчевый», «органический»."}</li>
+                <li>{isEN ? "SFX is the cheapest generation — try several phrasings to find the right one." : "SFX — самая дешёвая генерация. Перепробуй несколько формулировок, чтобы найти точную."}</li>
               </ul>
             </div>
           </div>
@@ -444,36 +451,36 @@ export function GuidePage() {
               <div className="guide-step">
                 <span className="guide-step-num">1</span>
                 <div>
-                  <strong>{isEN ? "Select the \"Cover Art\" tab" : "Выбери вкладку «Обложка»"}</strong>
-                  <p>{isEN ? "Third tab in the Studio. The form switches to image generation mode." : "Третья вкладка в Студии. Форма переключается в режим генерации изображения."}</p>
+                  <strong>{isEN ? "Open the Cover Art tile" : "Открой плитку «Обложка»"}</strong>
+                  <p>{isEN ? "On the Studio page click the \"Cover\" tile. The cover art builder opens — image generation, not music." : "На странице Студии нажми плитку «Обложка». Откроется конструктор обложки — это уже не музыка, а изображение."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">2</span>
                 <div>
-                  <strong>{isEN ? "Connect to a track (optional)" : "Свяжи с треком (необязательно)"}</strong>
-                  <p>{isEN ? "If you already have a track in the Library, you can attach it — RIFFA will analyze the music and suggest visuals that match the mood." : "Если у тебя уже есть трек в Библиотеке, можно прикрепить его — RIFFA проанализирует музыку и предложит визуал под настроение."}</p>
+                  <strong>{isEN ? "Describe the visual brief or ask the agent" : "Опиши визуальный бриф или спроси у агента"}</strong>
+                  <p>{isEN ? "Either write the prompt yourself (in English works best — \"album cover, lonely figure in a foggy field at dawn, golden tones, minimal\") or click \"Ask the agent\" and answer 4–5 questions in chat — the agent assembles the prompt for you." : "Либо напиши промт сам (лучше на английском — «album cover, lonely figure in a foggy field at dawn, golden tones, minimal»), либо нажми «Спросить агента» и ответь на 4–5 вопросов в чате — агент сам соберёт промт."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">3</span>
                 <div>
-                  <strong>{isEN ? "Describe the image" : "Опиши образ"}</strong>
-                  <p>{isEN ? "What should be on the cover? \"A lonely figure in a field at sunset, golden tones, minimal style\" or \"abstract geometric patterns, neon pink and dark blue, electronic vibes\"." : "Что должно быть на обложке? «Одинокая фигура в поле на закате, золотые тона, минималистичный стиль» или «абстрактные геометрические паттерны, неоново-розовый и тёмно-синий, электронный вайб»."}</p>
+                  <strong>{isEN ? "Attach a reference (optional)" : "Прикрепи референс (опционально)"}</strong>
+                  <p>{isEN ? "Drop an image or paste a URL into the reference field. Nano Banana 2 / Pro use it as a composition or style anchor." : "Перетащи картинку или вставь URL в поле референса. Nano Banana 2 / Pro используют его как ориентир композиции или стиля."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">4</span>
                 <div>
-                  <strong>{isEN ? "Choose format and style" : "Выбери формат и стиль"}</strong>
-                  <p>{isEN ? "Square 1:1 for streaming (Spotify, Apple Music), rectangle for podcasts. Style chips: photo-realistic, illustration, abstract, 3D." : "Квадрат 1:1 для стриминга (Spotify, Apple Music), прямоугольник для подкастов. Чипы стиля: фотореализм, иллюстрация, абстракция, 3D."}</p>
+                  <strong>{isEN ? "Pick the model" : "Выбери модель"}</strong>
+                  <p>{isEN ? "Nano Banana (1 token) for quick drafts, Nano Banana 2 (2 tokens) for higher quality, Nano Banana Pro (3 tokens) for the cleanest result. All output 1024×1024 square — perfect for streaming covers." : "Nano Banana (1 токен) — для быстрых черновиков, Nano Banana 2 (2 токена) — выше качество, Nano Banana Pro (3 токена) — самый чистый результат. Все выдают 1024×1024 квадрат — формат под стриминг."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">5</span>
                 <div>
-                  <strong>{isEN ? "Download in high resolution" : "Скачай в высоком разрешении"}</strong>
-                  <p>{isEN ? "The cover comes in 3000×3000 px — ready for uploading to Spotify, iTunes, or printing." : "Обложка выходит в 3000×3000 px — готова для загрузки на Spotify, iTunes или печати."}</p>
+                  <strong>{isEN ? "Generate, download, attach to track" : "Сгенерируй, скачай, привяжи к треку"}</strong>
+                  <p>{isEN ? "The cover appears in the library card alongside your music. Download PNG/JPG for upload to Spotify, Apple Music, iTunes. If it's not perfect — tweak the prompt, regenerate." : "Обложка появится в карточке библиотеки рядом с музыкой. Скачай PNG/JPG для Spotify, Apple Music, iTunes. Не идеально — подкрути промт и сгенерируй заново."}</p>
                 </div>
               </div>
             </div>
@@ -481,9 +488,9 @@ export function GuidePage() {
             <div className="guide-tips">
               <div className="guide-tips-head">{isEN ? "Tips" : "Советы"}</div>
               <ul>
-                <li>{isEN ? "Specify the color palette: \"warm tones, red and orange\" or \"cold monochrome, blue-gray\" — this dramatically narrows the result." : "Указывай цветовую палитру: «тёплые тона, красный и оранжевый» или «холодный монохром, сине-серый» — это кардинально сужает результат."}</li>
-                <li>{isEN ? "Specify the reference style: \"in the style of Saul Bass\" or \"like a '70s vinyl cover\" gives the model a clear direction." : "Указывай референсный стиль: «в стиле Сола Басса» или «как обложка винила 70-х» даёт модели чёткое направление."}</li>
-                <li>{isEN ? "Generate 2–3 variants at once — each will be unique. Pick the best or combine elements from the description." : "Создавай 2–3 варианта сразу — каждый будет уникальным. Выбери лучший или комбинируй элементы из описания."}</li>
+                <li>{isEN ? "English prompts work better for image models — Cyrillic is OK but adds noise. The agent always emits English." : "Английский промт работает лучше для image-моделей — кириллица допустима, но добавляет шум. Агент всегда пишет промт на английском."}</li>
+                <li>{isEN ? "Specify the palette: \"warm tones, red and orange\" or \"cold monochrome, blue-grey\" — narrows the result dramatically." : "Указывай палитру: «warm tones, red and orange» или «cold monochrome, blue-grey» — кардинально сужает результат."}</li>
+                <li>{isEN ? "Avoid artist or song titles in the prompt — image models add unwanted text artefacts. Describe the visual idea instead." : "Не пиши имена артистов или названия песен в промте — модели добавляют ненужные текстовые артефакты. Описывай только визуальную идею."}</li>
               </ul>
             </div>
           </div>
@@ -557,44 +564,44 @@ export function GuidePage() {
           <div className="guide-text">
             <p className="guide-lead-text">
               {isEN
-                ? "An intelligent assistant that helps when you don't know what to ask for. The agent asks clarifying questions and forms the ideal prompt for you."
-                : "Умный помощник, который помогает, когда не знаешь, что запросить. Агент задаёт уточняющие вопросы и формирует за тебя идеальный промт."}
+                ? "A world-class music expert in chat form. Tell it \"I want music like HVOB\" or \"instrumental in the spirit of toe\" — the agent recognises the artist, identifies their signature instruments and production, and builds a Suno-ready brief for you."
+                : "Музыкальный эксперт мирового уровня в формате чата. Скажи «хочу музыку как у HVOB» или «инструментал в духе toe» — агент узнает артиста, разберёт его инструменты и продакшн, и соберёт готовый бриф для Suno."}
             </p>
 
             <div className="guide-steps">
               <div className="guide-step">
                 <span className="guide-step-num">1</span>
                 <div>
-                  <strong>{isEN ? "Click \"Ask the Agent\"" : "Нажми «Спросить агента»"}</strong>
-                  <p>{isEN ? "The button with a green dot under the text field in the Studio. Opens a chat interface." : "Кнопка с зелёной точкой под текстовым полем в Студии. Открывает интерфейс чата."}</p>
+                  <strong>{isEN ? "Open the Agent" : "Открой агента"}</strong>
+                  <p>{isEN ? "Click \"Agent\" in the sidebar, or use the agent panel inside any Studio module. The chat opens with a greeting." : "Нажми «Агент» в сайдбаре или используй панель агента внутри любого модуля Студии. Чат откроется с приветствием."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">2</span>
                 <div>
-                  <strong>{isEN ? "Tell the agent what you need in general terms" : "Расскажи агенту в общих чертах"}</strong>
-                  <p>{isEN ? "\"I need music for a birthday\", \"I want something sad and electronic\" or \"I don't know, surprise me\" — anything works." : "«Нужна музыка на день рождения», «хочу что-то грустное и электронное» или «не знаю, удиви меня» — подойдёт что угодно."}</p>
+                  <strong>{isEN ? "Say what you want — short or long" : "Скажи, что хочешь — коротко или подробно"}</strong>
+                  <p>{isEN ? "Both work. \"Music like HVOB\", \"birthday song for mum\", \"sad lo-fi for studying\", \"surprise me\". The agent adapts: rich brief → 0–1 clarifying questions, vague → 2–3 questions with quick-reply chips." : "Работает и то, и другое. «Музыка как у HVOB», «песня маме на ДР», «грустный lo-fi под учёбу», «удиви меня». Агент адаптируется: подробный бриф → 0–1 вопрос, размытый → 2–3 вопроса с быстрыми чипами-ответами."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">3</span>
                 <div>
-                  <strong>{isEN ? "Answer 2–3 questions" : "Ответь на 2–3 вопроса"}</strong>
-                  <p>{isEN ? "The agent will ask clarifying questions: about mood, context, for whom, style. Short answers are enough — \"fast\", \"for myself\", \"I like Radiohead\"." : "Агент задаст уточняющие вопросы: о настроении, контексте, для кого, стиле. Достаточно коротких ответов — «быстрая», «для себя», «нравится Radiohead»."}</p>
+                  <strong>{isEN ? "Click the chips or type freely" : "Тыкай по чипам или пиши свободно"}</strong>
+                  <p>{isEN ? "Each agent question offers 2–4 short reply chips (\"slow\", \"medium\", \"fast\"; \"sad\", \"epic\", \"warm\"). Click one to keep the flow moving, or type your own answer for nuance." : "На каждый вопрос агент предложит 2–4 коротких чипа-ответа («медленный», «средний», «быстрый»; «грустная», «эпичная», «тёплая»). Тыкни — пойдёшь дальше; напиши своё, если хочешь нюансов."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">4</span>
                 <div>
-                  <strong>{isEN ? "Review the generated prompt" : "Проверь готовый промт"}</strong>
-                  <p>{isEN ? "The agent will compose a detailed description of the track and offer to submit it to the Studio. You can edit it before submitting." : "Агент составит подробное описание трека и предложит отправить его в Студию. Перед отправкой можно отредактировать."}</p>
+                  <strong>{isEN ? "Review the brief, launch generation" : "Проверь бриф и запусти генерацию"}</strong>
+                  <p>{isEN ? "When ready, the agent shows a structured brief (theme, instruments, mood, tempo) and two buttons: \"Launch generation\" (sends straight to Suno) or \"Refine the brief\" (returns to chat to keep tuning)." : "Когда бриф готов, агент покажет структурированную сводку (тема, инструменты, настроение, темп) и две кнопки: «Запустить генерацию» (отправит в Suno) или «Дополнить бриф» (вернёт в чат для доработки)."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">5</span>
                 <div>
-                  <strong>{isEN ? "Or just chat with the agent" : "Или просто общайся с агентом"}</strong>
-                  <p>{isEN ? "Ask anything about music, request music theory consultation, or ask how best to describe a certain style. The agent is a full-fledged music consultant." : "Спрашивай про музыку, запрашивай консультацию по теории музыки или узнавай, как лучше описать определённый стиль. Агент — полноценный музыкальный консультант."}</p>
+                  <strong>{isEN ? "Or just ask musical questions" : "Или просто задавай музыкальные вопросы"}</strong>
+                  <p>{isEN ? "Outside of generation flow, the agent works as a music consultant. \"What instruments are in dungeon synth?\", \"How does sidechain compression sound?\" — full answers, no fluff." : "Вне процесса генерации агент работает как музыкальный консультант. «Какие инструменты в dungeon synth?», «Как звучит sidechain-компрессия?» — отвечает по сути, без воды."}</p>
                 </div>
               </div>
             </div>
@@ -602,9 +609,9 @@ export function GuidePage() {
             <div className="guide-tips">
               <div className="guide-tips-head">{isEN ? "Tips" : "Советы"}</div>
               <ul>
-                <li>{isEN ? "Use the agent when you want something unusual: \"something between jazz and drill\" — it will clarify what exactly you mean and formulate the request correctly." : "Используй агента, когда хочешь что-то необычное: «что-то между джазом и дриллом» — он уточнит, что именно ты имеешь в виду, и правильно сформулирует запрос."}</li>
-                <li>{isEN ? "The agent remembers the context of the conversation — you can say \"make it a bit slower and more melancholic\" without repeating the full description." : "Агент помнит контекст разговора — можно говорить «сделай чуть медленнее и меланхоличнее», не повторяя всё описание."}</li>
-                <li>{isEN ? "After a session with the agent, the formed prompt remains in the Studio text field — you can use it as a starting point for the next creation." : "После сессии с агентом сформированный промт остаётся в текстовом поле Студии — можно использовать его как отправную точку для следующего создания."}</li>
+                <li>{isEN ? "Use artist references: \"in the style of Burial\", \"like early Radiohead\". The agent does the music research and translates the reference into English Suno vocabulary — without writing the artist's name in the prompt (Suno rejects those)." : "Используй ссылки на артистов: «в стиле Burial», «как ранний Radiohead». Агент сам проведёт музыкальный research и переведёт ссылку в английскую лексику для Suno — без упоминания имени артиста (Suno отвергает такие промты)."}</li>
+                <li>{isEN ? "The conversation persists for 24 hours and survives page reloads. Click \"↺ New chat\" in the header to start fresh." : "Диалог сохраняется на 24 часа и переживает перезагрузку страницы. Нажми «↺ Новый чат» в шапке, чтобы начать с нуля."}</li>
+                <li>{isEN ? "If you don't like the brief, use \"Refine the brief\" — the agent keeps all the context and just tweaks what you ask for." : "Не нравится бриф — нажми «Дополнить бриф», агент сохранит весь контекст и докрутит то, что попросишь."}</li>
               </ul>
             </div>
           </div>
@@ -664,8 +671,8 @@ export function GuidePage() {
           <div className="guide-text">
             <p className="guide-lead-text">
               {isEN
-                ? "All your created tracks, covers, and effects are stored here. You can listen, download, share a link, or delete."
-                : "Все твои созданные треки, обложки и эффекты хранятся здесь. Можно слушать, скачивать, делиться ссылкой или удалять."}
+                ? "Every variant (V1 and V2) of every generation lives in your Library as an independent file — listen, like, share, publish to Radio, download MP3/WAV, soft-delete to Trash."
+                : "Каждый вариант (V1 и V2) каждой генерации хранится в Библиотеке как отдельный файл — можно слушать, лайкать, делиться, выкладывать на Радио, скачивать MP3/WAV, переносить в Корзину."}
             </p>
 
             <div className="guide-steps">
@@ -673,28 +680,28 @@ export function GuidePage() {
                 <span className="guide-step-num">1</span>
                 <div>
                   <strong>{isEN ? "Open the Library" : "Открой Библиотеку"}</strong>
-                  <p>{isEN ? "Left panel → \"Library\" icon (or the keyboard shortcut L). All your creations are here, sorted by date." : "Левая панель → иконка «Библиотека» (или горячая клавиша L). Все твои создания здесь, отсортированы по дате."}</p>
+                  <p>{isEN ? "Sidebar → \"Library\". All your creations live here, newest first. Includes songs, instrumentals, covers, SFX, cover art." : "Сайдбар → «Библиотека». Все создания тут, сначала новые. Включает песни, инструменталы, каверы, SFX, обложки."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">2</span>
                 <div>
-                  <strong>{isEN ? "Filter by type" : "Фильтруй по типу"}</strong>
-                  <p>{isEN ? "Tabs at the top: All · Songs · Instrumentals · SFX · Covers. Use to quickly find the right category." : "Вкладки сверху: Все · Песни · Инструменталы · SFX · Обложки. Используй для быстрого поиска нужной категории."}</p>
+                  <strong>{isEN ? "Filter by type and search" : "Фильтруй по типу и поиску"}</strong>
+                  <p>{isEN ? "Toggle the type chips at the top (All · Songs · Instrumentals · SFX · Covers · Cover Art). Use the search box to find by title." : "Чипы типа сверху (Все · Песни · Инструменталы · SFX · Каверы · Обложки). Поиск — по заголовку трека."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">3</span>
                 <div>
-                  <strong>{isEN ? "Listen before downloading" : "Прослушай перед скачиванием"}</strong>
-                  <p>{isEN ? "Click on a track — it opens in the player at the bottom. You can listen and then decide which format to download." : "Кликни на трек — он открывается в плеере внизу. Можно прослушать и потом решить, в каком формате скачать."}</p>
+                  <strong>{isEN ? "Each card has its own actions" : "У каждой карточки — свои действия"}</strong>
+                  <p>{isEN ? "Per track: play, like / dislike, share, publish to Radio, download MP3 / WAV, delete. V1 and V2 from the same generation are separate cards with separate counters — your like on V1 doesn't affect V2." : "По треку: плей, лайк / дизлайк, шаринг, публикация на Радио, скачать MP3 / WAV, удалить. V1 и V2 одной генерации — отдельные карточки с отдельными счётчиками: лайк на V1 не влияет на V2."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">4</span>
                 <div>
-                  <strong>{isEN ? "Share a link" : "Поделись ссылкой"}</strong>
-                  <p>{isEN ? "The share icon next to each track generates a public link. The person at the link can listen without logging in and download — if you allow it in the settings." : "Иконка шаринга рядом с каждым треком генерирует публичную ссылку. Человек по ссылке может прослушать без входа и скачать — если ты разрешил в настройках."}</p>
+                  <strong>{isEN ? "Share or publish" : "Поделись или опубликуй"}</strong>
+                  <p>{isEN ? "\"Share\" gives a public /s/ link — listenable without login. \"Publish to Radio\" makes the track visible to all RIFFA users on the Radio page — you can publish V1 only, or V1 + V2." : "«Поделиться» даёт публичную ссылку /s/ — слушать без входа. «На Радио» — выкладывает трек на страницу Радио, открыто всем пользователям RIFFA. Можно опубликовать только V1 или V1 + V2."}</p>
                 </div>
               </div>
             </div>
@@ -702,9 +709,9 @@ export function GuidePage() {
             <div className="guide-tips">
               <div className="guide-tips-head">{isEN ? "Tips" : "Советы"}</div>
               <ul>
-                <li>{isEN ? "Titles: by default the track is called by the first words of the description. Rename it by clicking on the title — it makes it easier to find later." : "Названия: по умолчанию трек называется по первым словам описания. Переименуй, кликнув на заголовок — это упрощает поиск позже."}</li>
-                <li>{isEN ? "You can use the Library as a streaming service — the player at the bottom keeps playing even as you switch between sections." : "Библиотеку можно использовать как стриминг-сервис — плеер внизу продолжает играть, пока ты переходишь между разделами."}</li>
-                <li>{isEN ? "Old generation? Check the Library — perhaps the same track was created earlier and you can just download it again for free." : "Понадобился старый трек? Проверь Библиотеку — возможно, он уже создавался раньше и можно просто скачать его снова без затрат токенов."}</li>
+                <li>{isEN ? "Titles default to \"YourNickname — Auto Title\". Rename anything by clicking the title in the file card." : "Заголовок по умолчанию — «ТвойНик — Авто-название». Переименовать можно, кликнув по заголовку в карточке файла."}</li>
+                <li>{isEN ? "The player at the bottom is global: it keeps playing while you browse other pages. Hit the queue icon to see what's next." : "Глобальный плеер внизу не останавливается при переходах между страницами. Иконка очереди показывает, что играет следующим."}</li>
+                <li>{isEN ? "Soft-deleted tracks live in Trash for 7 days before being purged. Restore from there if you change your mind." : "Удалённые треки лежат в Корзине 7 дней перед окончательным удалением. Если передумал — восстанови оттуда."}</li>
               </ul>
             </div>
           </div>
@@ -777,37 +784,37 @@ export function GuidePage() {
           <div className="guide-text">
             <p className="guide-lead-text">
               {isEN
-                ? "A live stream of music created by RIFFA users right now. A mix of genres and styles — discovery mode for new sounds. Your tracks can also get here."
-                : "Живой поток музыки, которую прямо сейчас создают пользователи RIFFA. Микс жанров и стилей — режим открытий для новых звуков. Твои треки тоже могут попасть сюда."}
+                ? "A curated stream of music published by RIFFA users. Filter by mood, browse the charts, like / dislike tracks, add favourites to your collection. Your own tracks can land here too — one click in the Library."
+                : "Подборка музыки, которую пользователи RIFFA выложили в эфир. Фильтруй по настроению, смотри чарты, лайкай / дизлайкай треки, добавляй понравившиеся в свою коллекцию. Твои треки тоже сюда попадут — одним кликом из Библиотеки."}
             </p>
 
             <div className="guide-steps">
               <div className="guide-step">
                 <span className="guide-step-num">1</span>
                 <div>
-                  <strong>{isEN ? "Open the Radio" : "Открой Радио"}</strong>
-                  <p>{isEN ? "Left panel → radio icon. Playback starts immediately. No need to select anything." : "Левая панель → иконка радио. Воспроизведение начинается сразу. Ничего выбирать не нужно."}</p>
+                  <strong>{isEN ? "Open Radio from the sidebar" : "Открой Радио из сайдбара"}</strong>
+                  <p>{isEN ? "Sidebar → \"Radio\". The page shows mood cards on top, then the freshest tracks list, then today's chart." : "Сайдбар → «Радио». Сверху — карточки настроений, ниже — лента свежих треков, ещё ниже — чарт за сегодня."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">2</span>
                 <div>
-                  <strong>{isEN ? "Listen and discover" : "Слушай и открывай"}</strong>
-                  <p>{isEN ? "Each track plays automatically. Like a track — click the heart, and it will be added to your Library. Don't like it — skip to the next." : "Каждый трек играет автоматически. Понравился трек — кликни сердечко, он добавится в твою Библиотеку. Не понравился — пропусти к следующему."}</p>
+                  <strong>{isEN ? "Pick a mood to filter" : "Выбери настроение для фильтра"}</strong>
+                  <p>{isEN ? "Click a mood card (Happy, Calm, Sad, Energetic, Dreamy, Aggressive, Inspiring, Anxious, Dramatic, Confident — plus All / Vocal). The track list refreshes to that mood only." : "Кликни карточку настроения (Радостное, Спокойное, Грустное, Энергичное, Мечтательное, Агрессивное, Вдохновляющее, Тревожное, Драматичное, Уверенное — плюс «Все» / «С вокалом»). Лента обновится под выбранное настроение."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">3</span>
                 <div>
-                  <strong>{isEN ? "See the details of each track" : "Смотри детали каждого трека"}</strong>
-                  <p>{isEN ? "Below the player: creation description, genre, tempo. If you like the sound — you can use this description as a starting point for your own creation in the Studio." : "Под плеером: описание создания, жанр, темп. Если звук понравился — можно использовать это описание как отправную точку для собственного создания в Студии."}</p>
+                  <strong>{isEN ? "Like / dislike to influence the chart" : "Лайкай / дизлайкай — это влияет на чарт"}</strong>
+                  <p>{isEN ? "Each row has heart and thumbs-down icons. Likes feed the chart (today / week / month / all-time). Liking also adds the track to \"My collection\" — accessible from the Mood card row." : "У каждой строки — иконки сердца и пальца вниз. Лайки формируют чарт (сегодня / неделя / месяц / всё время). Лайк ещё добавляет трек в «Мою коллекцию» — её можно открыть из ряда карточек настроения."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">4</span>
                 <div>
-                  <strong>{isEN ? "Publish your tracks to Radio" : "Публикуй свои треки в Радио"}</strong>
-                  <p>{isEN ? "In the Library, each track has a \"Publish to Radio\" option. After publication the track will be heard by all users of the platform." : "В Библиотеке у каждого трека есть опция «Опубликовать в Радио». После публикации трек услышат все пользователи платформы."}</p>
+                  <strong>{isEN ? "Publish your own track" : "Опубликуй свой трек"}</strong>
+                  <p>{isEN ? "In the Library, each track variant has a \"Publish to Radio\" toggle. A mood must be set for the track (Radio uses it for filtering). You can publish V1 only, V2 only, or both as separate radio rows." : "В Библиотеке у каждого варианта есть тумблер «На Радио». У трека должно быть настроение (Радио по нему фильтрует). Можно опубликовать только V1, только V2 или оба варианта — будут двумя отдельными карточками."}</p>
                 </div>
               </div>
             </div>
@@ -815,9 +822,9 @@ export function GuidePage() {
             <div className="guide-tips">
               <div className="guide-tips-head">{isEN ? "Tips" : "Советы"}</div>
               <ul>
-                <li>{isEN ? "Radio is great for inspiration: leave it in the background while you work. When something catches your ear — look at the description and borrow the style." : "Радио отлично подходит для вдохновения: оставь его фоном во время работы. Когда что-то зацепит — посмотри описание и заимствуй стиль."}</li>
-                <li>{isEN ? "The Radio algorithm prioritizes fresh tracks — your freshly published track will be heard within minutes." : "Алгоритм Радио приоритизирует свежие треки — твой только что опубликованный трек услышат в течение нескольких минут."}</li>
-                <li>{isEN ? "Multiple tracks from the same description? Radio will show them together, allowing comparison between different generation variants." : "Несколько треков из одного описания? Радио покажет их рядом, позволяя сравнить разные варианты генерации."}</li>
+                <li>{isEN ? "Radio is great for inspiration — leave it on in the background. When something catches your ear, click the track to see its genre and mood, then borrow the style for your own brief." : "Радио отлично для вдохновения — оставь его фоном. Зацепило — кликни на трек, посмотри жанр и настроение, забери стиль в свой бриф."}</li>
+                <li>{isEN ? "V1 and V2 from the same generation appear as independent rows with their own like / play counters. You can like V1 without affecting V2 — completely independent." : "V1 и V2 из одной генерации — отдельные строки с собственными счётчиками лайков / прослушиваний. Лайк на V1 никак не задевает V2 — они полностью независимы."}</li>
+                <li>{isEN ? "Sort the playlist by recent, score (likes minus dislikes), or plays — tabs at the top of the list." : "Сортировка ленты: по свежести, по рейтингу (лайки минус дизлайки), по прослушиваниям — вкладки сверху ленты."}</li>
               </ul>
             </div>
           </div>
