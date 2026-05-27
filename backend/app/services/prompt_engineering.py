@@ -48,6 +48,7 @@ class SongParams:
     era: str = ""               # "1960s", "1980s", "2020s", etc.
     style_prompt: str = ""      # agent research + style description (highest authority)
     techniques: list[str] = field(default_factory=list)   # specific techniques from agent
+    key_instruments: list[str] = field(default_factory=list)  # explicit instruments from agent research
     constraints: str = ""       # hard constraints from agent ("no synths", etc.)
     suggested_bpm: str = ""     # BPM hint from agent
 
@@ -177,6 +178,16 @@ def build_suno_style(
         num_dynamic = rng.randint(2, 3)
         for category in rng.sample(pool, min(num_dynamic, len(pool))):
             style_parts.append(rng.choice(DYNAMIC_ELEMENTS[category]))
+
+    # Step 7.4: agent subgenre (NEW — most specific genre signal)
+    if params.subgenre:
+        style_parts.append(params.subgenre.strip())
+
+    # Step 7.45: agent key_instruments (NEW — explicit instrument lineup from research)
+    if params.key_instruments:
+        instruments_phrase = ", ".join(i.strip() for i in params.key_instruments[:8] if i)
+        if instruments_phrase:
+            style_parts.append(f"featuring {instruments_phrase}")
 
     # Step 7.5: agent-specified techniques (NEW — explicit, not random)
     if params.techniques:
