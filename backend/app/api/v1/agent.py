@@ -254,6 +254,59 @@ If ANY of 1-6 is missing — done MUST be false, ask the next-most-useful
 question. Do NOT show a "ready" brief while requirements are unmet.
 
 ═══════════════════════════════════════════════════════════════════════
+LAUNCH INTENT — explicit user command to start generation
+═══════════════════════════════════════════════════════════════════════
+If the user's latest message expresses an UNAMBIGUOUS intent to launch
+generation NOW — e.g. "запусти", "запускай", "поехали", "погнали", "го",
+"давай делать", "сделай уже", "начинаем", "генерируй", "launch", "go",
+"start", "let's go", "do it", "make it", "generate it now" — and the
+chat history contains enough material to satisfy requirements 1-6 above:
+
+  → IMMEDIATELY return done=true with the brief you can assemble from
+    the full conversation. Do NOT ask another clarifying question. Do
+    NOT show another mid-flow chip prompt. The user is telling you the
+    discussion is over.
+
+  → If genuinely critical info is still missing after assembling everything
+    you can find in the history (e.g. for module=song with vocals, no
+    lyrics were drafted yet), ask ONLY for the one piece that's blocking
+    finalisation, and keep the response tight.
+
+  → If this is a SECOND "launch" call (user previously finalised, then
+    clicked "Refine the brief", then said launch again with no real
+    changes), treat the previous brief as a baseline and re-emit it —
+    don't ask the same questions again.
+
+This rule overrides any of the regular "ask one question per turn"
+guidance. The user's explicit launch intent is the final signal.
+
+═══════════════════════════════════════════════════════════════════════
+PARTIAL UPDATE — user tweaks one parameter after finalisation
+═══════════════════════════════════════════════════════════════════════
+After you returned done=true once, the user may click "Дополнить бриф"
+(refine) on the frontend, which re-opens the chat. Their next message
+typically falls into one of three categories:
+
+1. **Launch command** ("запусти", "поехали", "go") — see LAUNCH INTENT
+   rule above. Re-emit the same brief with done=true immediately.
+
+2. **Single-parameter tweak** ("сделай быстрее", "пусть будет женский
+   вокал", "добавь синтезаторы", "поменяй жанр на phonk", "ещё мрачнее",
+   "убери барабаны"). Apply the tweak to the existing brief, then
+   re-emit done=true with the UPDATED params. Do NOT ask follow-up
+   questions for tweaks that are unambiguous — confirm in `reply` and
+   set done=true in the same turn.
+
+3. **Substantive new direction** ("вообще другой стиль, давай джаз",
+   "сделай для маминого дня рождения вместо этого") — treat as a new
+   conversation: ask 1-2 clarifying questions, then finalise.
+
+When in doubt between (2) and (3): if the tweak only changes 1-2
+parameters and the rest of the original brief still applies → category 2,
+re-finalise. Only fall back to questions when the tweak invalidates
+multiple parts of the brief.
+
+═══════════════════════════════════════════════════════════════════════
 LYRICS DRAFTING FLOW (module=song WITH vocals only)
 ═══════════════════════════════════════════════════════════════════════
 For song-with-vocals, ALWAYS handle lyrics BEFORE asking about
@@ -728,15 +781,16 @@ async def _build_user_stats(session: AsyncSession, user: User) -> str:
     return " ".join(pieces)
 
 
-def _coerce_intent(raw: Any, module_hint: ModuleKind) -> AgentIntent | None:
+def _coerce_intent(raw: Any, module_hint: ModuleKind) -> AgentIntent:
     """Best-effort parse of the GPT-emitted intent object.
 
-    GPT occasionally returns an empty object, a string, or skips fields. We always
-    end up with a usable AgentIntent (falling back to the module hint) so the
-    frontend can show the launch button.
+    GPT occasionally returns an empty object, a string, or skips fields. We
+    always end up with a usable AgentIntent (falling back to the module hint)
+    so the frontend can show the launch button. Callers should still gate on
+    ``done=True`` before showing the launch UI.
     """
     if not isinstance(raw, dict):
-        return None
+        raw = {}
 
     module_val = str(raw.get("module") or module_hint).strip().lower()
     if module_val not in (

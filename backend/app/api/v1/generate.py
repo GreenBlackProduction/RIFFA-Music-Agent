@@ -49,7 +49,9 @@ class GenerateResponse(BaseModel):
 
 
 class SongRequest(BaseModel):
-    description: str = Field(min_length=1, max_length=1000)
+    # Description can be empty when the agent supplies a finalised brief via
+    # `agent_prompt` + `agent_music_params` — the worker uses those instead.
+    description: str = Field(default="", max_length=1000)
     text_mode: Literal["ai", "custom", "none"] = "ai"
     lyrics: str = Field(default="", max_length=5000)
     genre: str = Field(default="", max_length=64)

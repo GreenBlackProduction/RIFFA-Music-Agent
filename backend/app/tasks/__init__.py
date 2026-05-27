@@ -220,17 +220,26 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             await _publish(ctx, gen_id, {"status": "processing", "step": "lyrics"})
 
             text_mode = params.get("text_mode", "ai")
+            # When description is empty (agent flow), fall back to the
+            # agent_prompt so we still have something to feed the lyrics/title
+            # generator.
+            description_for_lyrics = (
+                params.get("description")
+                or params.get("agent_prompt")
+                or ""
+            )
+
             lyrics = ""
             if text_mode == "ai":
                 lyrics = await lyrics_client.generate_lyrics(
-                    params.get("description", ""),
+                    description_for_lyrics,
                     style_hint=params.get("genre", ""),
                 )
             elif text_mode == "custom":
                 lyrics = params.get("lyrics", "")
 
             if not gen.title:
-                short_title = await lyrics_client.generate_title(params.get("description", ""))
+                short_title = await lyrics_client.generate_title(description_for_lyrics)
                 gen.title = compose_track_title(track_artist, short_title)
 
             # Agent-provided structured params override form fields
@@ -555,6 +564,100 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             await _publish(ctx, gen_id, {"status": "processing", "step": "generating"})
             image_url = await nb.generate_cover_art(prompt, model=model)
             result = {"image_url": image_url}
+
+        elif gen.type == GenerationType.occasion:
+            # Occasion is a song-with-vocals tailored to an event (birthday,
+            # wedding, anniversary). Build a description from the occasion
+            # type + answers dict, then run the song flow with AI lyrics.
+            occasion_type = str(params.get("occasion_type", "") or "поздравление")
+            answers = params.get("answers", {}) or {}
+            answer_lines = "; ".join(
+                f"{k}: {v}" for k, v in answers.items() if isinstance(v, str) and v.strip()
+            )
+            description = f"Песня к поводу: {occasion_type}. {answer_lines}".strip(". ")
+
+            await _publish(ctx, gen_id, {"status": "processing", "step": "lyrics"})
+            lyrics = await lyrics_client.generate_lyrics(
+                description, style_hint=params.get("genre", "")
+            )
+
+            if not gen.title:
+                short_title = await lyrics_client.generate_title(description)
+                gen.title = compose_track_title(track_artist, short_title)
+
+            agent_mp = params.get("agent_music_params") or {}
+            agent_research = params.get("agent_research_notes", "")
+            agent_prompt_text = params.get("agent_prompt", "")
+
+            song_params = SongParams(
+                user_description=description,
+                genre=agent_mp.get("genre") or params.get("genre", ""),
+                custom_genre=agent_mp.get("custom_genre", ""),
+                subgenre=agent_mp.get("subgenre", ""),
+                mood=agent_mp.get("mood") or params.get("mood", ""),
+                tempo=agent_mp.get("tempo") or params.get("tempo", ""),
+                vocal=agent_mp.get("vocal") or params.get("vocal", ""),
+                era=agent_mp.get("era", ""),
+                techniques=agent_mp.get("techniques", []),
+                key_instruments=agent_mp.get("key_instruments", []),
+                constraints=agent_mp.get("constraints", ""),
+                suggested_bpm=agent_mp.get("suggested_bpm", ""),
+                style_prompt=(agent_research + "\n" + agent_prompt_text).strip(),
+            )
+            preset_style, weight, constraint = build_suno_style(
+                song_params, user_id=gen.user_id
+            )
+
+            await _publish(ctx, gen_id, {"status": "processing", "step": "enriching_music"})
+            style = await lyrics_client.enrich_music_prompt(
+                user_description=description,
+                genre=song_params.genre,
+                custom_genre=song_params.custom_genre,
+                mood=song_params.mood,
+                tempo=song_params.tempo,
+                vocal=song_params.vocal,
+                instrumental=False,
+                approved_lyrics=lyrics,
+                agent_prompt=agent_prompt_text,
+                preset_style_hint=preset_style,
+            ) or preset_style
+
+            _dump_payload(gen_id, "occasion", {
+                "title": gen.title,
+                "occasion_type": occasion_type,
+                "style": style,
+                "lyrics": lyrics,
+                "vocal_gender": vocal_gender(params.get("vocal", "")),
+                "style_weight": weight,
+                "weirdness_constraint": constraint,
+            })
+            await _publish(ctx, gen_id, {"status": "processing", "step": "music"})
+            suno_result = await suno.generate_music(
+                prompt=lyrics,
+                style=style,
+                title=gen.title,
+                instrumental=False,
+                vocal_gender=vocal_gender(params.get("vocal", "")),
+                style_weight=weight,
+                weirdness_constraint=constraint,
+                progress_cb=progress_cb,
+            )
+            result = {
+                "tracks": [
+                    {
+                        "audio_url": t.audio_url,
+                        "audio_id": t.audio_id,
+                        "image_url": t.image_url,
+                        "duration": t.duration,
+                        "title": t.title or gen.title,
+                    }
+                    for t in suno_result.tracks
+                ],
+                "lyrics": lyrics,
+                "occasion_type": occasion_type,
+                "enriched_style": style,
+                "suno_task_id": suno_result.task_id,
+            }
 
         else:
             raise ValueError(f"unsupported generation type: {gen.type}")

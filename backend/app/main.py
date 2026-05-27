@@ -7,9 +7,11 @@ from pathlib import Path
 
 import sentry_sdk
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from loguru import logger
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -63,6 +65,24 @@ def create_app() -> FastAPI:
         RateLimitExceeded,
         _rate_limit_exceeded_handler,  # type: ignore[arg-type]
     )
+
+    # Log validation errors with the offending payload so we can see what the
+    # frontend sent when a request fails with 422.
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+        try:
+            body_bytes = await request.body()
+            body_preview = body_bytes[:1500].decode("utf-8", errors="replace")
+        except Exception:
+            body_preview = "<unreadable>"
+        logger.warning(
+            "Validation error on {} {}: errors={} body={}",
+            request.method,
+            request.url.path,
+            exc.errors(),
+            body_preview,
+        )
+        return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
     if settings.cors_origins:
         app.add_middleware(
