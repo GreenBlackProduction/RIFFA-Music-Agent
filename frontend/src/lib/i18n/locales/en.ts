@@ -75,6 +75,7 @@ export const en: TranslationKeys = {
       expiredHint: "Link expired. Tap «Sign in with Telegram» again.",
       botNotStartedText: "To sign in via Telegram, start the bot first — tap /start, then come back and sign in.",
       botNotStartedBtn: "Open @{{bot}} in Telegram",
+      popupBlocked: "Your browser blocked the new tab. Allow popups for this site and try again.",
     },
     email: {
       section: "With e-mail",

@@ -116,6 +116,10 @@ export function LoginPage() {
   }, [navigate, refresh]);
 
   // ── Inject Telegram widget script ─────────────────────────────────────────
+  // Popup-only mode: dropping `data-auth-url` prevents the widget from doing a
+  // full-tab redirect to oauth.telegram.org when the popup is blocked. Users
+  // who can't use the popup fall back to the bot-link button (which opens
+  // Telegram explicitly in a new tab via window.open).
   useEffect(() => {
     const container = document.getElementById("tg-widget-host");
     if (!container) return;
@@ -125,10 +129,8 @@ export function LoginPage() {
     script.src = "https://telegram.org/js/telegram-widget.js?22";
     script.setAttribute("data-telegram-login", TG_BOT);
     script.setAttribute("data-size", "large");
-    // data-onauth: popup mode — auth data passed directly to JS callback (no redirect)
+    // data-onauth: popup mode — auth data passed directly to JS callback.
     script.setAttribute("data-onauth", "window._riffa_tg_auth(user)");
-    // data-auth-url: fallback redirect mode if popup is blocked
-    script.setAttribute("data-auth-url", "https://riffastudio.site/tg-auth");
     script.setAttribute("data-request-access", "write");
     container.appendChild(script);
     return () => { container.innerHTML = ""; };
@@ -171,14 +173,28 @@ export function LoginPage() {
     setTgBtnError(null);
     setBotLinkStatus("waiting");
     botLinkAbortRef.current = false;
+
+    // Inside Telegram Mini App we can defer the open (native opener works post-await).
+    // For real browsers — open a placeholder tab SYNCHRONOUSLY so iOS Safari /
+    // strict popup blockers keep the user gesture context. We swap the URL once
+    // the backend returns the bot deep-link.
+    const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram;
+    const inMiniApp = !!tg?.WebApp?.openTelegramLink;
+    const placeholderWindow = inMiniApp ? null : window.open("about:blank", "_blank", "noopener,noreferrer");
+
     try {
       const { nonce, bot_url } = await startBotLinkLogin();
-      // Open the bot — Telegram Mini App uses native opener, browser opens new tab
-      const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram;
-      if (tg?.WebApp?.openTelegramLink) {
-        tg.WebApp.openTelegramLink(bot_url);
+      if (inMiniApp) {
+        tg!.WebApp!.openTelegramLink!(bot_url);
+      } else if (placeholderWindow && !placeholderWindow.closed) {
+        placeholderWindow.location.href = bot_url;
       } else {
-        window.open(bot_url, "_blank", "noopener,noreferrer");
+        // Popup was blocked by the browser — last-resort fallback. We DON'T
+        // navigate the current tab (that was the original UX bug); instead
+        // surface an error so the user can retry with popups enabled.
+        setBotLinkStatus("error");
+        setTgBtnError(t.telegram.popupBlocked);
+        return;
       }
       // Poll the backend every 2s up to 5 min (matches Redis TTL)
       const startedAt = Date.now();

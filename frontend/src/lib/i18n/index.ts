@@ -55,6 +55,7 @@ interface LoginDict {
     loadingShort: string; loadingHint: string;
     waitingHint: string; expiredHint: string;
     botNotStartedText: string; botNotStartedBtn: string;
+    popupBlocked: string;
   };
   email: {
     section: string; perk: string; loginTab: string; registerTab: string;

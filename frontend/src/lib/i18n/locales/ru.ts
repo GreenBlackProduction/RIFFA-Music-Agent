@@ -80,6 +80,7 @@ export const ru: LocaleTree = {
       expiredHint: "Срок ссылки истёк. Нажми «Войти через Telegram» ещё раз.",
       botNotStartedText: "Чтобы войти через Telegram, сначала запустите бота — нажмите /start, затем вернитесь и войдите снова.",
       botNotStartedBtn: "Открыть @{{bot}} в Telegram",
+      popupBlocked: "Браузер заблокировал открытие новой вкладки. Разреши popup для этого сайта и нажми кнопку ещё раз.",
     },
     email: {
       section: "По e-mail",
