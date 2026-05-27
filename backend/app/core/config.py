@@ -118,5 +118,16 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Return cached settings instance."""
-    return Settings()
+    """Return cached settings instance.
+
+    Refuses to start in production if the secret key was left at the
+    placeholder value. Catches deploy-mistakes that would otherwise let
+    anyone forge session JWTs.
+    """
+    settings = Settings()
+    if settings.app_env == "production" and settings.secret_key in {"", "change-me"}:
+        raise RuntimeError(
+            "SECRET_KEY is unset (or 'change-me') in production — "
+            "set a strong random value in the backend env file before starting."
+        )
+    return settings

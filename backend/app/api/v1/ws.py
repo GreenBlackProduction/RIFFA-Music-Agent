@@ -2,15 +2,57 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+import uuid as uuid_pkg
+
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 from loguru import logger
 from redis.asyncio import Redis
+from sqlalchemy import select
 
 from app.core.config import get_settings
+from app.core.security import TokenError, read_session_token
+from app.db.base import get_session
+from app.db.models import Generation
 
 router = APIRouter(tags=["ws"])
 
 _CHANNEL = "gen:progress:{}"
+_SESSION_COOKIE = "riffa_session"
+
+
+async def _authorize_ws(websocket: WebSocket, gen_id: str) -> bool:
+    """Confirm the connecting client owns ``gen_id``.
+
+    Reads the same ``riffa_session`` cookie the HTTP layer uses, then looks
+    up the Generation and checks ``user_id``. Closes the socket with a
+    policy-violation code on mismatch.
+    """
+    cookie = websocket.cookies.get(_SESSION_COOKIE)
+    if not cookie:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return False
+    try:
+        user_id = read_session_token(cookie)
+    except TokenError:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return False
+    try:
+        gid = uuid_pkg.UUID(gen_id)
+    except ValueError:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return False
+
+    async for session in get_session():
+        gen = (
+            await session.execute(
+                select(Generation.user_id).where(Generation.id == gid)
+            )
+        ).scalar_one_or_none()
+        if gen is None or int(gen) != user_id:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return False
+        return True
+    return False
 
 
 @router.websocket("/ws/generation/{gen_id}")
@@ -26,6 +68,9 @@ async def ws_generation_progress(websocket: WebSocket, gen_id: str) -> None:
       {"status": "failed", "error": "..."}
     """
     await websocket.accept()
+    if not await _authorize_ws(websocket, gen_id):
+        # _authorize_ws already closed the socket with a policy-violation code.
+        return
     settings = get_settings()
 
     redis: Redis[str] = Redis.from_url(settings.redis_url, decode_responses=True)

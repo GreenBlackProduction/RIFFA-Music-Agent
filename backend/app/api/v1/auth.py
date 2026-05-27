@@ -143,7 +143,9 @@ async def email_request_login(
 
 
 @router.get("/email/verify", response_model=EmailVerifyResponse)
+@limiter.limit("20/minute")
 async def email_verify_login(
+    request: Request,
     token: str,
     response: Response,
     settings: Settings = Depends(get_settings),
@@ -161,7 +163,9 @@ async def email_verify_login(
 
 
 @router.post("/email/register", status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 async def email_register(
+    request: Request,
     body: EmailRegisterRequest,
     response: Response,
     settings: Settings = Depends(get_settings),
@@ -172,10 +176,10 @@ async def email_register(
         email = normalize_email(body.email)
     except InvalidEmailError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    if len(body.password) < 6:
+    if len(body.password) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Пароль должен быть не менее 6 символов",
+            detail="Пароль должен быть не менее 8 символов",
         )
     try:
         user = await register_user_by_email(session, email, body.password, body.referral_code)
@@ -193,7 +197,9 @@ async def email_register(
 
 
 @router.post("/email/login", status_code=status.HTTP_200_OK)
+@limiter.limit("10/minute")
 async def email_password_login(
+    request: Request,
     body: EmailPasswordLoginRequest,
     response: Response,
     settings: Settings = Depends(get_settings),
