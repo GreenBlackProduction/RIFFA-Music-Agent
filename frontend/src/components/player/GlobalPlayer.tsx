@@ -172,9 +172,17 @@ export function GlobalPlayer() {
   // Last time we attempted onError-driven recovery — debounce so a broken
   // URL doesn't pin us in an infinite reload loop.
   const lastErrorRecoveryRef = useRef(0);
+  // Suppress the onPause event that fires when el.load() aborts a currently
+  // playing resource.  Without this, switching tracks while playing would
+  // call setPlaying(false) → kill the canplay listener → track never starts.
+  const suppressNextPauseRef = useRef(false);
+  // Always-current shadow of isPlaying so canplay callbacks don't see stale
+  // closure values captured at the time the effect ran.
+  const isPlayingRef = useRef(isPlaying);
   // Если URL обложки не загрузился — переключаемся на ♪
   const [coverFailed, setCoverFailed] = useState(false);
   useEffect(() => { setCoverFailed(false); }, [currentCover]);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
   // Queue dropdown
   const [queueOpen, setQueueOpen] = useState(false);
@@ -212,15 +220,22 @@ export function GlobalPlayer() {
       el.src = currentUrl;
       el.currentTime = 0;
       setProgress(0);
+      // el.load() при наличии playing-трека вызывает событие pause
+      // (браузер прерывает воспроизведение).  Без флага onPause
+      // сбрасывал бы isPlaying=false → убивал canplay-листенер →
+      // трек никогда не начинался.
+      suppressNextPauseRef.current = true;
       // Явный load() — на Android Chrome без него audio иногда
       // «застревает» на старом источнике, особенно в фоне.
       el.load();
       if (isPlaying) {
         // Ждём первого `canplay` — означает, что есть достаточно
         // данных, чтобы начать воспроизведение без немедленного обрыва.
+        // isPlayingRef.current вместо closure-значения isPlaying: если
+        // пользователь нажал паузу пока шла загрузка, читаем актуальное.
         const onCanPlay = () => {
           el.removeEventListener("canplay", onCanPlay);
-          if (!isPlaying) return;
+          if (!isPlayingRef.current) return;
           el.play().catch(() => setPlaying(false));
         };
         el.addEventListener("canplay", onCanPlay, { once: true });
@@ -283,6 +298,50 @@ export function GlobalPlayer() {
       document.removeEventListener("resume", onResume);
     };
   }, [isPlaying, currentUrl]);
+
+  // Native 'ended' event — bypasses the React rendering pipeline so the
+  // next track starts with zero gap.  This is critical for iOS / Android
+  // lock-screen background playback: if we go through Zustand → re-render →
+  // useEffect the browser may see a gap and terminate the audio session.
+  //
+  // Strategy:
+  //   1. Read fresh queue state via getState() (no stale closure).
+  //   2. Set el.src directly and call el.play() while still inside the
+  //      audio callback — the audio session is active at this point.
+  //   3. Update currentSrcRef BEFORE store.next() so the main useEffect
+  //      sees currentSrcRef === currentUrl and skips the URL-change branch.
+  //
+  // The React synthetic onEnded is removed from the JSX — it would advance
+  // the queue a second time and cause double-track skipping.
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    function handleEnded() {
+      if (!el) return;
+      const store = usePlayer.getState();
+      const { queue, queueIndex, shuffle } = store;
+      if (queue.length <= 1) { store.setPlaying(false); return; }
+      const nextIdx = shuffle
+        ? Math.floor(Math.random() * queue.length)
+        : (queueIndex + 1) % queue.length;
+      const nxt = queue[nextIdx];
+      if (!nxt?.url) { store.setPlaying(false); return; }
+      // Suppress load()-induced pause before setting new src.
+      suppressNextPauseRef.current = true;
+      currentSrcRef.current = nxt.url;
+      el.src = nxt.url;
+      el.currentTime = 0;
+      el.load();
+      // play() here is inside an audio-session callback — iOS/Android
+      // honour it without requiring a new user gesture.
+      el.play().catch(() => undefined);
+      // Sync UI state; since currentSrcRef is already updated, the
+      // main useEffect's URL-change branch won't fire again.
+      store.next();
+    }
+    el.addEventListener("ended", handleEnded);
+    return () => el.removeEventListener("ended", handleEnded);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Media Session API — lock screen / notification centre controls.
   // Lets the OS know audio is playing so it doesn't kill the tab on screen lock.
@@ -813,8 +872,13 @@ export function GlobalPlayer() {
           if (draggingRef.current) return; // don't fight user's drag
           setProgress((e.target as HTMLAudioElement).currentTime);
         }}
-        onEnded={() => { if (hasQueue) next(); else setPlaying(false); }}
+        /* onEnded handled by native listener above — see useEffect */
         onPause={() => {
+          // Пауза вызванная el.load() при смене трека — не пользователь.
+          if (suppressNextPauseRef.current) {
+            suppressNextPauseRef.current = false;
+            return;
+          }
           // Игнорируем pause-event когда вкладка скрыта — браузер может
           // сам приостановить аудио. Не сбрасываем isPlaying, тогда при
           // возврате на вкладку плеер автоматически продолжит.
@@ -834,6 +898,7 @@ export function GlobalPlayer() {
           if (!url) return;
           const savedTime = el.currentTime;
           try {
+            suppressNextPauseRef.current = true;
             el.src = url;
             el.load();
             if (savedTime > 0 && isFinite(savedTime)) {
