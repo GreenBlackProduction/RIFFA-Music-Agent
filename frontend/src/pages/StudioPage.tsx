@@ -942,6 +942,7 @@ export function StudioPage() {
     setActiveModule(id);
     setAgentOpen(false);
     setAgentSeed(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function backToTiles() {

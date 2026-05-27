@@ -590,7 +590,7 @@ export function ProfilePage() {
         <div className="right">{isEN ? "bonus tokens" : "бонусные токены"}</div>
       </div>
 
-      <div style={{ display: "flex", gap: 10 }}>
+      <div className="promo-row">
         <input
           type="text"
           className="studio-quick__input"
@@ -630,7 +630,7 @@ export function ProfilePage() {
                 <div className="val">0<Coin size={13} style={{ marginLeft: 2 }} /></div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
               <div style={{ flex: 1, minWidth: 0, padding: "10px 14px", background: "var(--paper)", border: "1px solid var(--rule)", borderRadius: 999, fontFamily: "var(--font-mono)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {referralLink}
               </div>

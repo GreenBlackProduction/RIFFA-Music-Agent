@@ -573,6 +573,13 @@
   max-height: 360px;
 }
 
+@media (max-width: 640px) {
+  .builder-panel .agent-chat {
+    height: 520px;
+    max-height: 520px;
+  }
+}
+
 .builder-head {
   display: flex;
   flex-direction: column;
@@ -899,6 +906,14 @@
   background: var(--paper-3);
 }
 
+/* Visible resize grip in the bottom-right corner */
+.builder-step textarea {
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3 11L11 3M7 11L11 7' stroke='%23888' stroke-width='1.5' stroke-linecap='round' opacity='0.45'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: bottom 4px right 5px;
+  background-size: 12px 12px;
+}
+
 .prompt-preview {
   display: grid;
   gap: var(--space-2);
@@ -1044,6 +1059,31 @@
   background: var(--paper-2);
   color: var(--ink-3);
   border: 1px solid var(--rule);
+}
+
+@media (max-width: 640px) {
+  .preset-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-2);
+  }
+  .preset-card {
+    padding: 22px 10px 8px;
+    gap: 3px;
+  }
+  .preset-card__title {
+    font-size: 12.5px;
+  }
+  .preset-card__title span[aria-hidden] {
+    font-size: 17px;
+  }
+  .preset-card__meta {
+    font-size: 10.5px;
+    padding-left: 24px;
+  }
+  .preset-card__tag {
+    font-size: 8.5px;
+    padding: 2px 6px;
+  }
 }
 
 .preset-toast {

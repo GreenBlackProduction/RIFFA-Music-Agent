@@ -1443,7 +1443,7 @@ a {
   .studio-quick .btn { width: 100%; }
 
   /* stats плитки: 2 в ряд на 640, 1 ряд ниже */
-  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   /* p-panel: уменьшить padding */
   .p-panel { padding: 16px; }

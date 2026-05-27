@@ -1263,10 +1263,20 @@
   padding: var(--space-4);
 }
 
+/* ── Promo code row ── */
+.promo-row {
+  display: flex;
+  gap: 10px;
+}
+@media (max-width: 480px) {
+  .promo-row { flex-wrap: wrap; }
+  .promo-row .btn { width: 100%; }
+}
+
 /* ── Referral + Documents side-by-side grid ── */
 .referral-docs-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
   align-items: start;
   margin-top: 36px;
@@ -1276,18 +1286,34 @@
   margin-bottom: 16px;
 }
 @media (max-width: 800px) {
-  .referral-docs-grid { grid-template-columns: 1fr; }
+  .referral-docs-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ── Pricing grid mobile ── */
 @media (max-width: 640px) {
+  /* Pricing tiles: 2-column but compact */
   .pricing { grid-template-columns: repeat(2, 1fr); }
-  .price-tile { padding: 18px 14px; }
-  .price-tile .price { font-size: 36px; }
+  .price-tile { padding: 12px 10px; }
+  .price-tile .tier { font-size: 9px; }
+  .price-tile .price { font-size: 26px; margin: 6px 0 2px; }
+  .price-tile .price small { font-size: 10px; }
+  .price-tile .tokens-meta { font-size: 10px; margin-bottom: 6px; }
+  .price-tile .discount { font-size: 9px; padding: 1px 6px; margin-bottom: 4px; }
+  .price-tile .perks { font-size: 11px; gap: 4px; margin: 4px 0 10px; }
 
-  /* pay method buttons */
-  .pay-method-row { flex-direction: column; }
-  .pay-method-btn { flex: none; width: 100%; }
+  /* Pay method buttons: compact row (not full-width stacked) */
+  .pay-method-row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .pay-method-btn {
+    flex: 1 1 0;
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+  .pay-method-btn__label { font-size: 12px; }
+  .pay-method-btn__hint { font-size: 10px; }
 
   /* profile-grid: уже 1fr на 860px, но поля на мобиле */
   .avatar-block { padding: 20px; }
@@ -1298,6 +1324,14 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+
+  /* Referral stats */
+  .referral-stats { grid-template-columns: repeat(2, 1fr); }
+
+  /* Doc list rows */
+  .doc-row { padding: 12px 14px; }
+  .doc-row .title { font-size: 13px; }
+  .doc-row .hint { font-size: 11px; }
 }
 
 /* .generation-item → переименован в .file-item (стили в global.css) */
