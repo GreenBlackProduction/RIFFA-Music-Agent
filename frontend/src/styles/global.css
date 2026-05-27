@@ -1143,17 +1143,34 @@ a {
 .module.is-main p { color: var(--ink-2); }
 .module-cost {
   margin-top: auto;
-  padding-top: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--rule);
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 8px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--ink-3);
 }
-.module-cost .price { color: var(--ink); font-weight: 600; }
+.module-cost .price {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--paper);
+  background: var(--ink);
+  border-radius: 999px;
+  font-weight: 700;
+}
+.module-cost .price .riffa-coin { color: var(--paper); }
+.module:hover .module-cost .price {
+  background: var(--hi);
+}
 
 /* ── Track tiles ── */
 .tracks {
