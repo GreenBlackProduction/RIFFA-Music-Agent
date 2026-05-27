@@ -113,3 +113,43 @@ async def notify_referral_joined(
         f"Вам начислено <b>+{bonus_tokens} токенов</b>!"
     )
     await _send(bot_token, referrer.telegram_user_id, text)
+
+
+async def notify_admin_new_user(
+    bot_token: str,
+    admin_chat_ids: set[int] | list[int],
+    new_user: "User",
+    source: str,
+) -> None:
+    """Ping the admin(s) when somebody finishes registration.
+
+    ``source`` is a short label for HOW they signed up — "telegram_widget",
+    "telegram_initdata", "email", "bot_link", etc. Shown verbatim in the
+    notification so the admin sees the signup channel at a glance.
+    """
+    if not admin_chat_ids:
+        return
+
+    name = (
+        new_user.display_name
+        or new_user.telegram_username
+        or (new_user.email.split("@", 1)[0] if new_user.email else None)
+        or "Новый пользователь"
+    )
+    handle = ""
+    if new_user.telegram_username:
+        handle = f" (@{new_user.telegram_username})"
+    elif new_user.email:
+        handle = f" ({new_user.email})"
+
+    text = (
+        f"👤 <b>Новый пользователь</b>\n\n"
+        f"<b>{name}</b>{handle}\n"
+        f"ID: <code>{new_user.id}</code>\n"
+        f"Канал: <i>{source}</i>"
+    )
+    if new_user.telegram_user_id:
+        text += f"\nTG-id: <code>{new_user.telegram_user_id}</code>"
+
+    for chat_id in admin_chat_ids:
+        await _send(bot_token, int(chat_id), text)

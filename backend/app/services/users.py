@@ -13,11 +13,30 @@ from app.auth.email import hash_password, verify_password
 from app.auth.telegram import TelegramAccount
 from app.core.config import get_settings
 from app.db.models import Referral, User, WalletTransaction
+from app.services.notifications import notify_admin_new_user
 from app.services.telegram_sync import sync_bot_user_on_first_login
 
 _NEW_USER_BONUS = 5          # free tokens on first registration
 _REFERRAL_BONUS_REFERRER = 10  # tokens for the person who shared the link
 _REFERRAL_BONUS_REFERRED = 4   # tokens for the new user who joined via link
+
+
+async def _notify_admin_signup(user: User, source: str) -> None:
+    """Fire-and-forget Telegram ping to admins on new signup.
+
+    Errors here must never break the signup flow — the user has already been
+    persisted at this point. We swallow exceptions and log them.
+    """
+    try:
+        settings = get_settings()
+        await notify_admin_new_user(
+            settings.telegram_bot_token,
+            settings.admin_id_set,
+            user,
+            source,
+        )
+    except Exception as exc:
+        logger.warning("admin signup notify failed for user {}: {}", user.id, exc)
 
 
 async def _generate_referral_code(session: AsyncSession) -> str:
@@ -143,6 +162,8 @@ async def get_or_create_user_by_telegram(
     # Pull existing bot-side data so the web profile is immediately up-to-date.
     await sync_bot_user_on_first_login(session, user, account.id)
 
+    await _notify_admin_signup(user, "telegram")
+
     return user, True
 
 
@@ -177,6 +198,7 @@ async def register_user_by_email(
     )
 
     await _apply_referral(session, user, referral_code)
+    await _notify_admin_signup(user, "email")
     return user
 
 
@@ -226,4 +248,5 @@ async def get_or_create_user_by_email(
     )
 
     await _apply_referral(session, user, referral_code)
+    await _notify_admin_signup(user, "email_magic_link")
     return user, True
