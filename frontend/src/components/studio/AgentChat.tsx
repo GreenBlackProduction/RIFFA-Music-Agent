@@ -841,8 +841,10 @@ export function AgentChat({
           <Button
             variant="secondary"
             onClick={() => {
+              // Re-open the chat but KEEP the previous result so the user
+              // can still launch the original brief if they change their
+              // mind, and so the backend agent has the brief in context.
               setDone(false);
-              setResult(null);
               setWizardPhase("free");
             }}
             disabled={launching}
