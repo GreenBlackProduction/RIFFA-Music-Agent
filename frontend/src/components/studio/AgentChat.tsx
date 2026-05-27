@@ -806,12 +806,23 @@ export function AgentChat({
         <div className="agent-chat__actions">
           {onLaunch && result?.intent ? (
             <Button onClick={handleLaunch} disabled={launching}>
-              {launching ? "Запускаю…" : "🚀 Запустить генерацию"}
+              {launching ? (isEn ? "Launching…" : "Запускаю…") : (isEn ? "Launch generation" : "Запустить генерацию")}
             </Button>
           ) : null}
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setDone(false);
+              setResult(null);
+              setWizardPhase("free");
+            }}
+            disabled={launching}
+          >
+            {isEn ? "Refine the brief" : "Дополнить бриф"}
+          </Button>
           {onComplete && (
             <Button variant="secondary" onClick={handleAccept} disabled={launching}>
-              Вставить в форму
+              {isEn ? "Insert into form" : "Вставить в форму"}
             </Button>
           )}
         </div>
