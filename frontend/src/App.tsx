@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { RequireAdmin } from "@/components/RequireAdmin";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppShell } from "@/components/layout/AppShell";
+import { CookieConsent } from "@/components/CookieConsent";
 import { GlobalPlayer } from "@/components/player/GlobalPlayer";
 
 const AdminPage         = lazy(() => import("@/pages/AdminPage").then((m) => ({ default: m.AdminPage })));
@@ -131,6 +132,7 @@ export default function App() {
         </Routes>
       </Suspense>
       <GlobalPlayer />
+      <CookieConsent />
     </AppShell>
   );
 }
