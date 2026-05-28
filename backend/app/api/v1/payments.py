@@ -23,7 +23,7 @@ PACKAGES = {
     "starter":  {"tokens": 10,  "stars": 55,  "rub": 100, "name": "Стартовый"},
     "basic":    {"tokens": 25,  "stars": 110, "rub": 200, "name": "Базовый"},
     "advanced": {"tokens": 60,  "stars": 220, "rub": 400, "name": "Продвинутый"},
-    "premium":  {"tokens": 150, "stars": 500, "rub": 900, "name": "Премиум"},
+    "premium":  {"tokens": 150, "stars": 620, "rub": 999, "name": "Премиум"},
 }
 
 PackageCode = Literal["starter", "basic", "advanced", "premium"]
