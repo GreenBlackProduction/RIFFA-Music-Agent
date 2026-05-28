@@ -167,7 +167,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           onClick={onClose}
         >
           <span className="nav-icon"><IconGuide /></span>
-          <span className="nav-label">{currentLang === "en" ? "Guide" : "Гайд"}</span>
+          <span className="nav-label">{currentLang === "en" ? "Manual" : "Руководство"}</span>
         </NavLink>
         {user ? (
           <button type="button" className="nav-item nav-item--signout" onClick={handleSignOut}>

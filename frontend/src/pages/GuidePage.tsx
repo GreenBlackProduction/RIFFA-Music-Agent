@@ -9,13 +9,15 @@ export function GuidePage() {
     <div className="guide-page">
       <div className="top-meta">
         <div className="breadcrumb">
-          <b>{isEN ? "guide" : "руководство"}</b>
+          <b>{isEN ? "manual" : "руководство"}</b>
         </div>
-        <div>{isEN ? "8 tools · practical guide" : "8 инструментов · практическое руководство"}</div>
+        <div>{isEN ? "8 tools · practical manual" : "8 инструментов · практическое руководство"}</div>
       </div>
 
       <h1 className="h-page">
-        {isEN ? <>How to use <em>RIFFA Studio</em>.</> : <>Как пользоваться <em>RIFFA Studio</em>.</>}
+        {isEN
+          ? <>RIFFA Studio <em>user manual</em>.</>
+          : <>Руководство по применению <em>RIFFA Studio</em>.</>}
       </h1>
       <p className="h-lead">
         {isEN
@@ -33,8 +35,8 @@ export function GuidePage() {
           <div className="guide-text">
             <p className="guide-lead-text">
               {isEN
-                ? "The main tool. RIFFA writes lyrics and produces music together — you get a full track with vocals in about 30 seconds."
-                : "Главный инструмент. RIFFA сразу пишет текст и создаёт музыку — получаешь полноценный трек с вокалом примерно за 30 секунд."}
+                ? "The main tool. RIFFA writes lyrics and produces music together — you get a full track with vocals in about 3-5 minutes."
+                : "Главный инструмент. RIFFA сразу пишет текст и создаёт музыку — получаешь полноценный трек с вокалом примерно за 3-5 минут."}
             </p>
 
             <div className="guide-steps">
@@ -70,14 +72,14 @@ export function GuidePage() {
                 <span className="guide-step-num">5</span>
                 <div>
                   <strong>{isEN ? "Click \"Create\"" : "Нажми «Создать»"}</strong>
-                  <p>{isEN ? "The emerald-coloured action button at the bottom of the form. Cost: 2 tokens. Suno returns TWO variants (V1 and V2) — usually within 30–60 seconds." : "Изумрудная кнопка-действие внизу формы. Цена: 2 токена. Suno возвращает ДВА варианта (V1 и V2) — обычно за 30–60 секунд."}</p>
+                  <p>{isEN ? "The orange action button at the bottom of the form. Cost: 2 tokens. Suno returns TWO variants (V1 and V2) — usually within 3-5 minutes." : "Ораньжевая кнопка-действие внизу формы. Цена: 2 токена. Suno возвращает ДВА варианта (V1 и V2) — обычно за 3-5 минут."}</p>
                 </div>
               </div>
               <div className="guide-step">
                 <span className="guide-step-num">6</span>
                 <div>
                   <strong>{isEN ? "Listen, pick a variant, download" : "Послушай, выбери вариант, скачай"}</strong>
-                  <p>{isEN ? "Both variants appear in your library card. Each variant is independent — you can like one, share another, publish only the V1 you prefer to Radio. Download MP3 for social media, WAV for DAW editing." : "Оба варианта появятся в карточке библиотеки. Каждый вариант независим — можно лайкнуть один, поделиться другим, выложить на Радио только тот, что больше понравился. Скачать MP3 для соцсетей, WAV для монтажа в DAW."}</p>
+                  <p>{isEN ? "Both variants appear in your library card. Each variant is independent — you can like one, share another, publish only the V1 you prefer to Radio. Download MP3 for social media, WAV for editing." : "Оба варианта появятся в карточке библиотеки. Каждый вариант независим — можно лайкнуть один, поделиться другим, выложить на Радио только тот, что больше понравился. Скачать MP3 для соцсетей, WAV для монтажа."}</p>
                 </div>
               </div>
             </div>
@@ -348,7 +350,7 @@ export function GuidePage() {
                 <span className="guide-step-num">1</span>
                 <div>
                   <strong>{isEN ? "Open the SFX tile" : "Открой плитку «Звуковой эффект»"}</strong>
-                  <p>{isEN ? "On the Studio page click the SFX tile (lightning bolt icon). The form is the most minimal — pick source, environment, duration, style." : "На странице Студии нажми плитку «Звуковой эффект» (иконка молнии). Форма самая минимальная — выбери источник, среду, длительность, стиль."}</p>
+                  <p>{isEN ? "On the Studio page click the SFX tile. The form is the most minimal — pick source, environment, duration, style." : "На странице Студии нажми плитку «Звуковой эффект». Форма самая минимальная — выбери источник, среду, длительность, стиль."}</p>
                 </div>
               </div>
               <div className="guide-step">
@@ -479,7 +481,7 @@ export function GuidePage() {
               <div className="guide-step">
                 <span className="guide-step-num">5</span>
                 <div>
-                  <strong>{isEN ? "Generate, download, attach to track" : "Сгенерируй, скачай, привяжи к треку"}</strong>
+                  <strong>{isEN ? "Generate, download" : "Сгенерируй, скачай"}</strong>
                   <p>{isEN ? "The cover appears in the library card alongside your music. Download PNG/JPG for upload to Spotify, Apple Music, iTunes. If it's not perfect — tweak the prompt, regenerate." : "Обложка появится в карточке библиотеки рядом с музыкой. Скачай PNG/JPG для Spotify, Apple Music, iTunes. Не идеально — подкрути промт и сгенерируй заново."}</p>
                 </div>
               </div>
@@ -564,8 +566,8 @@ export function GuidePage() {
           <div className="guide-text">
             <p className="guide-lead-text">
               {isEN
-                ? "A world-class music expert in chat form. Tell it \"I want music like HVOB\" or \"instrumental in the spirit of toe\" — the agent recognises the artist, identifies their signature instruments and production, and builds a Suno-ready brief for you."
-                : "Музыкальный эксперт мирового уровня в формате чата. Скажи «хочу музыку как у HVOB» или «инструментал в духе toe» — агент узнает артиста, разберёт его инструменты и продакшн, и соберёт готовый бриф для Suno."}
+                ? "A world-class music expert in chat form. Tell it \"I want music like HVOB\" or \"instrumental in the spirit of AC/DC\" — the agent recognises the artist, identifies their signature instruments and production, and builds a Suno-ready brief for you."
+                : "Музыкальный эксперт мирового уровня в формате чата. Скажи «хочу музыку как у HVOB» или «инструментал в духе AC/DC» — агент узнает артиста, разберёт его инструменты и продакшн, и соберёт готовый бриф для Suno."}
             </p>
 
             <div className="guide-steps">
@@ -573,7 +575,7 @@ export function GuidePage() {
                 <span className="guide-step-num">1</span>
                 <div>
                   <strong>{isEN ? "Open the Agent" : "Открой агента"}</strong>
-                  <p>{isEN ? "Click \"Agent\" in the sidebar, or use the agent panel inside any Studio module. The chat opens with a greeting." : "Нажми «Агент» в сайдбаре или используй панель агента внутри любого модуля Студии. Чат откроется с приветствием."}</p>
+                  <p>{isEN ? "Click \"Agent\" in the sidebar, or use the agent panel. The chat opens with a greeting." : "Нажми «Агент» в сайдбаре или используй панель агента. Чат откроется с приветствием."}</p>
                 </div>
               </div>
               <div className="guide-step">
@@ -701,7 +703,7 @@ export function GuidePage() {
                 <span className="guide-step-num">4</span>
                 <div>
                   <strong>{isEN ? "Share or publish" : "Поделись или опубликуй"}</strong>
-                  <p>{isEN ? "\"Share\" gives a public /s/ link — listenable without login. \"Publish to Radio\" makes the track visible to all RIFFA users on the Radio page — you can publish V1 only, or V1 + V2." : "«Поделиться» даёт публичную ссылку /s/ — слушать без входа. «На Радио» — выкладывает трек на страницу Радио, открыто всем пользователям RIFFA. Можно опубликовать только V1 или V1 + V2."}</p>
+                  <p>{isEN ? "\"Share\" gives a public /s/ link — listenable without login. \"Publish to Radio\" makes the track visible to all RIFFA users on the Radio page — you can publish V1 or V2, or both options." : "«Поделиться» даёт публичную ссылку /s/ — слушать без входа. «На Радио» — выкладывает трек на страницу Радио, открыто всем пользователям RIFFA. Можно опубликовать V1 или V2, либо оба варианта."}</p>
                 </div>
               </div>
             </div>
@@ -807,7 +809,7 @@ export function GuidePage() {
                 <span className="guide-step-num">3</span>
                 <div>
                   <strong>{isEN ? "Like / dislike to influence the chart" : "Лайкай / дизлайкай — это влияет на чарт"}</strong>
-                  <p>{isEN ? "Each row has heart and thumbs-down icons. Likes feed the chart (today / week / month / all-time). Liking also adds the track to \"My collection\" — accessible from the Mood card row." : "У каждой строки — иконки сердца и пальца вниз. Лайки формируют чарт (сегодня / неделя / месяц / всё время). Лайк ещё добавляет трек в «Мою коллекцию» — её можно открыть из ряда карточек настроения."}</p>
+                  <p>{isEN ? "Each row has heart and a listening counter. Likes feed the chart (today / week / month / all-time). Liking also adds the track to \"My collection\" — accessible from the Mood card row." : "У каждой строки — иконки сердца и счетчик прослушиваний. Лайки формируют чарт (сегодня / неделя / месяц / всё время). Лайк ещё добавляет трек в «Мою коллекцию» — её можно открыть из ряда карточек настроения."}</p>
                 </div>
               </div>
               <div className="guide-step">
@@ -822,7 +824,7 @@ export function GuidePage() {
             <div className="guide-tips">
               <div className="guide-tips-head">{isEN ? "Tips" : "Советы"}</div>
               <ul>
-                <li>{isEN ? "Radio is great for inspiration — leave it on in the background. When something catches your ear, click the track to see its genre and mood, then borrow the style for your own brief." : "Радио отлично для вдохновения — оставь его фоном. Зацепило — кликни на трек, посмотри жанр и настроение, забери стиль в свой бриф."}</li>
+                <li>{isEN ? "Radio is great for inspiration — leave it on in the background. When something catches your ear, click the track to see its genre and mood, then borrow the style for your own brief." : "Радио отлично для вдохновения — оставь его фоном. Зацепило — кликни на трек, посмотри жанр и настроение, забери стиль в свой бриф (функция в разработке)."}</li>
                 <li>{isEN ? "V1 and V2 from the same generation appear as independent rows with their own like / play counters. You can like V1 without affecting V2 — completely independent." : "V1 и V2 из одной генерации — отдельные строки с собственными счётчиками лайков / прослушиваний. Лайк на V1 никак не задевает V2 — они полностью независимы."}</li>
                 <li>{isEN ? "Sort the playlist by recent, score (likes minus dislikes), or plays — tabs at the top of the list." : "Сортировка ленты: по свежести, по рейтингу (лайки минус дизлайки), по прослушиваниям — вкладки сверху ленты."}</li>
               </ul>
