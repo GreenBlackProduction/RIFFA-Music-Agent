@@ -641,10 +641,39 @@ export function ProfilePage() {
           </div>
         </div>
 
-        {/* ── 04 · документы ── */}
+        {/* ── 04 · уведомления в боте ── */}
         <div>
           <div className="h-section">
-            <div className="tag"><span className="num">04</span> · {isEN ? "documents" : "документы"}</div>
+            <div className="tag"><span className="num">04</span> · {isEN ? "notifications" : "уведомления"}</div>
+            <h2>{isEN ? "bot notifications" : "уведомления в боте"}</h2>
+          </div>
+          <div className="p-panel">
+            <p className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
+              {isEN
+                ? "Manage all push messages from the bot — morning songs and generation-ready notifications. Tap the button to open the bot and toggle."
+                : "Единый переключатель для всех push-сообщений бота: утренние треки и уведомления о готовности генераций. Нажмите кнопку — откроется бот, где можно включить или отключить."}
+            </p>
+            <button
+              type="button"
+              className="btn btn-ink btn-sm"
+              onClick={() => {
+                const url = "https://t.me/The_Riffa_bot?start=notifications";
+                if (window.Telegram?.WebApp?.openTelegramLink) {
+                  window.Telegram.WebApp.openTelegramLink(url);
+                } else {
+                  window.open(url, "_blank", "noopener");
+                }
+              }}
+            >
+              {isEN ? "Manage notifications →" : "Настроить уведомления →"}
+            </button>
+          </div>
+        </div>
+
+        {/* ── 05 · документы ── */}
+        <div>
+          <div className="h-section">
+            <div className="tag"><span className="num">05</span> · {isEN ? "documents" : "документы"}</div>
             <h2>{isEN ? "legal" : "правовая информация"}</h2>
           </div>
           <div className="doc-list">
