@@ -781,13 +781,49 @@ async def _build_user_stats(session: AsyncSession, user: User) -> str:
     return " ".join(pieces)
 
 
-def _coerce_intent(raw: Any, module_hint: ModuleKind) -> AgentIntent:
+_INSTRUMENTAL_MARKERS = (
+    "без вокала",
+    "без голоса",
+    "без слов",
+    "только бит",
+    "только инструмент",
+    "только ударные",
+    "только гитара",
+    "только барабаны",
+    "no vocals",
+    "no vocal",
+    "instrumental only",
+    "instrumental,",
+    "instrumental track",
+    "инструментал",
+)
+
+
+def _looks_instrumental(*texts: str) -> bool:
+    blob = " ".join(t.lower() for t in texts if t)
+    return any(marker in blob for marker in _INSTRUMENTAL_MARKERS)
+
+
+def _coerce_intent(
+    raw: Any,
+    module_hint: ModuleKind,
+    *,
+    reply_text: str = "",
+    summary_text: str = "",
+    prompt_text: str = "",
+) -> AgentIntent:
     """Best-effort parse of the GPT-emitted intent object.
 
     GPT occasionally returns an empty object, a string, or skips fields. We
     always end up with a usable AgentIntent (falling back to the module hint)
     so the frontend can show the launch button. Callers should still gate on
     ``done=True`` before showing the launch UI.
+
+    Additionally enforces a hard ``instrumental`` override: if the brief
+    explicitly says "без вокала" / "instrumental" / "только барабаны" but
+    the model still returned module=song with a vocal, we coerce it to
+    module=instrumental and drop the vocal — Suno was generating with vocals
+    for clearly-instrumental briefs because GPT slipped on the module flag.
     """
     if not isinstance(raw, dict):
         raw = {}
@@ -823,10 +859,25 @@ def _coerce_intent(raw: Any, module_hint: ModuleKind) -> AgentIntent:
     if vocal not in ("", "male", "female"):
         vocal = ""
 
+    description = str(raw_params.get("description") or "")[:500]
+
+    # Hard instrumental override — protects against GPT slipping on the
+    # module flag when the brief is clearly instrumental.
+    if module_val in ("song", "occasion") and _looks_instrumental(
+        description, reply_text, summary_text, prompt_text
+    ):
+        logger.info(
+            "[AGENT] forcing module=instrumental — instrumental markers "
+            "detected in brief (was module={})", module_val,
+        )
+        module_val = "instrumental"
+        vocal = ""
+        text_mode = "none"
+
     params = AgentIntentParams(
-        description=str(raw_params.get("description") or "")[:500],
+        description=description,
         text_mode=text_mode,
-        lyrics=str(raw_params.get("lyrics") or "")[:5000],
+        lyrics=str(raw_params.get("lyrics") or "")[:5000] if module_val == "song" else "",
         genre=str(raw_params.get("genre") or "")[:64],
         custom_genre=str(raw_params.get("custom_genre") or "")[:128],
         mood=str(raw_params.get("mood") or "")[:32],
@@ -894,14 +945,19 @@ async def agent_chat(
         )
 
     try:
+        # gpt-4o-mini: 3-5x faster and 10x cheaper than gpt-4o, with comparable
+        # quality on the agent's JSON-structured musical-research task. Switched
+        # because gpt-4o was visibly slow after the system-prompt expansion in
+        # eda2187 and users complained the agent "thinks forever". If quality
+        # regressions show up on niche genres, raise to "gpt-4o" again.
         # `response_format` accepts the {"type": "json_object"} literal at
         # runtime, but the typed-dict variant in openai 1.61 is too narrow
         # for mypy to pick the right overload — silence just this call.
         resp = await client.chat.completions.create(  # type: ignore[call-overload]
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=chat_messages,
             temperature=0.55,
-            max_tokens=1800,
+            max_tokens=1500,
             response_format={"type": "json_object"},
         )
         raw = (resp.choices[0].message.content or "").strip()
@@ -929,7 +985,17 @@ async def agent_chat(
     if len(prompt) > 5000:
         prompt = prompt[:5000].rsplit(" ", 1)[0]
 
-    intent = _coerce_intent(parsed.get("intent"), body.module) if done else None
+    intent = (
+        _coerce_intent(
+            parsed.get("intent"),
+            body.module,
+            reply_text=reply,
+            summary_text=summary,
+            prompt_text=prompt,
+        )
+        if done
+        else None
+    )
 
     raw_suggestions = parsed.get("suggestions", [])
     suggestions: list[str] = []
