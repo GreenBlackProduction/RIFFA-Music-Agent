@@ -80,10 +80,19 @@ export interface CurrentUser {
   terms_accepted_at: string | null;
   terms_version: string | null;
   legal_version: string | null;
+  notifications_enabled: boolean;
 }
 
 export function fetchCurrentUser(): Promise<CurrentUser> {
   return apiFetch<CurrentUser>("/api/v1/users/me");
+}
+
+/** Toggle all bot notifications (morning broadcast + generation-done). */
+export function updateNotifications(enabled: boolean): Promise<{ enabled: boolean }> {
+  return apiFetch("/api/v1/users/notifications", {
+    method: "PATCH",
+    body: JSON.stringify({ enabled }),
+  });
 }
 
 export interface LegalDocument {

@@ -235,6 +235,24 @@
 }
 .token-explainer__text strong { font-size: 14px; font-weight: 600; color: var(--ink); }
 .token-explainer__text span { font-size: 12.5px; color: var(--ink-3); line-height: 1.4; }
+
+/* Compact variant — lives inside profile-grid's right column, not a full
+   row below it. Smaller icon, tighter padding, single-line strong title. */
+.token-explainer--compact {
+  margin-top: 16px;
+  padding: 10px 14px;
+  gap: 10px;
+  background: var(--paper-2);
+  border-color: var(--rule);
+}
+.token-explainer--compact .token-explainer__icon {
+  width: 32px;
+  height: 32px;
+  border-color: var(--rule);
+}
+.token-explainer--compact .token-explainer__text strong { font-size: 12px; }
+.token-explainer--compact .token-explainer__text span { font-size: 11.5px; line-height: 1.35; }
+
 @media (max-width: 540px) {
   .token-explainer { padding: 12px; gap: 10px; }
   .token-explainer__icon { width: 36px; height: 36px; }

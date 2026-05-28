@@ -1,22 +1,30 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth";
 import "./CookieConsent.css";
 
-const STORAGE_KEY = "riffa_cookie_consent";
+// We key consent by user.id so a fresh signup on the same browser still sees
+// the banner. Anonymous visitors fall back to a shared key.
+const KEY_PREFIX = "riffa_cookie_consent:";
+const ANON_KEY = "riffa_cookie_consent:anon";
 
 export function CookieConsent() {
+  const { user } = useAuth();
   const [visible, setVisible] = useState(false);
 
+  const key = user ? `${KEY_PREFIX}${user.id}` : ANON_KEY;
+
   useEffect(() => {
-    // Don't show on login page or when already accepted
-    if (localStorage.getItem(STORAGE_KEY) !== "1") {
+    if (localStorage.getItem(key) !== "1") {
       setVisible(true);
+    } else {
+      setVisible(false);
     }
-  }, []);
+  }, [key]);
 
   if (!visible) return null;
 
   const accept = () => {
-    localStorage.setItem(STORAGE_KEY, "1");
+    localStorage.setItem(key, "1");
     setVisible(false);
   };
 

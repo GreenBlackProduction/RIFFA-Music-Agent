@@ -10,6 +10,7 @@ import {
   redeemPromo,
   restoreGeneration,
   updateDisplayName,
+  updateNotifications,
   uploadAvatar,
   type PackageCode,
 } from "@/lib/api/client";
@@ -173,6 +174,31 @@ export function ProfilePage() {
   const [payMethod, setPayMethod] = useState<string>("card");
   const [payStatus, setPayStatus] = useState<"idle" | "loading" | "error">("idle");
   const [payError, setPayError] = useState<string | null>(null);
+
+  // ── Notifications toggle ──
+  const [notifyOn, setNotifyOn] = useState<boolean>(user?.notifications_enabled ?? true);
+  const [notifyPending, setNotifyPending] = useState(false);
+  const [notifyError, setNotifyError] = useState<string | null>(null);
+  useEffect(() => {
+    if (user) setNotifyOn(user.notifications_enabled);
+  }, [user?.notifications_enabled]);
+
+  const handleToggleNotifications = async (next: boolean) => {
+    if (notifyPending) return;
+    setNotifyPending(true);
+    setNotifyError(null);
+    const prev = notifyOn;
+    setNotifyOn(next); // optimistic
+    try {
+      await updateNotifications(next);
+      await refreshAuth();
+    } catch {
+      setNotifyOn(prev);
+      setNotifyError(isEN ? "Failed to save. Try again." : "Не удалось сохранить. Попробуйте ещё раз.");
+    } finally {
+      setNotifyPending(false);
+    }
+  };
 
   const handleBuyPack = async () => {
     // Align frontend pack ids with backend ("pro" on frontend → "advanced" on backend)
@@ -461,18 +487,21 @@ export function ProfilePage() {
             </div>
           </div>
 
-          {/* display name field */}
-          <div className="field">
-            <label>{isEN ? "display name" : "имя для отображения"}</label>
-            {editingName ? (
-              <div style={{ display: "flex", gap: 8 }}>
-                <input type="text" value={nameInput} onChange={(e) => setNameInput(e.target.value)} disabled={nameSaving} maxLength={64} onKeyDown={(e) => e.key === "Escape" && setEditingName(false)} autoFocus />
-                <button type="button" className="btn btn-ink btn-sm" onClick={handleSaveName} disabled={nameSaving} aria-label="save"><IconCheck /></button>
-                <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setEditingName(false); setNameInput(displayName); }} aria-label="cancel"><IconClose /></button>
-              </div>
-            ) : (
-              <input type="text" value={displayName} readOnly onClick={() => { setNameInput(displayName); setEditingName(true); }} />
-            )}
+          {/* Display-name edit lives only in the avatar block on the left —
+              the second field was a duplicate and confused users. */}
+
+          {/* Compact token explainer — shrunk and moved next to the user
+              card instead of taking a full row below profile-grid. */}
+          <div className="token-explainer token-explainer--compact">
+            <span className="token-explainer__icon"><Coin size={20} /></span>
+            <div className="token-explainer__text">
+              <strong>{isEN ? "What is a token?" : "Что такое токен?"}</strong>
+              <span>
+                {isEN
+                  ? <>Internal RIFFA currency. <Coin size={11} /> next to a number = balance. Each generation costs tokens.</>
+                  : <>Внутренняя валюта RIFFA. <Coin size={11} /> рядом с цифрой = баланс. Каждая генерация списывает токены.</>}
+              </span>
+            </div>
           </div>
 
           {/* Inline gen stats — в пустом пространстве справа */}
@@ -511,18 +540,7 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {/* Token icon explainer */}
-      <div className="token-explainer">
-        <span className="token-explainer__icon"><Coin size={28} /></span>
-        <div className="token-explainer__text">
-          <strong>{isEN ? "What is a token?" : "Что такое токен?"}</strong>
-          <span>
-            {isEN
-              ? <>This icon <Coin size={11} /> means a RIFFA token — the universal currency of the studio. The number next to it shows how many tokens you have. Generations consume tokens.</>
-              : <>Эта иконка <Coin size={11} /> — токен RIFFA, универсальная валюта студии. Цифра рядом показывает их количество. Генерации списывают токены.</>}
-          </span>
-        </div>
-      </div>
+      {/* Token explainer теперь живёт внутри profile-grid справа (см. выше). */}
 
       {/* ── 01 · купить токены ── */}
       <div className="h-section">
@@ -650,23 +668,37 @@ export function ProfilePage() {
           <div className="p-panel">
             <p className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
               {isEN
-                ? "Manage all push messages from the bot — morning songs and generation-ready notifications. Tap the button to open the bot and toggle."
-                : "Единый переключатель для всех push-сообщений бота: утренние треки и уведомления о готовности генераций. Нажмите кнопку — откроется бот, где можно включить или отключить."}
+                ? "Single switch for every push from the bot: morning tracks and generation-ready notifications."
+                : "Единый переключатель для всех push-сообщений бота: утренние треки и уведомления о готовности генераций."}
             </p>
-            <button
-              type="button"
-              className="btn btn-ink btn-sm"
-              onClick={() => {
-                const url = "https://t.me/The_Riffa_bot?start=notifications";
-                if (window.Telegram?.WebApp?.openTelegramLink) {
-                  window.Telegram.WebApp.openTelegramLink(url);
-                } else {
-                  window.open(url, "_blank", "noopener");
-                }
+            <label
+              className="notify-toggle"
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: 14, cursor: notifyPending ? "wait" : "pointer", userSelect: "none",
+                padding: "10px 14px", border: "1px solid var(--rule)", borderRadius: 12,
+                background: "var(--paper)",
               }}
             >
-              {isEN ? "Manage notifications →" : "Настроить уведомления →"}
-            </button>
+              <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>
+                {notifyOn
+                  ? (isEN ? "🔔 Notifications are on" : "🔔 Уведомления включены")
+                  : (isEN ? "🔕 Notifications are off" : "🔕 Уведомления отключены")}
+              </span>
+              <input
+                type="checkbox"
+                checked={notifyOn}
+                disabled={notifyPending}
+                onChange={(e) => void handleToggleNotifications(e.target.checked)}
+                style={{
+                  width: 40, height: 22, cursor: notifyPending ? "wait" : "pointer",
+                  accentColor: "var(--hi)",
+                }}
+              />
+            </label>
+            {notifyError && (
+              <p style={{ color: "var(--hi)", fontSize: 12, marginTop: 8 }}>{notifyError}</p>
+            )}
           </div>
         </div>
 
