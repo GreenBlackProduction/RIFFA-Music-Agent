@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import secrets
 import uuid
 from contextlib import suppress
@@ -407,6 +408,149 @@ async def convert_to_wav(
         GenerationType.wav_convert,
         params=body.model_dump(),
         title=wav_title,
+    )
+    await session.commit()
+    await _enqueue(settings.redis_url, str(gen.id))
+    return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
+
+
+# ── Similar track — remix a published Radio track ──────────────────────────
+
+
+def _remix_agent_params(agent_mp: dict[str, Any]) -> dict[str, Any]:
+    """Light remix: keep genre+mood, shuffle techniques/instruments, jitter BPM ±10 %.
+
+    The point is to produce a track that's recognisably the same family as the
+    source but not a clone — different drum pattern, different lead sound,
+    nudged tempo. We intentionally don't touch genre or mood: those are the
+    user's "I want more like this" signal.
+    """
+    if not isinstance(agent_mp, dict):
+        return {}
+
+    remixed = dict(agent_mp)
+
+    # Shuffle techniques: keep up to 3 from source.
+    techniques = remixed.get("techniques")
+    if isinstance(techniques, list) and len(techniques) > 1:
+        sample_size = min(3, max(1, len(techniques) - 1))
+        remixed["techniques"] = random.sample(techniques, sample_size)
+
+    # Shuffle key_instruments: keep up to 5, drop 1-2 randomly.
+    key_instruments = remixed.get("key_instruments")
+    if isinstance(key_instruments, list) and len(key_instruments) > 2:
+        sample_size = max(2, len(key_instruments) - random.randint(1, 2))
+        remixed["key_instruments"] = random.sample(key_instruments, sample_size)
+
+    # BPM jitter: extract the first integer from "112 BPM" / "70-80 BPM" and
+    # shift it ±10 %, then write back as "<bpm> BPM".
+    bpm_str = str(remixed.get("suggested_bpm") or "").strip()
+    if bpm_str:
+        import re
+        match = re.search(r"\d+", bpm_str)
+        if match:
+            base = int(match.group())
+            shift = random.uniform(-0.10, 0.10)
+            new_bpm = max(40, int(round(base * (1 + shift))))
+            remixed["suggested_bpm"] = f"{new_bpm} BPM"
+
+    # Drop subgenre about half the time — forces the prompt engineer to pick
+    # a fresh angle within the parent genre.
+    if "subgenre" in remixed and random.random() < 0.5:
+        remixed.pop("subgenre", None)
+
+    return remixed
+
+
+@router.post(
+    "/similar/{generation_id}",
+    response_model=GenerateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def generate_similar(
+    generation_id: str,
+    request: Request,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+    settings: Settings = Depends(get_settings),
+) -> GenerateResponse:
+    """Launch a fresh song/instrumental musically similar to ``generation_id``.
+
+    The source must be a published (Radio) track so we don't leak private
+    libraries. Cost equals a regular song/instrumental. The new generation
+    lands in *the caller's* library — not the original author's.
+    """
+    try:
+        src_gid = uuid.UUID(generation_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="bad generation_id"
+        ) from exc
+
+    src = (
+        await session.execute(select(Generation).where(Generation.id == src_gid))
+    ).scalar_one_or_none()
+    if src is None or src.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="track not found")
+
+    # Owner can always remix their own; others only if it's on Radio.
+    if src.user_id != user.id and not src.is_public:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="track is not on radio",
+        )
+
+    # Source must be a vocal/instrumental track — covers/SFX/cover_art aren't
+    # remixable through this flow.
+    new_type = (
+        GenerationType.instrumental
+        if src.type == GenerationType.instrumental
+        else GenerationType.song
+    )
+    if src.type not in (
+        GenerationType.song,
+        GenerationType.instrumental,
+        GenerationType.occasion,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="similar generation supports only song / instrumental sources",
+        )
+
+    src_params = dict(src.params or {})
+    src_agent_mp = src_params.get("agent_music_params") or {}
+    remixed_mp = _remix_agent_params(src_agent_mp)
+
+    # New params re-use the same agent envelope so the existing worker pipeline
+    # (tasks/__init__.py::run_generation) picks up genre+mood+remixed knobs.
+    new_params: dict[str, Any] = {
+        "description": src_params.get("description") or src.prompt or "",
+        "genre": src.genre or "",
+        "custom_genre": src_params.get("custom_genre", ""),
+        "mood": src.mood or "",
+        "tempo": src.tempo or "",
+        "agent_music_params": remixed_mp,
+        # text_mode=ai so the model writes fresh lyrics — copying the original
+        # would defeat the "similar but new" goal.
+        "text_mode": "ai" if new_type == GenerationType.song else "none",
+        "vocal": src.vocal or "" if new_type == GenerationType.song else "",
+        "similar_source_generation_id": generation_id,
+    }
+
+    title_prefix = "Похожий" if new_type == GenerationType.song else "Похожий инструментал"
+    base_title = src.title or "трек"
+    new_title = f"{title_prefix} — {base_title}"[:120]
+
+    gen = await _create_generation(
+        session,
+        user,
+        new_type,
+        params=new_params,
+        title=new_title,
+        genre=src.genre or "",
+        mood=src.mood or "",
+        tempo=src.tempo or "",
+        vocal=src.vocal or "" if new_type == GenerationType.song else "",
     )
     await session.commit()
     await _enqueue(settings.redis_url, str(gen.id))
