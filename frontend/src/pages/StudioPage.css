@@ -128,6 +128,23 @@
   .hero-ai-icon__img { animation: none !important; }
 }
 
+/* Touch-устройства (телефоны, планшеты) — отключаем непрерывные
+   hero-анимации и тяжёлый blur. Они дают красивый эффект на
+   десктопе, но сильно греют мобильные GPU и батарею.
+   will-change сбрасываем тоже — иначе GPU держит отдельный слой
+   с blur-bitmap даже когда анимация уже остановлена. */
+@media (hover: none) and (pointer: coarse) {
+  .hero-card__accent { animation: none !important; background-position: 0 50%; }
+  .hero-card__glow {
+    animation: none !important;
+    filter: blur(24px) !important;
+    opacity: 0.65 !important;
+    will-change: auto !important;
+    transform: none !important;
+  }
+  .hero-ai-icon__img { animation: none !important; }
+}
+
 .hero-card__accent {
   background: linear-gradient(
     120deg,

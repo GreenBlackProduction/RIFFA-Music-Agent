@@ -86,6 +86,16 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
       "(prefers-reduced-motion: reduce)",
     ).matches;
 
+    // Touch-устройства (телефоны/планшеты) — основной источник перегрева:
+    // canvas.filter blur 40+ px при 60 fps греет GPU. Снижаем до 24 fps
+    // и используем меньший blur — визуально почти то же, температурно
+    // существенно легче. На десктопе ограничения нет.
+    const isTouch = window.matchMedia(
+      "(hover: none) and (pointer: coarse)",
+    ).matches;
+    const frameMinMs = reduceMotion ? 1000 / 12 : isTouch ? 1000 / 24 : 1000 / 60;
+    let lastFrameTs = 0;
+
     let raf = 0;
     let t = 0;
     let disposed = false;
@@ -178,7 +188,11 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
       // Размеры blob'ов считаем от высоты (плеер — узкая полоса), чтобы их
       // яркие центры не улетали далеко за канвас.
       const baseR = h * 1.9;
-      const blur = Math.max(16, h * 0.5);
+      // На touch — более мелкий blur (тяжелее всех операций canvas), а
+      // gradient sluggish'ный, всё равно даёт мягкость без перегрева.
+      const blur = isTouch
+        ? Math.max(10, h * 0.3)
+        : Math.max(16, h * 0.5);
       ctx2d.filter = `blur(${blur}px)`;
       ctx2d.globalCompositeOperation = "lighter";
       ctx2d.globalAlpha = reduceMotion ? 0.3 : (active ? 0.72 : 0.45);
@@ -215,10 +229,18 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
       ctx2d.globalCompositeOperation = "source-over";
     }
 
-    function tick() {
+    function tick(ts: number = 0) {
       if (disposed) return;
-      t += 1;
-      drawFrame();
+      // FPS limiter: rAF на мобильных всё равно даёт 60-120 событий в секунду
+      // и пере-планирует кадр даже когда мы пропустили draw. Заворачиваем
+      // вызовы draw в минимальный интервал — на touch это 24fps, на
+      // desktop = native 60fps (frameMinMs ≈ 16ms всегда меньше delta).
+      const elapsed = ts - lastFrameTs;
+      if (elapsed >= frameMinMs) {
+        lastFrameTs = ts;
+        t += 1;
+        drawFrame();
+      }
       // КЛЮЧЕВАЯ ОПТИМИЗАЦИЯ: rAF продолжаем только когда плеер активен.
       // На паузе — выходим из цикла, остаётся последний нарисованный кадр.
       if (active) {
@@ -227,7 +249,7 @@ export function PlayerAura({ audio, active, onEnergy }: PlayerAuraProps) {
     }
 
     if (active) {
-      tick();
+      raf = requestAnimationFrame(tick);
     } else {
       // Single idle frame — без подписки на rAF
       drawFrame();
