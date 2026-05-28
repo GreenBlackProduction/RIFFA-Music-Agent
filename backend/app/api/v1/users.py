@@ -60,6 +60,7 @@ def read_current_user(user: User = Depends(current_user_loose)) -> CurrentUser:
         terms_accepted_at=user.terms_accepted_at.isoformat() if user.terms_accepted_at else None,
         terms_version=user.terms_version,
         legal_version=settings.legal_terms_version,
+        notifications_enabled=user.morning_messages_enabled,
     )
 
 
@@ -136,6 +137,27 @@ async def update_display_name(
     session.add(user)
     await session.commit()
     return {"display_name": user.display_name}
+
+
+class NotificationsToggleRequest(BaseModel):
+    enabled: bool
+
+
+@router.patch("/notifications", status_code=status.HTTP_200_OK)
+async def update_notifications(
+    body: NotificationsToggleRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+) -> dict[str, bool]:
+    """Toggle all bot notifications (morning broadcast + generation-done).
+
+    Backed by ``users.morning_messages_enabled`` — the single flag covers both
+    push types, see services/notifications.py::notify_generation_done.
+    """
+    user.morning_messages_enabled = body.enabled
+    session.add(user)
+    await session.commit()
+    return {"enabled": user.morning_messages_enabled}
 
 
 @router.post("/change-password", status_code=status.HTTP_200_OK)

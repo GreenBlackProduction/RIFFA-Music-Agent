@@ -414,6 +414,53 @@ async def convert_to_wav(
     return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
 
 
+# ── Active / recent generations — sidebar sync ─────────────────────────────
+
+
+@router.get("/active", status_code=status.HTTP_200_OK)
+async def list_active_generations(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+) -> list[dict[str, Any]]:
+    """Return generations that are still running or finished within the last
+    hour so the sidebar "Active generations" tray can hydrate on app start.
+
+    Frontend currently calls this on every page load — returning [] was OK
+    (the page worked) but the 404 spam in DevTools made other regressions
+    harder to spot. Now returns a real list, capped at 20 rows.
+    """
+    from datetime import datetime, timedelta, timezone
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    rows = (
+        await session.execute(
+            select(Generation)
+            .where(
+                Generation.user_id == user.id,
+                Generation.deleted_at.is_(None),
+                (Generation.status.in_(
+                    [GenerationStatus.queued, GenerationStatus.processing]
+                )) | (Generation.completed_at.is_not(None) & (Generation.completed_at >= cutoff)),
+            )
+            .order_by(Generation.created_at.desc())
+            .limit(20)
+        )
+    ).scalars().all()
+
+    return [
+        {
+            "id": str(g.id),
+            "type": g.type.value if hasattr(g.type, "value") else str(g.type),
+            "title": g.title or "",
+            "status": g.status.value if hasattr(g.status, "value") else str(g.status),
+            "progress": int((g.params or {}).get("progress", 0)) if g.status != GenerationStatus.completed else 100,
+            "step": (g.params or {}).get("step"),
+            "error": g.error_message,
+            "result": g.result if g.status == GenerationStatus.completed else None,
+        }
+        for g in rows
+    ]
+
+
 # ── Similar track — remix a published Radio track ──────────────────────────
 
 

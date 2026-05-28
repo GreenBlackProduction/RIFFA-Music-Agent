@@ -16,9 +16,11 @@ from app.db.models import Referral, User, WalletTransaction
 from app.services.notifications import notify_admin_new_user
 from app.services.telegram_sync import sync_bot_user_on_first_login
 
-_NEW_USER_BONUS = 5          # free tokens on first registration
+_NEW_USER_BONUS = 3          # free tokens on first registration
 _REFERRAL_BONUS_REFERRER = 10  # tokens for the person who shared the link
 _REFERRAL_BONUS_REFERRED = 4   # tokens for the new user who joined via link
+# Итого для нового пользователя по реферальной ссылке:
+#   _NEW_USER_BONUS + _REFERRAL_BONUS_REFERRED = 3 + 4 = 7 токенов
 
 
 async def _notify_admin_signup(user: User, source: str) -> None:
