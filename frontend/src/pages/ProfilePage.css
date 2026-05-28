@@ -211,7 +211,7 @@
   align-items: center;
   gap: 14px;
   padding: 14px 18px;
-  margin-top: 24px;
+  margin: 12px 0 28px;
   border: 1px solid var(--ink);
   border-radius: 12px;
   background: var(--paper-3);
@@ -236,28 +236,105 @@
 .token-explainer__text strong { font-size: 14px; font-weight: 600; color: var(--ink); }
 .token-explainer__text span { font-size: 12.5px; color: var(--ink-3); line-height: 1.4; }
 
-/* Compact variant — lives inside profile-grid's right column, not a full
-   row below it. Smaller icon, tighter padding, single-line strong title. */
-.token-explainer--compact {
-  margin-top: 16px;
-  padding: 10px 14px;
-  gap: 10px;
-  background: var(--paper-2);
-  border-color: var(--rule);
-}
-.token-explainer--compact .token-explainer__icon {
-  width: 32px;
-  height: 32px;
-  border-color: var(--rule);
-}
-.token-explainer--compact .token-explainer__text strong { font-size: 12px; }
-.token-explainer--compact .token-explainer__text span { font-size: 11.5px; line-height: 1.35; }
-
 @media (max-width: 540px) {
   .token-explainer { padding: 12px; gap: 10px; }
   .token-explainer__icon { width: 36px; height: 36px; }
   .token-explainer__text strong { font-size: 13px; }
   .token-explainer__text span { font-size: 12px; }
+}
+
+/* ── Notifications card (lives in profile-grid right column).
+   Compact card — half-width on desktop, full-width on mobile. */
+.notify-card {
+  margin-top: 16px;
+  max-width: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--ink);
+  border-radius: 10px;
+  background: var(--paper-3);
+}
+@media (max-width: 860px) {
+  .notify-card { max-width: none; }
+}
+.notify-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.notify-card__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.notify-card__title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.2;
+}
+.notify-card__state {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+}
+.notify-card__state--on { color: var(--emr); }
+.notify-card__hint {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--ink-4);
+}
+.notify-card__err {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--hi);
+}
+
+/* Square on/off switch — ink (off) → emerald (on). No glows. */
+.notify-switch {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+.notify-switch:disabled { cursor: wait; opacity: 0.55; }
+.notify-switch__track {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.notify-switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--paper);
+  transition: transform 160ms ease;
+}
+.notify-switch--on .notify-switch__track {
+  background: var(--emr);
+  border-color: var(--emr);
+}
+.notify-switch--on .notify-switch__knob {
+  transform: translateX(24px);
 }
 
 /* ── Inline gen stats (compact pills) ── */

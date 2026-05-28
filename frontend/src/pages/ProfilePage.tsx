@@ -175,13 +175,14 @@ export function ProfilePage() {
   const [payStatus, setPayStatus] = useState<"idle" | "loading" | "error">("idle");
   const [payError, setPayError] = useState<string | null>(null);
 
-  // ── Notifications toggle ──
-  const [notifyOn, setNotifyOn] = useState<boolean>(user?.notifications_enabled ?? true);
+  // ── Generation-ready notifications toggle (site-controlled).
+  // Morning broadcast lives in the bot — not toggled from here.
+  const [notifyOn, setNotifyOn] = useState<boolean>(user?.generation_notifications_enabled ?? true);
   const [notifyPending, setNotifyPending] = useState(false);
   const [notifyError, setNotifyError] = useState<string | null>(null);
   useEffect(() => {
-    if (user) setNotifyOn(user.notifications_enabled);
-  }, [user?.notifications_enabled]);
+    if (user) setNotifyOn(user.generation_notifications_enabled);
+  }, [user?.generation_notifications_enabled]);
 
   const handleToggleNotifications = async (next: boolean) => {
     if (notifyPending) return;
@@ -434,7 +435,6 @@ export function ProfilePage() {
           <button type="button" className="btn btn-soft btn-sm" style={{ marginTop: 14 }} onClick={() => avatarInputRef.current?.click()}>
             {isEN ? "change avatar" : "сменить аватар"}
           </button>
-          <div className="since">{joinDate}</div>
 
           {user?.email && (
             <div style={{ marginTop: 16, width: "100%" }}>
@@ -473,7 +473,7 @@ export function ProfilePage() {
             <div className="stat">
               <div className="label">{isEN ? "total created" : "всего создано"}</div>
               <div className="val">{totalGens}<small>{isEN ? "tr." : "трек."}</small></div>
-              <div className="delta">{joinDate || (isEN ? "since registration" : "с регистрации")}</div>
+              <div className="delta">{isEN ? "since registration" : "за всё время"}</div>
             </div>
             <div className="stat">
               <div className="label">{isEN ? "genres" : "жанров"}</div>
@@ -490,18 +490,43 @@ export function ProfilePage() {
           {/* Display-name edit lives only in the avatar block on the left —
               the second field was a duplicate and confused users. */}
 
-          {/* Compact token explainer — shrunk and moved next to the user
-              card instead of taking a full row below profile-grid. */}
-          <div className="token-explainer token-explainer--compact">
-            <span className="token-explainer__icon"><Coin size={20} /></span>
-            <div className="token-explainer__text">
-              <strong>{isEN ? "What is a token?" : "Что такое токен?"}</strong>
-              <span>
-                {isEN
-                  ? <>Internal RIFFA currency. <Coin size={11} /> next to a number = balance. Each generation costs tokens.</>
-                  : <>Внутренняя валюта RIFFA. <Coin size={11} /> рядом с цифрой = баланс. Каждая генерация списывает токены.</>}
-              </span>
+          {/* Notifications card — replaces the token-explainer here. The
+              explainer was moved to the "buy tokens" section, which is a
+              more logical home for it. */}
+          <div className="notify-card">
+            <div className="notify-card__head">
+              <div className="notify-card__heading">
+                <div className="notify-card__title">
+                  {isEN ? "Generation pings" : "Уведомления о готовности"}
+                </div>
+                <div className={`notify-card__state${notifyOn ? " notify-card__state--on" : ""}`}>
+                  {notifyOn
+                    ? (isEN ? "ON" : "ВКЛ")
+                    : (isEN ? "OFF" : "ВЫКЛ")}
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={notifyOn}
+                aria-label={isEN ? "Toggle generation notifications" : "Переключить уведомления о готовности"}
+                className={`notify-switch${notifyOn ? " notify-switch--on" : ""}`}
+                disabled={notifyPending}
+                onClick={() => void handleToggleNotifications(!notifyOn)}
+              >
+                <span className="notify-switch__track">
+                  <span className="notify-switch__knob" />
+                </span>
+              </button>
             </div>
+            <p className="notify-card__hint">
+              {isEN
+                ? "Generation-ready notification."
+                : "Уведомление о готовности генерации."}
+            </p>
+            {notifyError && (
+              <p className="notify-card__err">{notifyError}</p>
+            )}
           </div>
 
           {/* Inline gen stats — в пустом пространстве справа */}
@@ -540,13 +565,25 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {/* Token explainer теперь живёт внутри profile-grid справа (см. выше). */}
-
       {/* ── 01 · купить токены ── */}
       <div className="h-section">
         <div className="tag"><span className="num">01</span> · {isEN ? "top up" : "пополнить"}</div>
         <h2>{isEN ? "buy tokens" : "купить токены"}</h2>
         <div className="right">{isEN ? "from ₽100 · card / stars" : "от 100 ₽ · картой / stars"}</div>
+      </div>
+
+      {/* Token explainer — moved here from the profile-grid since it
+          belongs next to the purchase block. */}
+      <div className="token-explainer">
+        <span className="token-explainer__icon"><Coin size={20} /></span>
+        <div className="token-explainer__text">
+          <strong>{isEN ? "What is a token?" : "Что такое токен?"}</strong>
+          <span>
+            {isEN
+              ? <>Internal RIFFA currency. <Coin size={11} /> next to a number = balance. Each generation costs tokens.</>
+              : <>Внутренняя валюта RIFFA. <Coin size={11} /> рядом с цифрой = баланс. Каждая генерация списывает токены.</>}
+          </span>
+        </div>
       </div>
 
       <div className="pricing">
@@ -659,53 +696,10 @@ export function ProfilePage() {
           </div>
         </div>
 
-        {/* ── 04 · уведомления в боте ── */}
+        {/* ── 04 · документы ── */}
         <div>
           <div className="h-section">
-            <div className="tag"><span className="num">04</span> · {isEN ? "notifications" : "уведомления"}</div>
-            <h2>{isEN ? "bot notifications" : "уведомления в боте"}</h2>
-          </div>
-          <div className="p-panel">
-            <p className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-              {isEN
-                ? "Single switch for every push from the bot: morning tracks and generation-ready notifications."
-                : "Единый переключатель для всех push-сообщений бота: утренние треки и уведомления о готовности генераций."}
-            </p>
-            <label
-              className="notify-toggle"
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                gap: 14, cursor: notifyPending ? "wait" : "pointer", userSelect: "none",
-                padding: "10px 14px", border: "1px solid var(--rule)", borderRadius: 12,
-                background: "var(--paper)",
-              }}
-            >
-              <span style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>
-                {notifyOn
-                  ? (isEN ? "🔔 Notifications are on" : "🔔 Уведомления включены")
-                  : (isEN ? "🔕 Notifications are off" : "🔕 Уведомления отключены")}
-              </span>
-              <input
-                type="checkbox"
-                checked={notifyOn}
-                disabled={notifyPending}
-                onChange={(e) => void handleToggleNotifications(e.target.checked)}
-                style={{
-                  width: 40, height: 22, cursor: notifyPending ? "wait" : "pointer",
-                  accentColor: "var(--hi)",
-                }}
-              />
-            </label>
-            {notifyError && (
-              <p style={{ color: "var(--hi)", fontSize: 12, marginTop: 8 }}>{notifyError}</p>
-            )}
-          </div>
-        </div>
-
-        {/* ── 05 · документы ── */}
-        <div>
-          <div className="h-section">
-            <div className="tag"><span className="num">05</span> · {isEN ? "documents" : "документы"}</div>
+            <div className="tag"><span className="num">04</span> · {isEN ? "documents" : "документы"}</div>
             <h2>{isEN ? "legal" : "правовая информация"}</h2>
           </div>
           <div className="doc-list">

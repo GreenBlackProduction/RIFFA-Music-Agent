@@ -207,6 +207,7 @@ export interface AgentChatProps {
 export interface AgentResult {
   summary: string;
   prompt: string;
+  shortPrompt?: string;
   intent: AgentIntent | null;
   transcript?: AgentChatMessage[];
   musicParams?: Record<string, unknown>;
@@ -498,14 +499,14 @@ export function AgentChat({
     setThinking(true);
     setError(null);
 
-    // Only show lyrics-phase thinking indicator BEFORE lyrics have been generated
-    const mightGenerateLyrics =
-      !lyricsGeneratedRef.current &&
-      /текст|лирик|слова|куплет|припев|стих|напиши|черновик/i.test(text);
+    // Only show lyrics-phase ("Пишу текст…") when the agent has ALREADY drafted
+    // lyrics in this thread — predicting from the user's wording produced false
+    // positives (any «текст / напиши» triggered the lyrics phase even for plain
+    // chitchat).
     const historyHasLyricsAlready = !lyricsGeneratedRef.current && nextHistory.some(
-      (m) => hasLyrics(m.content)
+      (m) => m.role === "agent" && hasLyrics(m.content)
     );
-    startThinking(mightGenerateLyrics || historyHasLyricsAlready, false);
+    startThinking(historyHasLyricsAlready, false);
 
     const p = wizardParams.current;
     try {
@@ -558,7 +559,8 @@ export function AgentChat({
           intent.params.text_mode = "custom";
         }
         setResult({
-          summary: resp.summary, prompt: resp.prompt, intent,
+          summary: resp.summary, prompt: resp.prompt,
+          shortPrompt: resp.short_prompt, intent,
           musicParams: resp.music_params, researchNotes: resp.research_notes,
         });
         setDone(true);
@@ -805,10 +807,16 @@ export function AgentChat({
             )}
             <h4>Бриф</h4>
             <pre className="agent-result__summary">{result.summary || "—"}</pre>
-            {/* Готовый Suno-промт намеренно скрыт от пользователя:
-                он содержит подробное research + параметры, которые
-                иначе можно скопировать в другой сервис. Бэкенд получит
-                его в момент запуска генерации. */}
+            {result.shortPrompt && (
+              <div className="agent-result__suno">
+                <span className="agent-result__suno-label">
+                  {isEn ? "Suno prompt" : "Suno-промт"}
+                </span>
+                <p className="agent-result__suno-text">{result.shortPrompt}</p>
+              </div>
+            )}
+            {/* The FULL prompt (with research notes + every param) stays
+                hidden — only the short distillation goes to the user. */}
           </div>
         )}
       </div>

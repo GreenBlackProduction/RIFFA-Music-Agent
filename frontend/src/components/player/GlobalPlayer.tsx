@@ -1045,15 +1045,24 @@ export function GlobalPlayer() {
                 ⚡&nbsp; {t("globalPlayer.generateSimilar", { defaultValue: "Сгенерировать похожий трек" })}
               </button>
             ) : (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => void handleWavConvert()}
-                disabled={!currentAudioId || wavPending}
-                title={!currentAudioId ? t("globalPlayer.convertWavTooltip") : undefined}
-              >
-                {wavPending ? t("globalPlayer.convertWavRunning") : t("globalPlayer.convertWav")}
-              </button>
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void handleWavConvert()}
+                  disabled={!currentAudioId || wavPending}
+                  title={!currentAudioId ? t("globalPlayer.convertWavTooltip") : undefined}
+                >
+                  {wavPending ? t("globalPlayer.convertWavRunning") : t("globalPlayer.convertWav")}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => void handleGenerateSimilar()}
+                >
+                  ⚡&nbsp; {t("globalPlayer.generateSimilar", { defaultValue: "Сгенерировать похожий трек" })}
+                </button>
+              </>
             )}
           </div>,
           document.body,

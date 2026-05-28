@@ -21,8 +21,8 @@ export function GuidePage() {
       </h1>
       <p className="h-lead">
         {isEN
-          ? "Eight tools — from a full song with vocals to a single sound effect. Each creation takes 20–60 seconds. Here is a step-by-step guide for each."
-          : "Восемь инструментов — от полноценной песни с вокалом до единственного звукового эффекта. Каждое создание занимает 20–60 секунд. Здесь — пошаговые инструкции к каждому."}
+          ? "Eight tools — from a full song with vocals to a single sound effect. Each creation takes 3-5 minutes. Here is a step-by-step guide for each."
+          : "Восемь инструментов — от полноценной песни с вокалом до единственного звукового эффекта. Каждое создание занимает 3-5 минут. Здесь — пошаговые инструкции к каждому."}
       </p>
 
       {/* ─── 01 · Создать песню ─── */}

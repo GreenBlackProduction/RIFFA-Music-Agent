@@ -1731,16 +1731,16 @@
 .track-cover.c-rose { background: linear-gradient(135deg, #C97262 0%, #883E2F 100%); }
 
 .play {
-  width: 32px;
-  height: 32px;
-  background: var(--ink);
+  width: 40px;
+  height: 40px;
+  background: var(--hi);
   color: var(--paper);
   border-radius: 999px;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 14px;
   cursor: pointer;
   transition: transform 150ms;
   position: relative;
@@ -1748,7 +1748,7 @@
   flex-shrink: 0;
 }
 
-.track:hover .play { transform: scale(1.1); }
+.track:hover .play { transform: scale(1.08); }
 
 .duration {
   position: absolute;

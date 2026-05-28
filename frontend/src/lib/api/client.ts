@@ -80,7 +80,8 @@ export interface CurrentUser {
   terms_accepted_at: string | null;
   terms_version: string | null;
   legal_version: string | null;
-  notifications_enabled: boolean;
+  generation_notifications_enabled: boolean;
+  morning_messages_enabled: boolean;
 }
 
 export function fetchCurrentUser(): Promise<CurrentUser> {
@@ -673,6 +674,7 @@ export interface AgentChatResponse {
   done: boolean;
   summary: string;
   prompt: string;
+  short_prompt?: string;
   music_params: Record<string, unknown>;
   research_notes: string;
   intent: AgentIntent | null;

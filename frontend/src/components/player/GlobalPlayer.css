@@ -505,7 +505,6 @@
 
   .gp-actions { justify-content: flex-end; flex-wrap: wrap; gap: 4px; }
   .gp-act--radio { display: inline-flex; font-size: 10px; padding: 0 8px; }
-  .gp-act--bolt  { display: none; }
 }
 
 /* ── Collapsed ── */
