@@ -805,8 +805,10 @@ export function AgentChat({
             )}
             <h4>Бриф</h4>
             <pre className="agent-result__summary">{result.summary || "—"}</pre>
-            <h4>Готовый prompt для Suno</h4>
-            <pre className="agent-result__prompt">{result.prompt}</pre>
+            {/* Готовый Suno-промт намеренно скрыт от пользователя:
+                он содержит подробное research + параметры, которые
+                иначе можно скопировать в другой сервис. Бэкенд получит
+                его в момент запуска генерации. */}
           </div>
         )}
       </div>
