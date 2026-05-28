@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import {
   convertToWav,
+  generateSimilar,
   rateGeneration,
   toggleHistoryRadio,
   voteRadioTrack,
@@ -489,6 +490,10 @@ export function GlobalPlayer() {
   const onRadio = radioSet.has(currentId);
   const likes = currentLikes + (rating === "like" ? 1 : 0);
   const dislikes = currentDislikes + (rating === "dislike" ? 1 : 0);
+  // Radio-foreign = трек играет из радио и НЕ принадлежит текущему юзеру.
+  // Скрываем скачивание/конвертацию/extend (это контент чужого автора);
+  // вместо этого в bolt-menu остаётся только «Сгенерировать похожий».
+  const isRadioForeign = currentSource === "radio" && currentIsOwn === false;
 
   async function handleRadioToggle() {
     if (!currentId || radioPending) return;
@@ -678,6 +683,27 @@ export function GlobalPlayer() {
     }
   }
 
+  async function handleGenerateSimilar() {
+    if (!currentId) return;
+    const gId = extractGenId(currentId);
+    if (!gId) return;
+    setBoltOpen(false);
+    try {
+      const resp = await generateSimilar(gId);
+      trackGeneration(
+        resp.generation_id,
+        resp.ws_url,
+        "song",
+        t("globalPlayer.similarTrackTracking", {
+          defaultValue: "Похожий трек: {{title}}",
+          title: currentTitle,
+        }),
+      );
+    } catch {
+      // sidebar generation card surfaces the error
+    }
+  }
+
   function handleDownload() {
     if (!currentUrl) return;
     const filename = `RIFFA - ${sanitizeFilename(currentTitle ?? "Track")}.mp3`;
@@ -804,26 +830,30 @@ export function GlobalPlayer() {
 
       {/* RIGHT: actions — flat single row */}
       <div className="gp-actions">
-        <button
-          type="button"
-          className="gp-act gp-act--dl"
-          onClick={handleDownload}
-          title={t("globalPlayer.download")}
-          aria-label={t("globalPlayer.download")}
-        >
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" aria-hidden>
-            <path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          MP3
-        </button>
+        {!isRadioForeign && (
+          <button
+            type="button"
+            className="gp-act gp-act--dl"
+            onClick={handleDownload}
+            title={t("globalPlayer.download")}
+            aria-label={t("globalPlayer.download")}
+          >
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" aria-hidden>
+              <path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            MP3
+          </button>
+        )}
 
-        {currentIsMusicType && (
+        {(currentIsMusicType || isRadioForeign) && (
           <button
             ref={boltBtnRef}
             type="button"
             className={`gp-act gp-act--bolt${boltOpen ? " gp-act--open" : ""}`}
             onClick={openBolt}
-            title={t("globalPlayer.trackActions")}
+            title={isRadioForeign
+              ? t("globalPlayer.generateSimilarTitle", { defaultValue: "Сгенерировать похожий трек" })
+              : t("globalPlayer.trackActions")}
             aria-expanded={boltOpen}
             aria-haspopup="menu"
           >
@@ -1006,18 +1036,25 @@ export function GlobalPlayer() {
             className="file-bolt-menu"
             style={{ bottom: boltPos.bottom, right: boltPos.right }}
           >
-            <button type="button" role="menuitem" onClick={() => setBoltOpen(false)}>
-              {t("globalPlayer.extendTrack")}
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => void handleWavConvert()}
-              disabled={!currentAudioId || wavPending}
-              title={!currentAudioId ? t("globalPlayer.convertWavTooltip") : undefined}
-            >
-              {wavPending ? t("globalPlayer.convertWavRunning") : t("globalPlayer.convertWav")}
-            </button>
+            {isRadioForeign ? (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => void handleGenerateSimilar()}
+              >
+                ⚡&nbsp; {t("globalPlayer.generateSimilar", { defaultValue: "Сгенерировать похожий трек" })}
+              </button>
+            ) : (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => void handleWavConvert()}
+                disabled={!currentAudioId || wavPending}
+                title={!currentAudioId ? t("globalPlayer.convertWavTooltip") : undefined}
+              >
+                {wavPending ? t("globalPlayer.convertWavRunning") : t("globalPlayer.convertWav")}
+              </button>
+            )}
           </div>,
           document.body,
         )}

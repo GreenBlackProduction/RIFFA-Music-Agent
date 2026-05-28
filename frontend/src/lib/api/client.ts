@@ -498,6 +498,17 @@ export function convertToWav(params: {
   });
 }
 
+/** Generate a track that's musically similar to an existing one — used from
+ *  the player's bolt menu when listening to someone else's radio track.
+ *  Backend reads the source generation's params, applies a light remix,
+ *  and launches a fresh song/instrumental. Costs the same as a normal
+ *  generation; results land in the user's own library. */
+export function generateSimilar(generationId: string): Promise<GenerateResponse> {
+  return apiFetch(`/api/v1/generate/similar/${encodeURIComponent(generationId)}`, {
+    method: "POST",
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Upload API — presigned URLs for cover song source files
 // ---------------------------------------------------------------------------

@@ -40,8 +40,6 @@ interface Props {
   onDelete?: (rect: DOMRect | null) => void;
   isImageType?: boolean;
   imageUrl?: string;
-  /** Hide "Extend track" in the bolt menu (e.g. on the Radio page). */
-  hideExtend?: boolean;
   /** Where the share button should point. "library" (default) → /s/<share_id>;
    *  "radio" → /radio?s=<share_id> so the link opens the radio player and
    *  auto-plays this track. */
@@ -68,7 +66,6 @@ export function FileActions({
   onPlayPause,
   onDelete,
   isImageType,
-  hideExtend,
   shareKind = "library",
   children,
 }: Props) {
@@ -345,11 +342,7 @@ export function FileActions({
               </>
             ) : (
               <>
-                {!hideExtend && (
-                  <button type="button" role="menuitem" onClick={() => setMenuOpen(false)}>
-                    🔁&nbsp; {t("fileActions.extendTrack")}
-                  </button>
-                )}
+                {/* Extend disabled site-wide for now. */}
                 <button
                   type="button"
                   role="menuitem"
