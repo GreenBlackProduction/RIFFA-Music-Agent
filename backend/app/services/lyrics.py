@@ -13,7 +13,23 @@ Stay under 5000 characters. Write in the same language as the prompt unless inst
 
 _SYS_TITLE = """\
 Create a short, catchy song title (2-5 words) based on the user's description.
-Return ONLY the title text — no quotes, no explanation.\
+
+ABSOLUTE RULE — NEVER include any artist, band, musician, performer,
+producer, album, or song name in the title. Suno's API REJECTS prompts
+containing real-world artist names. If the user's description mentions
+references like "inspired by X", "in the style of Y", "feat. Z",
+"like A" — IGNORE those references when writing the title. Capture
+only the mood, vibe, theme, or imagery — never the reference.
+
+Examples:
+  Bad:  "Cult — track inspired by La Dispute"
+  Good: "Cult — Spiraling Static"
+  Bad:  "Dance like Dua Lipa"
+  Good: "Glass Floor Dancers"
+  Bad:  "Sad ballad in the style of Lana Del Rey"
+  Good: "Cigarette Boulevard"
+
+Return ONLY the title text — no quotes, no explanation, no artist names.\
 """
 
 _SYS_COMPRESS = """\
@@ -26,6 +42,41 @@ _SYS_ENRICH_MUSIC = """\
 You are a senior prompt engineer for Suno's Music Generation API (V5.5).
 Your job: take the user's request + the music parameters they selected (genre, mood, tempo, vocal,
 optional approved lyrics, optional assistant brief) and produce ONE Suno-ready music style prompt.
+
+═══════════════════════════════════════════════════════════════════════
+SPECIFICITY MANDATE — non-negotiable
+═══════════════════════════════════════════════════════════════════════
+Generic descriptors are a CRITICAL FAILURE. If you write
+"driving drums with tight punchy kicks", "atmospheric synths with lush
+pads", "powerful guitars with distorted sustain" — you have FAILED
+this task. Those phrases could describe any genre and produce a
+generic Suno output that disappoints the user.
+
+INSTEAD, you MUST:
+1. Name specific instrument MODELS / TYPES — "TR-808 drum machine",
+   "Moog Sub 37 bassline", "fingerpicked Telecaster", "fuzzed Big-Muff
+   bass", "vintage Rhodes electric piano", "Linn LM-1 drums",
+   "Juno-106 pads". NOT "synths" / "guitars" / "drums".
+2. Anchor a specific SCENE / ERA — "early-2000s post-rock crescendo
+   build", "mid-2010s Berlin techno minimalism", "late-90s shoegaze
+   wall-of-sound", "2020s hyperpop maximalism". Not just "underground".
+3. State a CONCRETE BPM RANGE — "around 150 BPM", "78-82 BPM half-time",
+   "driving 128 BPM four-on-the-floor". Not just "fast".
+4. Pin the SUBGENRE precisely. "Melancholic instrumental" → say WHICH
+   melancholic subgenre: post-rock, doom metal, dark synthwave,
+   shoegaze, witch house, dungeon synth, etc. Pick ONE.
+5. Name PRODUCTION TRICKS by their real names — "sidechain duck on
+   the bass", "tape saturation on the master bus", "plate reverb on
+   snare", "vinyl crackle layer", "granular pitch-shifted samples".
+
+If the input is thin, MAKE EXPERT INFERENCES. "Underground melancholic
+fast instrumental with synths + guitars + drums" should become e.g.
+"post-rock instrumental with hints of dark synthwave, fuzz-pedal
+distorted Stratocaster arpeggios, Juno-60 pad swells, Moog Voyager
+sub-bass, Roland TR-909 4/4 kick with side-chained sub, snare under
+plate reverb, ~155 BPM, build-and-release crescendo dynamics, wall-of-
+sound mix with wide stereo guitars and centered drums, late-2010s
+underground production aesthetic". Always infer when the user is vague.
 
 Hard rules:
 - Suno's `prompt`/`style` field accepts up to 5000 characters. Use as much or as little as needed.
@@ -48,14 +99,13 @@ Hard rules:
 - Return ONLY the prompt itself — nothing before or after.
 
 Style guidance for content:
-- Lead with the genre/sub-genre and 1-2 anchor descriptors.
-- Then instrumentation (specific instruments, not just "guitar" — e.g. "fingerpicked nylon-string
-  acoustic guitar", "808 sub bass with sliding glides", "vintage Rhodes electric piano").
-- Then rhythm (groove, tempo feel, swing, syncopation, BPM range if relevant).
-- Then texture / production (analog warmth, lo-fi tape hiss, wide stereo, dry close-mic'd, etc.).
+- Lead with the SUBGENRE (not the broad genre) and 1-2 anchor descriptors.
+- Then instrumentation by SPECIFIC NAME — never just "guitar"/"synth"/"drums".
+- Then rhythm with explicit BPM and groove feel (half-time, syncopation, swing).
+- Then production by real-name techniques (plate reverb, sidechain, tape saturation,
+  analog warmth, etc.).
 - Then vocal direction (if vocals): timbre, delivery, layering, processing.
 - Then mood arc / dynamics (intro builds, drops, breakdown, outro).
-- Mention BPM only if user signalled tempo intent.
 
 ⚠️  CRITICAL — NEVER USE ARTIST OR BAND NAMES IN THE OUTPUT:
 Suno's API REJECTS prompts containing specific artist, band, or musician names.
@@ -166,21 +216,27 @@ class LyricsClient:
             raise
 
     async def generate_title(self, prompt: str) -> str:
+        from app.services.track_naming import strip_artist_references
+        # Pre-scrub the user prompt so reference phrases never reach GPT —
+        # belt + braces with the no-name rule in _SYS_TITLE.
+        scrubbed_prompt = strip_artist_references(prompt[:300])
         try:
             resp = await self._client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {"role": "system", "content": _SYS_TITLE},
-                    {"role": "user", "content": prompt[:300]},
+                    {"role": "user", "content": scrubbed_prompt},
                 ],
                 temperature=0.7,
                 max_tokens=20,
             )
             raw = (resp.choices[0].message.content or "").strip()
-            return raw.strip('"').strip("'")
+            cleaned = raw.strip('"').strip("'")
+            # Post-scrub: if GPT still slipped an artist reference, drop it.
+            return strip_artist_references(cleaned)
         except Exception as exc:
             logger.warning("title generation failed: {} — falling back to prompt slice", exc)
-            return " ".join(prompt.split()[:5])
+            return " ".join(scrubbed_prompt.split()[:5])
 
     async def enrich_music_prompt(
         self,
@@ -194,6 +250,7 @@ class LyricsClient:
         instrumental: bool = False,
         approved_lyrics: str = "",
         agent_prompt: str = "",
+        agent_research_notes: str = "",
         preset_style_hint: str = "",
         max_length: int = 5000,
     ) -> str:
@@ -226,6 +283,8 @@ class LyricsClient:
             preview = " / ".join(line.strip() for line in head if line.strip())
             if preview:
                 bits.append(f"Lyrics opening lines (for vocal phrasing reference): {preview}")
+        if agent_research_notes:
+            bits.append(f"Genre research (use this verbatim for instrument/era details): {agent_research_notes}")
         if agent_prompt:
             bits.append(f"Assistant brief: {agent_prompt}")
 
@@ -252,7 +311,9 @@ class LyricsClient:
 
         if len(enriched) > max_length:
             enriched = enriched[:max_length].rsplit(" ", 1)[0]
-        return enriched
+        # Final guard: strip any trailing reference clause that survived.
+        from app.services.track_naming import strip_artist_references
+        return strip_artist_references(enriched)
 
     async def enrich_lyrics_prompt(
         self,

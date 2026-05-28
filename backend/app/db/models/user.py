@@ -39,7 +39,12 @@ class User(Base, TimestampMixin):
     notice_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 'ban' | 'warning'. None ⇒ нет активного notice.
     notice_kind: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Morning broadcast — toggled in the bot only.
     morning_messages_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Per-generation "your track is ready" pushes — toggled on the site only.
+    generation_notifications_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False
+    )
 
     bot_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

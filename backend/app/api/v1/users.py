@@ -60,7 +60,8 @@ def read_current_user(user: User = Depends(current_user_loose)) -> CurrentUser:
         terms_accepted_at=user.terms_accepted_at.isoformat() if user.terms_accepted_at else None,
         terms_version=user.terms_version,
         legal_version=settings.legal_terms_version,
-        notifications_enabled=user.morning_messages_enabled,
+        generation_notifications_enabled=user.generation_notifications_enabled,
+        morning_messages_enabled=user.morning_messages_enabled,
     )
 
 
@@ -149,15 +150,15 @@ async def update_notifications(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(db_session),
 ) -> dict[str, bool]:
-    """Toggle all bot notifications (morning broadcast + generation-done).
+    """Toggle generation-ready pushes from the bot.
 
-    Backed by ``users.morning_messages_enabled`` — the single flag covers both
-    push types, see services/notifications.py::notify_generation_done.
+    Morning broadcast is managed inside the bot itself (``morning_messages_enabled``);
+    this site-side toggle only covers per-generation ``notify_generation_done``.
     """
-    user.morning_messages_enabled = body.enabled
+    user.generation_notifications_enabled = body.enabled
     session.add(user)
     await session.commit()
-    return {"enabled": user.morning_messages_enabled}
+    return {"enabled": user.generation_notifications_enabled}
 
 
 @router.post("/change-password", status_code=status.HTTP_200_OK)

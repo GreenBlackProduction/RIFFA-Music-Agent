@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.config import get_settings
 from app.db.models import Generation, GenerationStatus, GenerationType
 from app.db.models.user import User
+from app.db.models.wallet import WalletTransaction
 from app.services.lyrics import make_lyrics_client
 from app.services.nanobanana import NanoBananaError, make_nanobanana_client
 from app.services.notifications import notify_generation_done
@@ -159,7 +160,47 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             return
 
         if gen.status != GenerationStatus.queued:
-            logger.warning("generation {} already in status {}", gen_id, gen.status)
+            # Recovery path: previous worker run was killed mid-flight (status
+            # stayed `processing`) or generation already terminal. Refund any
+            # tokens that got deducted and mark as failed so the user can retry
+            # instead of losing money to a silent stuck row.
+            logger.warning(
+                "generation {} already in status {} — entering recovery",
+                gen_id, gen.status,
+            )
+            if gen.status == GenerationStatus.processing:
+                # Have any tokens already been refunded for this gen?
+                existing_refund = (
+                    await session.execute(
+                        select(WalletTransaction.id)
+                        .where(WalletTransaction.reference_id == str(gen.id))
+                        .where(WalletTransaction.amount_tokens > 0)
+                    )
+                ).scalar_one_or_none()
+                if existing_refund is None and gen.cost_tokens > 0:
+                    try:
+                        await credit_tokens(
+                            session,
+                            gen.user_id,
+                            gen.cost_tokens,
+                            reason="refund:worker_restart",
+                            reference_id=str(gen.id),
+                        )
+                    except Exception as exc:
+                        logger.error(
+                            "[REFUND] worker-restart refund failed for {}: {}",
+                            gen_id, exc,
+                        )
+                gen.status = GenerationStatus.failed
+                gen.error_message = (
+                    "Воркер перезапустился во время генерации. "
+                    "Токены возвращены — запусти ещё раз."
+                )[:512]
+                await session.commit()
+                await _publish(
+                    ctx, gen_id,
+                    {"status": "failed", "error": gen.error_message},
+                )
             return
 
         gen.status = GenerationStatus.processing
@@ -279,6 +320,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 instrumental=False,
                 approved_lyrics=lyrics,
                 agent_prompt=agent_prompt_text,
+                agent_research_notes=agent_research,
                 preset_style_hint=preset_style,
             ) or preset_style
 
@@ -619,6 +661,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 instrumental=False,
                 approved_lyrics=lyrics,
                 agent_prompt=agent_prompt_text,
+                agent_research_notes=agent_research,
                 preset_style_hint=preset_style,
             ) or preset_style
 

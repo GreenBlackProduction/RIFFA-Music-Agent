@@ -72,7 +72,7 @@ class CurrentUser(BaseModel):
     terms_accepted_at: str | None = None
     terms_version: str | None = None
     legal_version: str | None = None
-    # Single tumbler for every bot push (morning broadcast + generation-done).
-    # Stored on User as ``morning_messages_enabled`` but exposed under a more
-    # honest name to the frontend.
-    notifications_enabled: bool = True
+    # Generation-ready pushes — controlled on the site.
+    generation_notifications_enabled: bool = True
+    # Morning broadcast — controlled in the bot only (read-only on the site).
+    morning_messages_enabled: bool = True

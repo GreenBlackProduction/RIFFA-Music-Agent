@@ -7,7 +7,39 @@ for download ID3 tags. Keep them in sync if the rule changes.
 
 from __future__ import annotations
 
+import re
+
 from app.db.models import User
+
+
+# Reference phrases that leak third-party artist names into titles or prompts.
+# Anything from the phrase to end-of-string gets stripped — Suno rejects prompts
+# with real-world artist names and the title field is just as risky.
+# Order matters: longer alternatives first so "like the band" matches before "like".
+_ARTIST_REFERENCE_RE = re.compile(
+    r"[\s,;:.\-—–]*(?:"
+    r"inspired by|in the style of|in style of|in the vein of|"
+    r"after the manner of|sounding like|similar to|reminiscent of|"
+    r"like the band|à la|a la|feat\.?|featuring|"
+    r"like (?=[A-ZА-Я])|"  # "like X" only when next word is capitalised (proper noun)
+    r"вдохновлено|вдохновлен(?:а|о|ы)?|"
+    r"в стиле|в духе|похож(?:е|а|и)? на|как у|при участии"
+    r")\b.*$",
+    flags=re.IGNORECASE,
+)
+
+
+def strip_artist_references(text: str) -> str:
+    """Drop trailing 'inspired by X / in the style of Y / feat. Z' clauses.
+
+    These are the only patterns where GPT consistently leaks artist names into
+    titles/prompts. The leading separators (comma, dash, period) are eaten
+    too so the cleaned string doesn't end with dangling punctuation.
+    """
+    if not text:
+        return text
+    cleaned = _ARTIST_REFERENCE_RE.sub("", text).strip()
+    return cleaned.rstrip(" .,;:-—–") or text
 
 
 def resolve_artist(user: User, override: str = "") -> str:
@@ -46,4 +78,4 @@ def compose_track_title(artist: str, short_title: str, max_len: int = 80) -> str
     return full[:max_len]
 
 
-__all__ = ["resolve_artist", "compose_track_title"]
+__all__ = ["resolve_artist", "compose_track_title", "strip_artist_references"]

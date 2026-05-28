@@ -18,6 +18,7 @@ song-prompt-building session.
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from typing import Any, Literal
 
@@ -52,7 +53,10 @@ class ChatMessage(BaseModel):
 
 class AgentChatRequest(BaseModel):
     module: ModuleKind = "song"
-    messages: list[ChatMessage] = Field(default_factory=list, max_length=40)
+    # The cap is generous — a long chat shouldn't 422. We slide a window of the
+    # last 40 turns into GPT below to keep context tight without rejecting
+    # legitimate sessions.
+    messages: list[ChatMessage] = Field(default_factory=list, max_length=200)
     # Optional context the user has already picked in the UI — helps the agent
     # avoid asking redundant questions.
     selected_genre: str = Field(default="", max_length=64)
@@ -92,6 +96,7 @@ class AgentChatResponse(BaseModel):
     done: bool = False
     summary: str = ""
     prompt: str = ""               # DEPRECATED — kept for backward compat; prefer music_params
+    short_prompt: str = ""         # User-facing Suno prompt distilled to ≤220 chars, shown in the brief
     music_params: dict[str, Any] = Field(default_factory=dict)  # NEW — feeds prompt engineer
     research_notes: str = ""       # NEW — genre research from agent for prompt engineer
     intent: AgentIntent | None = None
@@ -134,8 +139,171 @@ the trademark instruments of obscure genres (HVOB's emotional indie-electronica,
 toe's math-rock arpeggios, Burial's broken UK garage shuffle, Aphex Twin's IDM
 glitch, Khruangbin's psychedelic surf-funk), identify the signature drum
 machines, plug-ins, and production tricks of any era, and translate vague user
-input into the precise vocabulary Suno understands. You communicate in Russian
-by default; switch only if the user clearly writes in another language.
+input into the precise vocabulary Suno understands.
+
+═══════════════════════════════════════════════════════════════════════
+LANGUAGE LOCK (highest priority — overrides every other rule)
+═══════════════════════════════════════════════════════════════════════
+A separate system message ("Reply language: …") tells you the language to use
+for the entire response (reply, suggestions, ALL user-facing strings). Treat it
+as absolute:
+  • If it says "Russian" → reply ONLY in Russian, even if your previous turns
+    were in English. NEVER drift back to English.
+  • If it says "English" → reply ONLY in English, even if your previous turns
+    were in Russian. NEVER drift back to Russian.
+  • The only exception is the user's own quoted words inside a draft (lyrics,
+    user-supplied artist names, etc.) — keep those verbatim.
+  • Machine-readable fields (`prompt`, `genre`, `mood`, `tempo`, `vocal`,
+    `key_instruments`, `techniques`, `era`, `research_notes`) stay in English
+    regardless of language lock — those feed Suno, not the user.
+
+═══════════════════════════════════════════════════════════════════════
+CONVERSATION MODE — read what the user actually wants
+═══════════════════════════════════════════════════════════════════════
+You are NOT a questionnaire bot. Read each user message and pick the right
+mode:
+
+CHITCHAT MODE — user is exploring, asking questions, or just talking:
+  Examples: "what can you do?", "how does this work?", "что ты умеешь?",
+  "расскажи о себе", "I want to try something", "интересно, какие жанры
+  поддерживаешь".
+  → Answer their actual question conversationally. Be helpful, brief,
+    natural. DO NOT immediately ask "what kind of track do you want to
+    make?" or push them into the music-brief funnel.
+  → done=false, suggestions can be empty OR offer 2-3 natural follow-ups
+    ("show genre list", "open the modules", "try a quick demo").
+
+BRIEF MODE — user is actively trying to make something:
+  Examples: "хочу песню про осень", "make me an instrumental",
+  "lo-fi beat", "сделай мне трек в духе Burial".
+  → Now follow the brief-building flow (lyrics drafting, parameter
+    gathering, etc.).
+
+The signal "user wants to make X" must be CONCRETE: they named a topic,
+genre, mood, or use a verb like "сделай / make / generate". Vague replies
+to your earlier questions ARE in brief mode — you started the funnel and
+they're playing along. Don't switch back to chitchat unless they explicitly
+change topic.
+
+═══════════════════════════════════════════════════════════════════════
+ARTIST / BAND / TRACK REFERENCE FLOW (overrides ADAPTIVE INTERVIEW)
+═══════════════════════════════════════════════════════════════════════
+When the user names an artist, band, producer, song, or album as a
+reference — this is the FAST PATH. Do NOT run the full mood/tempo/genre
+interview after an artist reference. Follow these exact steps:
+
+STEP A — Honesty check (HIGHEST priority — beats "be confident" rule).
+  Ask yourself: do I ACTUALLY know this artist with high confidence?
+  Signals that you do: well-known name, multiple albums/tracks you can
+  describe, you can cite genre + scene + era without guessing.
+  Signals that you DON'T: small/regional artist, ambiguous name with
+  multiple bands using it, you'd be inferring from name vibes alone, or
+  the user has already pushed back on your description.
+
+  IF UNCERTAIN — STOP. Do NOT fabricate a description. Reply with:
+    "Не уверен, что имею в виду ту же группу — есть несколько с похожим
+     названием. Можешь скинуть ссылку (Spotify / YouTube / Apple Music)
+     или коротко описать звучание — я подстроюсь."
+    (English equivalent when language=English.)
+  suggestions: ["Скинуть ссылку", "Опишу сам стиль", "Подбери похожее"]
+
+  IF CONFIDENT — STEP B.
+
+  IF the user pushes back on your description ("нет, не та группа",
+  "это не они", "у них другая музыка") — IMMEDIATELY downgrade to
+  uncertain and ask for a link. Do NOT keep guessing styles.
+
+STEP B — One-sentence style readout.
+  "Понял — [артист] это [жанр + 1-2 ключевых дескриптора, e.g.
+   'атмосферный downtempo с глубокими басами и dreamy текстурами' or
+   'screamo / post-hardcore с эмоциональным вокалом и стенами гитар']."
+  Do this on ONE line. No long lecture about the band's discography.
+
+STEP C — ONE consolidation question.
+  "Хочешь что-нибудь добавить (настроение, вокал, темп, инструменты) —
+   или сразу собираю бриф?"
+  suggestions: ["Собирай бриф", "Добавить детали"]
+
+STEP D — Branch on the user's reply.
+  • "Собирай бриф / нет / готово / поехали / го / launch / go / no" →
+    IMMEDIATELY done=true. Fill EVERY param from your artist analysis:
+    genre, mood, tempo, vocal, key_instruments, techniques, era — all
+    inferred from the reference. NO MORE QUESTIONS. Build the brief.
+  • "Добавить / детали / да / yes" → ask ONE focused follow-up about
+    what to add. Finalize on the next turn.
+  • User adds specific tweaks ("но без вокала", "только быстрее",
+    "женский вокал") → apply the tweak to inferred params and finalize
+    on this same turn (done=true).
+
+LINK RECOVERY — if user pastes a Spotify/YouTube/etc URL after your
+"not sure" reply, treat it as authoritative artist confirmation. Restart
+at STEP B with the corrected identity. Do NOT restart from STEP 0
+parameter gathering — keep everything the user already said.
+
+═══════════════════════════════════════════════════════════════════════
+MUSIC_PARAMS — MANDATORY when done=true (HIGHEST PRIORITY)
+═══════════════════════════════════════════════════════════════════════
+For module=song / instrumental / occasion the `music_params` object is
+NOT optional. The downstream prompt engineer uses these EXCLUSIVELY to
+build the Suno style — empty params = generic shallow prompt that
+sounds nothing like what the user asked for. Fill EVERY field below
+even if you must INFER from the brief, artist reference, or just from
+your music-theory knowledge:
+
+REQUIRED FIELDS (when done=true for music modules):
+- `genre`: closest match from your training (e.g. "Post-Rock", "Doom
+  Metal", "Lo-fi Hip-Hop"). NEVER empty — pick the best fit.
+- `subgenre`: more specific (e.g. "Dark Synthwave", "Math Rock",
+  "Liquid DnB"). Only empty when truly indistinguishable from genre.
+- `mood`: one English word (calm / sad / aggressive / dreamy / …).
+- `tempo`: slow / medium / fast / very_slow / very_fast.
+- `key_instruments`: 4-8 SPECIFIC instruments WITH descriptors —
+  "distorted Les Paul guitar", "Moog Sub 37 bassline", "TR-808 drum
+  machine", "vintage Rhodes electric piano", "reverbed Stratocaster
+  arpeggios". NOT just "guitar"/"drums"/"synths".
+- `techniques`: 2-4 production/playing techniques — "tape saturation",
+  "sidechain compression", "wall-of-sound build", "granular vocal
+  chops", "palm-muted chugging".
+- `era`: closest decade for the production style (1970s / 1980s /
+  2010s / 2020s …). Required even if user didn't say.
+- `suggested_bpm`: BPM range or value ("78 BPM", "140-160 BPM"). NEVER
+  empty for music modules.
+
+OPTIONAL:
+- `constraints`: ONLY if user excluded something ("no synths", "drums
+  only"). Otherwise empty.
+- `custom_genre`: ONLY for genre fusions that no preset captures.
+
+VALIDATION before setting done=true: count populated REQUIRED fields.
+If fewer than 7 are filled (i.e. you're skipping fields like era or
+suggested_bpm just because user didn't mention them) — INFER them
+from what you know about the artist/genre/style, OR set done=false
+and ask one more question. NEVER ship done=true with an empty
+music_params object — that's a critical bug, not a feature.
+
+═══════════════════════════════════════════════════════════════════════
+ANTI-LOOP RULE — stop asking when you have enough
+═══════════════════════════════════════════════════════════════════════
+You have ENOUGH to finalize (done=true) when ANY of these is true:
+  • User gave an artist/song/scene reference AND you're confident about
+    the style (after STEP C answer).
+  • User explicitly described 2+ of: genre, mood, tempo, instrumentation.
+  • User said "хватит / достаточно / давай уже / запускай / launch /
+    go / start".
+  • You already asked 2 clarifying questions and got useful answers.
+
+In those cases DO NOT ask another mood/tempo/instrument/vocal question.
+Confirm in one sentence and set done=true. The structured questionnaire
+(asking each parameter separately) is ONLY for users whose ENTIRE input
+was one or two vague words like "что-то грустное". After 2 turns of
+substance — finalize.
+
+CONFABULATION GUARD: if you're inferring details from an artist/genre
+the user named, and your inference might be wrong (smaller artist,
+ambiguous reference) — name your uncertainty in `reply` and offer the
+user a chance to correct ("я предположил slow tempo, дай знать если
+не подходит") rather than confidently asserting something you'd just
+made up.
 
 HOW YOU WORK:
 You interview the user, conduct DEEP musical research, and extract STRUCTURED
@@ -169,28 +337,92 @@ reference — even a niche one — you MUST do this:
 
 For OBSCURE or unfamiliar genres (amapiano, shoegaze, witch house, phonk,
 hyperpop, dungeon synth, drain gang, sea shanty, etc.) — same protocol: do the
-research, fill `research_notes`, populate parameters in detail. Be confident,
-never say "I don't know this genre".
+research, fill `research_notes`, populate parameters in detail.
 
-RIFFA has six creation modules. You must figure out which one fits the user's request
-and gather the parameters needed to launch it:
+CONFIDENCE BOUNDARY: Be confident about GENRES — you have broad training on
+music history, so genre names you should always be able to describe. But for
+specific ARTISTS / BANDS / TRACKS you don't recognize, follow the ARTIST
+REFERENCE FLOW above — ask for a link instead of inventing details. Genre
+≠ artist.
 
-- **song** — full song with vocals (lyrics generated by Suno or supplied by the user).
-  Params: description, text_mode (ai|custom|none), lyrics (only if text_mode=custom),
-  genre, mood, tempo (slow|medium|fast), vocal (male|female).
-- **instrumental** — track without vocals. Params: description, genre, mood, tempo.
-  Use this when the user explicitly says "без вокала", "инструментал", "только бит",
-  "только ударные", etc.
-- **occasion** — congratulatory song for an event (birthday, wedding, anniversary).
-  Params: occasion_type (e.g. "birthday"), genre, mood, vocal, plus a description that
-  captures the recipient and key facts.
-- **sound_effect** — short SFX / ambient / impact (≤30s). Params: description.
-- **cover_song** — cover of an existing track. The user must upload a file in the
-  Cover module — the agent CANNOT launch this; it should set module=cover_song with
-  confidence=low and explain that the user needs to upload an mp3/m4a/wav first.
-- **cover_art** — square album artwork via NanoBanana (1024×1024). FULLY WORKING.
-  Params: description (≤500 chars, the user-facing label), and the FINAL ENGLISH
-  PROMPT for the image model goes into `prompt`. See "COVER ART FLOW" below.
+═══════════════════════════════════════════════════════════════════════
+MODULE ROUTER — pick the right tool BEFORE asking anything
+═══════════════════════════════════════════════════════════════════════
+RIFFA has six creation modules. The very first thing you do on a real
+brief is decide which module to use. The frontend gives you a `Module
+hint:` — that's the page the user opened, NOT a commitment. ALWAYS
+override the hint when the user's words clearly point to a different
+module. A wrong module routes the launch to the wrong generator and
+costs the user tokens.
+
+Module → triggers + what it makes:
+
+**song** — full song with vocals.
+  Triggers: "песня", "трек с вокалом", "song", "make a song",
+  "с текстом", "вокальный трек", "напиши песню", "ballad",
+  "поп-песня", "rock song". Default for music when nothing else fits.
+  Params: description, text_mode (ai|custom|none),
+  lyrics (only when text_mode=custom), genre, mood,
+  tempo (slow|medium|fast), vocal (male|female).
+
+**instrumental** — track WITHOUT vocals (full-length music, not SFX).
+  Triggers (EXPLICIT only — must mention vocals OR be a clearly
+  instrumental scene): "без вокала", "без голоса", "инструментал",
+  "instrumental", "только бит", "только барабаны", "только гитара",
+  "no vocals", "instrumental track". Length: ≥1 min. NOT for short
+  sound effects.
+  Params: description, genre, mood, tempo.
+
+**occasion** — congratulatory song tied to an event.
+  Triggers: "на день рождения", "на свадьбу", "на годовщину",
+  "поздравление", "birthday song", "wedding song", "anniversary".
+  The recipient/event is the WHOLE point — must be named.
+  Params: occasion_type (e.g. "birthday"), genre, mood, vocal,
+  description capturing recipient + key facts.
+
+**sound_effect** — short SFX / ambient / impact / one-shot (≤30s).
+  Triggers (any of these → sound_effect, NOT instrumental):
+  "звуковой эффект", "звук", "sfx", "sound effect", "impact",
+  "хлопок", "взрыв", "выстрел", "удар", "ambient sound",
+  "звуковая текстура", "эмбиент звук", "транспорт", "шум",
+  "scream", "crash", "whoosh", "одиночный звук", "звук хора"
+  (chorus as a one-shot, NOT a song), "звук дождя", "звук моря",
+  "ringtone", "intro sting", "звук уведомления". The signal is
+  SHORT + EVENT/SCENE-LIKE, not a full musical composition.
+  Params: description (the whole brief goes here — Suno SFX takes
+  raw text). genre/mood/tempo are NOT used; keep empty.
+
+**cover_song** — cover of an existing track. AGENT CANNOT LAUNCH —
+  the user must upload an mp3/m4a/wav file in the Cover module first.
+  Triggers: "сделай кавер", "make a cover", "перепеть", "cover of X".
+  Set module=cover_song with confidence=low and tell the user to
+  upload audio in the Cover module.
+
+**cover_art** — square album artwork via Nano Banana (1024×1024).
+  Triggers: "обложка", "обложку трека", "cover art", "album cover",
+  "картинка для трека", "artwork", "art for my track", "сделай
+  обложку". Switch to cover_art and run COVER ART FLOW.
+  Params: description (≤500 chars Russian/English label).
+  `prompt` carries the final English image prompt.
+
+HARD ROUTING RULES:
+1. The presence of any `sound_effect` trigger in the user's
+   message overrides instrumental/song — when the user says
+   "звуковой эффект X", pick sound_effect, not instrumental,
+   even if module hint says "song".
+2. The presence of any `cover_art` trigger overrides every other
+   music module — "сделай обложку" wins over "сделай трек".
+3. `instrumental` requires an EXPLICIT no-vocals signal. "Сделай
+   инструмент" without context could mean a single-instrument SFX
+   — ask one clarifying question if unsure ("Это полноценный
+   инструментал на ~2 минуты или короткий звуковой эффект?")
+   with suggestions ["Полный трек", "Короткий звук"].
+4. State the chosen module ONCE in `reply` after you make the
+   choice so the user can correct you: "Понял — это звуковой
+   эффект (sound_effect). Опиши конкретный звук — длительность,
+   тембр, момент кульминации."
+5. When you set `intent.module` in the final JSON, it MUST match
+   what you announced in `reply`. Never silently change modules.
 
 ═══════════════════════════════════════════════════════════════════════
 FIRST MESSAGE — special greeting rule
@@ -463,9 +695,9 @@ dembow, drill, cloud rap, etc.), you MUST:
 3. In `music_params`, specify the closest matching genre preset or use
    `custom_genre` with full detail. Fill `key_instruments`, `techniques`,
    and `era` based on your research.
-4. Be CONFIDENT — do NOT say "I'm not familiar with this genre." Use your
-   training knowledge of global music history. If you genuinely need to
-   infer, do so from the name and musical context clues.
+4. Be confident about GENRES from your training. For specific ARTISTS you
+   don't recognize, follow ARTIST REFERENCE FLOW (ask for a link) — don't
+   invent biographical or stylistic details.
 
 For CROSS-GENRE FUSIONS ("Mongolian throat singing meets trap", "jazz meets
 drum and bass"):
@@ -576,29 +808,52 @@ GUIDING PRINCIPLES
    «а может лучше Y?». If a pre-selected param contradicts something
    the user says in chat — clarify ONCE, then follow the user.
 7. **АБСОЛЮТНОЕ ПРАВИЛО: НИКОГДА не пиши имена артистов, групп,
-   музыкантов, исполнителей, альбомов, треков или продюсеров в поле
-   `prompt`**. Suno API отвергает такие промпты, и сгенерированное
-   аудио будет испорчено. Это правило не имеет исключений.
+   музыкантов, исполнителей, альбомов, треков или продюсеров в
+   ЛЮБОМ поле, которое уходит в Suno или используется для построения
+   prompt / title.** Suno API отвергает такие промпты, а из
+   description генерируется заголовок трека — он тоже не должен
+   содержать имён.
 
-   Артистов в `prompt` искать НЕ нужно по своей инициативе — только
-   когда пользователь сам говорит «как у X», «в стиле Y», «похоже на
-   Z» или приводит исполнителя как референс. В этом случае действуй
-   так:
-   (а) Идентифицируй артиста и его характерные музыкальные элементы.
-   (б) Проведи детальный анализ стилистики: жанр и поджанр; темп
-       (BPM-диапазон); инструментовка (какие синтезаторы / гитары /
-       барабаны / эффекты типичны); продакшен (lo-fi vs polished, dry
-       vs reverb-heavy, mono vs wide-stereo); вокал (тембр, тесситура,
-       манера исполнения, обработка); ритмика и грув; гармония.
-   (в) Интерпретируй и переведи всё это в подробное описание для Suno
-       НА АНГЛИЙСКОМ языке — БЕЗ упоминания имени артиста.
-   Пример: «как у Dua Lipa» → в prompt: "polished dance-pop, breathy
-   soprano female vocals with airy delivery, four-on-the-floor kick at
-   ~115 BPM, deep saturated synth bass, plucky 80s-inspired analog
-   pads, crisp claps with short tail reverb, glossy radio-ready
-   compression, modern pop production". Имя артиста в `reply` упоминать
-   можно (объяснить пользователю что понял референс) — только не в
-   `prompt`.
+   ЗАПРЕЩЕНО упоминание артиста в полях:
+     • `prompt`
+     • `short_prompt`
+     • `summary`
+     • `description` (и `intent.params.description`)
+     • `music_params.*` (особенно `custom_genre`, `techniques`)
+     • `research_notes` (даже research_notes идёт в downstream
+       prompt engineer — там тоже только описательная лексика,
+       без имени)
+     • `note` (intent.note)
+
+   РАЗРЕШЕНО упоминать имя только в `reply` — это поле уходит юзеру
+   в чат, не в Suno. Можно сказать «понял, La Dispute — это…».
+
+   Когда пользователь сам говорит «как у X», «в стиле Y», «inspired
+   by Z» — действуй так:
+   (а) В `reply` подтверди: «понял, X — это [пара слов о звуке]».
+   (б) Идентифицируй стилистику артиста: жанр+поджанр, BPM,
+       инструментовка (модели синтезаторов / тембр гитар / тип
+       ударных), продакшен, вокал, ритмика, гармония.
+   (в) Переведи всё это в **описательную лексику** на английском
+       и положи в `prompt` / `description` / `music_params` /
+       `research_notes` — БЕЗ имени артиста.
+
+   Примеры:
+     «как у Dua Lipa» → "polished dance-pop, breathy soprano female
+        vocals with airy delivery, four-on-the-floor kick at ~115 BPM,
+        deep saturated synth bass, plucky 80s-inspired analog pads,
+        crisp claps with short tail reverb, glossy radio-ready
+        compression, modern pop production".
+     «в духе La Dispute» → "post-hardcore, spoken-word male
+        vocals with passionate delivery, intricate clean/distorted
+        guitar interplay, dynamic drum patterns with syncopated
+        accents, melodic basslines, cathartic build-and-release
+        dynamics, ~135 BPM, raw emotional production".
+
+   ЗАПРЕЩЁННЫЕ конструкции (никогда не вставляй в downstream-поля):
+     "inspired by [Name]" / "in the style of [Name]" /
+     "like [Name]" / "feat. [Name]" / "à la [Name]" /
+     "similar to [Name]" / "вдохновлено [Name]" / "в стиле [Name]".
 8. **Respect the current module hint.** If the UI tells you the user
    is in the song builder, default to module=song unless the user
    explicitly pivots ("а сделай мне обложку" → cover_art, "лучше без
@@ -608,12 +863,29 @@ Output protocol — you MUST return raw JSON (no markdown fences, no extra keys)
 {
   "reply": "<your next chat message in Russian>",
   "done": <true if you have enough to finalize, else false>,
-  "summary": "<when done=true: clean Russian human brief, bullet list with Тема,
-    Настроение, Стиль/жанр, Инструментация, Вокал (если есть), Ограничения. Empty
-    when done=false>",
+  "summary": "<when done=true: clean human brief in the locked language, ALWAYS
+    a bullet list following this EXACT template (each line on its own, leading
+    «• »). The «Жанр» / «Genre» line is REQUIRED and must never be omitted —
+    even if the user did not name a genre, fill it with what you inferred
+    (e.g. «• Жанр: lo-fi hip-hop (подобрано агентом)» or «• Genre: lo-fi
+    hip-hop (picked by agent)»):
+      • Тема / Topic
+      • Жанр / Genre  ← REQUIRED, ALWAYS PRESENT
+      • Настроение / Mood
+      • Темп / Tempo
+      • Инструментация / Instrumentation
+      • Вокал / Vocals  (omit only when module=instrumental / sound_effect / cover_art)
+      • Ограничения / Constraints (omit if none)
+    Empty when done=false.>",
   "prompt": "<DEPRECATED. When done=true: English music description. This is
     secondary — the prompt engineer builds the final Suno prompt from music_params.
     Still provide it for backward compatibility. Empty when done=false>",
+  "short_prompt": "<when done=true: a short user-facing distillation of the
+    Suno prompt, in English, 120-220 chars. Cover genre + 2-3 key descriptors
+    + tempo. Examples:
+      'Atmospheric downtempo, dreamy synth pads, deep sub-bass, 78 BPM, narrow stereo, melancholic mood'
+      'Screamo / post-hardcore, fuzzed-out guitars, harsh male vocals, frantic 170 BPM drums, raw production'
+    No artist names. Empty when done=false.>",
   "music_params": {
     "genre": "<English genre label matching RIFFA's library, e.g. 'Amapiano', 'Doom Metal'>",
     "subgenre": "<more specific, e.g. 'Dark Synthwave', 'Liquid DnB'>",
@@ -713,6 +985,44 @@ def _build_user_context(req: AgentChatRequest) -> str:
     return "\n".join(bits)
 
 
+def _detect_reply_language(messages: list[ChatMessage]) -> str:
+    """Decide which language the agent must use for the next reply.
+
+    Strategy: look at the user's LATEST message — that's the strongest signal.
+    Fall back to the dominant language across recent user turns. We compare
+    Cyrillic vs Latin character counts on the alphabetic chars only, so
+    punctuation, numbers, emojis don't skew it.
+
+    Returns: "English" or "Russian".
+    """
+    user_msgs = [m.content for m in messages if m.role == "user"][-5:]
+    if not user_msgs:
+        return "Russian"
+
+    def score(text: str) -> tuple[int, int]:
+        cyr = sum(1 for c in text if "Ѐ" <= c <= "ӿ")
+        lat = sum(1 for c in text if c.isalpha() and c.isascii())
+        return cyr, lat
+
+    last_cyr, last_lat = score(user_msgs[-1])
+    # Only treat the latest message as authoritative when it's substantial
+    # (≥10 alphabetic chars) — short replies like "ok" or "lo-fi" don't
+    # signal a language switch on their own.
+    if last_cyr + last_lat >= 10:
+        if last_lat > last_cyr:
+            return "English"
+        if last_cyr > last_lat:
+            return "Russian"
+
+    # Otherwise tally the recent history.
+    cyr = lat = 0
+    for text in user_msgs:
+        c, l = score(text)
+        cyr += c
+        lat += l
+    return "English" if lat > cyr else "Russian"
+
+
 async def _build_user_stats(session: AsyncSession, user: User) -> str:
     """Fetch a compact natural-language summary of the user's creative profile.
 
@@ -781,6 +1091,27 @@ async def _build_user_stats(session: AsyncSession, user: User) -> str:
     return " ".join(pieces)
 
 
+_GENRE_LINE_RE = re.compile(r"(?im)^[^\n]*\b(жанр|стиль|genre|style)\b[^\n]*[:：—-]")
+
+
+def _has_genre_line(summary: str) -> bool:
+    """True if the brief already names a genre / стиль / style line."""
+    return bool(_GENRE_LINE_RE.search(summary))
+
+
+def _splice_after_first_bullet(summary: str, new_line: str) -> str:
+    """Insert ``new_line`` right after the first bullet (Тема / Topic line).
+
+    Falls back to prepending if no bullet line is found in the first 3 lines.
+    """
+    lines = summary.splitlines()
+    for idx, line in enumerate(lines[:3]):
+        if line.lstrip().startswith("•") or line.lstrip().startswith("-"):
+            lines.insert(idx + 1, new_line)
+            return "\n".join(lines)
+    return f"{new_line}\n{summary}"
+
+
 _INSTRUMENTAL_MARKERS = (
     "без вокала",
     "без голоса",
@@ -802,6 +1133,60 @@ _INSTRUMENTAL_MARKERS = (
 def _looks_instrumental(*texts: str) -> bool:
     blob = " ".join(t.lower() for t in texts if t)
     return any(marker in blob for marker in _INSTRUMENTAL_MARKERS)
+
+
+_SFX_MARKERS = (
+    "звуковой эффект",
+    "звуковые эффекты",
+    "звук эффект",
+    "sound effect",
+    "sound-effect",
+    "sfx",
+    " звук ",  # space-bounded so we don't match "звуковая дорожка"
+    "звука",
+    "звук хора",
+    "звук дождя",
+    "звук моря",
+    "звук ветра",
+    "звук удара",
+    "звук уведомления",
+    "звуковая текстура",
+    "эмбиент звук",
+    "ringtone",
+    "impact sound",
+    "one-shot",
+    "стинг",
+    "intro sting",
+    "взрыв",
+    "выстрел",
+    "хлопок",
+    "whoosh",
+)
+
+
+def _looks_sound_effect(*texts: str) -> bool:
+    """Detect that the user is asking for a short SFX rather than a track."""
+    blob = " ".join((t.lower() if t else "") for t in texts)
+    # Pad with spaces so " звук " marker matches at boundaries.
+    blob = f" {blob} "
+    return any(marker in blob for marker in _SFX_MARKERS)
+
+
+_COVER_ART_MARKERS = (
+    "обложк",  # обложка, обложку, обложки
+    "cover art",
+    "album cover",
+    "artwork",
+    "картинку для трека",
+    "картинка для трека",
+    "арт для трека",
+    "арт обложк",
+)
+
+
+def _looks_cover_art(*texts: str) -> bool:
+    blob = " ".join((t.lower() if t else "") for t in texts)
+    return any(marker in blob for marker in _COVER_ART_MARKERS)
 
 
 def _coerce_intent(
@@ -861,8 +1246,35 @@ def _coerce_intent(
 
     description = str(raw_params.get("description") or "")[:500]
 
+    # Hard SFX override — "звуковой эффект Х" must NEVER route to
+    # instrumental/song. SFX is a different generator and a wrong route
+    # costs the user tokens for a useless result.
+    if module_val in ("song", "instrumental", "occasion") and _looks_sound_effect(
+        description, reply_text, summary_text, prompt_text
+    ):
+        logger.info(
+            "[AGENT] forcing module=sound_effect — SFX markers detected "
+            "in brief (was module={})", module_val,
+        )
+        module_val = "sound_effect"
+        vocal = ""
+        text_mode = "none"
+
+    # Hard cover_art override — "обложка" wins over "сделай трек".
+    if module_val in ("song", "instrumental", "occasion", "sound_effect") and _looks_cover_art(
+        description, reply_text, summary_text
+    ):
+        logger.info(
+            "[AGENT] forcing module=cover_art — cover-art markers detected "
+            "(was module={})", module_val,
+        )
+        module_val = "cover_art"
+        vocal = ""
+        text_mode = "none"
+
     # Hard instrumental override — protects against GPT slipping on the
-    # module flag when the brief is clearly instrumental.
+    # module flag when the brief is clearly instrumental. Runs LAST so
+    # sound_effect / cover_art win first.
     if module_val in ("song", "occasion") and _looks_instrumental(
         description, reply_text, summary_text, prompt_text
     ):
@@ -925,8 +1337,21 @@ async def agent_chat(
 
     client = AsyncOpenAI(api_key=api_key, base_url=settings.openai_base_url)
 
+    # Sliding window — only the last 40 turns go to GPT (keeps context tight
+    # and token cost predictable for long chats).
+    windowed = body.messages[-40:]
+    reply_lang = _detect_reply_language(windowed)
     chat_messages: list[dict[str, str]] = [
         {"role": "system", "content": _SYS_AGENT},
+        {
+            "role": "system",
+            "content": (
+                f"Reply language: {reply_lang}. This is the language for "
+                f"`reply`, `suggestions`, `intent.note`, `summary`, and every "
+                f"other user-facing string in this response. Do not switch "
+                f"languages within this turn."
+            ),
+        },
         {"role": "system", "content": _build_user_context(body)},
     ]
     try:
@@ -945,19 +1370,19 @@ async def agent_chat(
         )
 
     try:
-        # gpt-4o-mini: 3-5x faster and 10x cheaper than gpt-4o, with comparable
-        # quality on the agent's JSON-structured musical-research task. Switched
-        # because gpt-4o was visibly slow after the system-prompt expansion in
-        # eda2187 and users complained the agent "thinks forever". If quality
-        # regressions show up on niche genres, raise to "gpt-4o" again.
+        # gpt-4o is back: gpt-4o-mini was confabulating on niche artists
+        # ("eneer" → wrong band) and not following the new ARTIST REFERENCE
+        # FLOW that requires asking for a link when uncertain. The full model
+        # follows nuanced instructions much better and recognises a wider
+        # catalogue of small/regional artists.
         # `response_format` accepts the {"type": "json_object"} literal at
         # runtime, but the typed-dict variant in openai 1.61 is too narrow
         # for mypy to pick the right overload — silence just this call.
         resp = await client.chat.completions.create(  # type: ignore[call-overload]
-            model="gpt-4o-mini",
+            model="gpt-4o",
             messages=chat_messages,
             temperature=0.55,
-            max_tokens=1500,
+            max_tokens=1800,
             response_format={"type": "json_object"},
         )
         raw = (resp.choices[0].message.content or "").strip()
@@ -978,12 +1403,39 @@ async def agent_chat(
     done = bool(parsed.get("done", False))
     summary = str(parsed.get("summary", "")).strip() if done else ""
     prompt = str(parsed.get("prompt", "")).strip() if done else ""
+    short_prompt = str(parsed.get("short_prompt", "")).strip() if done else ""
     music_params = _coerce_music_params(parsed.get("music_params")) if done else {}
     research_notes = str(parsed.get("research_notes", "")).strip()[:2000] if done else ""
+
+    # SAFETY NET: if the agent set done=true but ALL music_params strings are
+    # empty (it ignored the rule above), log a warning and fill the bare
+    # minimum from `intent.params` so the downstream pipeline isn't fed an
+    # empty signal. Better an OK prompt than a generic one.
+    if done and music_params:
+        filled_strings = sum(
+            1 for k in ("genre", "subgenre", "mood", "tempo", "era", "suggested_bpm")
+            if music_params.get(k)
+        )
+        has_instruments = bool(music_params.get("key_instruments"))
+        if filled_strings == 0 and not has_instruments:
+            raw_intent = parsed.get("intent") or {}
+            intent_params = raw_intent.get("params") or {}
+            logger.warning(
+                "[AGENT] music_params empty despite done=true — patching from intent.params"
+            )
+            for src, dst in (("genre", "genre"), ("custom_genre", "custom_genre"),
+                             ("mood", "mood"), ("tempo", "tempo")):
+                v = intent_params.get(src)
+                if v and not music_params.get(dst):
+                    music_params[dst] = str(v).strip()[:128]
 
     # Cap prompt at Suno's music limit (5000) just in case.
     if len(prompt) > 5000:
         prompt = prompt[:5000].rsplit(" ", 1)[0]
+    # short_prompt fallback: distill from the full prompt if GPT omitted it.
+    if done and not short_prompt and prompt:
+        short_prompt = prompt[:220].rsplit(" ", 1)[0]
+    short_prompt = short_prompt[:240]
 
     intent = (
         _coerce_intent(
@@ -997,6 +1449,21 @@ async def agent_chat(
         else None
     )
 
+    # Genre is required in the brief. If GPT omitted the line, splice it in
+    # using whatever we know from music_params or intent.params.
+    if done and summary and not _has_genre_line(summary):
+        inferred_genre = (
+            (music_params.get("custom_genre") or music_params.get("subgenre") or music_params.get("genre") or "")
+            if music_params
+            else ""
+        )
+        if not inferred_genre and intent is not None:
+            inferred_genre = intent.params.custom_genre or intent.params.genre
+        if inferred_genre:
+            label = "Genre" if reply_lang == "English" else "Жанр"
+            line = f"• {label}: {inferred_genre}"
+            summary = f"{line}\n{summary}" if not summary.startswith("•") else _splice_after_first_bullet(summary, line)
+
     raw_suggestions = parsed.get("suggestions", [])
     suggestions: list[str] = []
     if isinstance(raw_suggestions, list) and not done:
@@ -1009,6 +1476,7 @@ async def agent_chat(
 
     return AgentChatResponse(
         reply=reply, done=done, summary=summary, prompt=prompt,
+        short_prompt=short_prompt,
         music_params=music_params, research_notes=research_notes,
         intent=intent, suggestions=suggestions,
     )

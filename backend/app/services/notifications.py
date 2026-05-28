@@ -37,14 +37,13 @@ async def notify_generation_done(
 ) -> None:
     """Send a Telegram message when a generation finishes.
 
-    Respects ``users.morning_messages_enabled`` — that single flag toggles
-    every push the bot sends (morning broadcast, generation-done). Users
-    opt out from a single button in the bot or in the website profile;
-    we don't keep separate notification categories.
+    Respects ``users.generation_notifications_enabled`` — controlled on the
+    website profile. Morning-broadcast opt-out is a separate flag managed
+    in the bot.
     """
     if not user.telegram_user_id:
         return
-    if not getattr(user, "morning_messages_enabled", True):
+    if not getattr(user, "generation_notifications_enabled", True):
         return
 
     gen_type_labels = {
