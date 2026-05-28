@@ -332,9 +332,22 @@ export function GlobalPlayer() {
       el.src = nxt.url;
       el.currentTime = 0;
       el.load();
-      // play() here is inside an audio-session callback — iOS/Android
-      // honour it without requiring a new user gesture.
-      el.play().catch(() => undefined);
+      // Immediate play() works on a warm cache but silently rejects on
+      // slow mobile networks because el.load() just invalidated the
+      // buffer. Fall back to playing on `canplay` — that keeps us inside
+      // the existing audio-session window (no fresh user gesture needed,
+      // as long as we don't wait too long, which canplay won't).
+      const playAttempt = el.play();
+      if (playAttempt && typeof playAttempt.catch === "function") {
+        playAttempt.catch(() => {
+          if (!el) return;
+          const onCanPlay = () => {
+            el.removeEventListener("canplay", onCanPlay);
+            el.play().catch(() => undefined);
+          };
+          el.addEventListener("canplay", onCanPlay, { once: true });
+        });
+      }
       // Sync UI state; since currentSrcRef is already updated, the
       // main useEffect's URL-change branch won't fire again.
       store.next();
