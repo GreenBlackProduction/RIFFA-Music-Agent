@@ -566,6 +566,21 @@ export function GlobalPlayer() {
     return x * duration;
   }
 
+  /** Apply currentTime, preferring fastSeek when available — iOS Safari often
+   *  ignores a plain `currentTime =` assignment if the target is outside the
+   *  loaded buffer, which on a quick click looks like the track jumping back
+   *  to where it was playing (and on a fresh track, that's 0). */
+  function applySeek(el: HTMLAudioElement, t: number) {
+    try {
+      const fast = (el as HTMLAudioElement & { fastSeek?: (n: number) => void }).fastSeek;
+      if (typeof fast === "function") {
+        fast.call(el, t);
+        return;
+      }
+    } catch { /* fall through */ }
+    try { el.currentTime = t; } catch { /* ignore */ }
+  }
+
   /** Single-click or start of drag — capture the pointer so we keep getting
    *  pointermove events even when the cursor leaves the bar. */
   function handleSeekStart(e: React.PointerEvent<HTMLDivElement>) {
@@ -575,7 +590,7 @@ export function GlobalPlayer() {
     if (t === null) return;
     seekingRef.current = true;
     draggingRef.current = true;
-    el.currentTime = t;
+    applySeek(el, t);
     setProgress(t);
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -590,7 +605,7 @@ export function GlobalPlayer() {
     if (!el) return;
     const t = computeSeekTime(e.clientX);
     if (t === null) return;
-    el.currentTime = t;
+    applySeek(el, t);
     setProgress(t);
   }
 
@@ -599,9 +614,24 @@ export function GlobalPlayer() {
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch { /* ignore */ }
-    // Allow pause/play events to fire normally again after a short delay
-    // so we don't reset playback state during the trailing seek event.
-    window.setTimeout(() => { seekingRef.current = false; }, 200);
+    // Wait for the audio element to actually finish seeking before letting
+    // timeupdate overwrite progress. Without this, a quick click pushes
+    // currentTime but the next timeupdate fires with the old position
+    // (because the seek hasn't completed yet) and the bar — and the audio —
+    // snap back to where they were. Using the `seeked` event tracks real
+    // browser state instead of guessing with a timer. 1.5 s safety net in
+    // case the browser never fires `seeked` (lost network, broken codec).
+    const el = audioRef.current;
+    if (!el) { seekingRef.current = false; return; }
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      el.removeEventListener("seeked", finish);
+      seekingRef.current = false;
+    };
+    el.addEventListener("seeked", finish, { once: true });
+    window.setTimeout(finish, 1500);
   }
 
   function toggleQueueDropdown() {
@@ -869,7 +899,11 @@ export function GlobalPlayer() {
         playsInline
         onLoadedMetadata={(e) => setDuration((e.target as HTMLAudioElement).duration)}
         onTimeUpdate={(e) => {
-          if (draggingRef.current) return; // don't fight user's drag
+          // Don't fight user's drag, and don't overwrite the just-set
+          // position while the browser is still finishing the seek — that
+          // race is what makes a click on the progress bar look like a
+          // jump back to the start of the track.
+          if (draggingRef.current || seekingRef.current) return;
           setProgress((e.target as HTMLAudioElement).currentTime);
         }}
         /* onEnded handled by native listener above — see useEffect */
