@@ -65,8 +65,11 @@ export function LoginPage() {
 
   // ── Bot-link auth: state for the magic-link via bot flow ──────────────────
   const [botLinkStatus, setBotLinkStatus] = useState<
-    "idle" | "waiting" | "approved" | "expired" | "error"
+    "idle" | "waiting" | "approved" | "expired" | "error" | "popup_blocked"
   >("idle");
+  // When the popup is blocked Chrome still wants a "direct user action" link.
+  // We keep the deep-link in state so a regular <a href> can take over.
+  const [tgBotUrl, setTgBotUrl] = useState<string | null>(null);
   const botLinkPollRef = useRef<number | null>(null);
   const botLinkAbortRef = useRef<boolean>(false);
 
@@ -171,30 +174,36 @@ export function LoginPage() {
   async function handleBotLinkLogin() {
     if (botLinkStatus === "waiting") return;
     setTgBtnError(null);
+    setTgBotUrl(null);
     setBotLinkStatus("waiting");
     botLinkAbortRef.current = false;
 
     // Inside Telegram Mini App we can defer the open (native opener works post-await).
     // For real browsers — open a placeholder tab SYNCHRONOUSLY so iOS Safari /
     // strict popup blockers keep the user gesture context. We swap the URL once
-    // the backend returns the bot deep-link.
+    // the backend returns the bot deep-link. We drop `noopener,noreferrer` here
+    // because some Chromium builds use those flags as a stronger heuristic
+    // for "looks like an ad popup, block it".
     const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram;
     const inMiniApp = !!tg?.WebApp?.openTelegramLink;
-    const placeholderWindow = inMiniApp ? null : window.open("about:blank", "_blank", "noopener,noreferrer");
+    const placeholderWindow = inMiniApp ? null : window.open("about:blank", "_blank");
 
     try {
       const { nonce, bot_url } = await startBotLinkLogin();
+      // Always save the URL so a <a href> fallback can take over if the
+      // popup never opened or got closed by the browser.
+      setTgBotUrl(bot_url);
       if (inMiniApp) {
         tg!.WebApp!.openTelegramLink!(bot_url);
       } else if (placeholderWindow && !placeholderWindow.closed) {
         placeholderWindow.location.href = bot_url;
       } else {
-        // Popup was blocked by the browser — last-resort fallback. We DON'T
-        // navigate the current tab (that was the original UX bug); instead
-        // surface an error so the user can retry with popups enabled.
-        setBotLinkStatus("error");
+        // Popup was blocked. We keep the nonce alive and start polling — the
+        // user just needs to click the visible <a href> fallback to actually
+        // open the bot. That click is a direct user action and bypasses the
+        // popup blocker.
+        setBotLinkStatus("popup_blocked");
         setTgBtnError(t.telegram.popupBlocked);
-        return;
       }
       // Poll the backend every 2s up to 5 min (matches Redis TTL)
       const startedAt = Date.now();
@@ -316,6 +325,21 @@ export function LoginPage() {
 
             {botLinkStatus === "waiting" && (
               <p className="muted login-hint">{t.telegram.waitingHint}</p>
+            )}
+            {botLinkStatus === "popup_blocked" && tgBotUrl && (
+              <a
+                href={tgBotUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="tg-login-btn"
+                style={{ marginTop: 10 }}
+                onClick={() => setBotLinkStatus("waiting")}
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true">
+                  <path d="M21.8 3.1L2.3 10.7c-1.3.5-1.3 1.3-.2 1.6l5 1.6 11.4-7.2c.5-.3 1 0 .6.4L9 16.5v3.1c0 .9 1.2 1.3 1.8.6l2.6-2.5 5.1 3.8c.9.5 1.6.2 1.8-.8l3.3-16.2c.4-1.4-.5-2-1.8-1.4z" fill="#fff"/>
+                </svg>
+                {t.telegram.btnText}
+              </a>
             )}
             {botLinkStatus === "expired" && (
               <p className="muted login-hint" style={{ color: "var(--accent)" }}>
