@@ -809,12 +809,25 @@ a {
   position: fixed;
   z-index: 500;
   min-width: 200px;
+  /* Never overflow the viewport on narrow mobile screens — clamp width and
+     let long entries wrap. */
+  max-width: calc(100vw - 16px);
   border-radius: var(--radius-md);
   border: 1px solid var(--ink);
   background: var(--paper-3);
   overflow: hidden;
   box-shadow: 0 4px 24px rgba(22, 20, 19, 0.16);
   animation: file-bolt-menu-in 140ms ease;
+}
+@media (max-width: 480px) {
+  .file-bolt-menu {
+    min-width: 180px;
+    max-width: calc(100vw - 12px);
+  }
+  .file-bolt-menu button {
+    white-space: normal;
+    word-break: break-word;
+  }
 }
 @keyframes file-bolt-menu-in {
   from { opacity: 0; transform: translateY(6px) scale(0.96); }
