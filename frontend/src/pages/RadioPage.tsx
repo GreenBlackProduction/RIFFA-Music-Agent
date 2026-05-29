@@ -12,6 +12,7 @@ import {
   fetchMyRadioCollection,
   fetchRadio,
   fetchRadioStats,
+  fetchRadioMoodCounts,
   fetchSharedGeneration,
   recordRadioPlay,
   voteRadioTrack,
@@ -206,6 +207,14 @@ export function RadioPage() {
     queryFn: fetchRadioStats,
   });
 
+  // ── Mood counts for chip badges ─────────────────────────
+  const moodCountsQuery = useQuery({
+    queryKey: [...RADIO_QUERY_KEY, "mood-counts"],
+    queryFn: fetchRadioMoodCounts,
+    staleTime: 30_000,
+  });
+  const moodCounts = moodCountsQuery.data;
+
 
   // ── Playlist (filtered by current mood) ──────────────────
   const isCollection = mood === "collection";
@@ -357,14 +366,21 @@ export function RadioPage() {
         <div className="right">{MOODS.length} {isEN ? "presets" : "пресетов"}</div>
       </div>
       <div className="pill-row" style={{ marginBottom: 28 }}>
-        {MOODS.map((m) => (
-          <button key={m.key} type="button"
-            className={`pill${mood === m.key ? " on" : ""}`}
-            onClick={() => setMood(m.key)}
-          >
-            {moodTranslated(m.key)}
-          </button>
-        ))}
+        {MOODS.map((m) => {
+          const count = !moodCounts ? null
+            : m.key === "all" ? moodCounts.total
+            : m.key === "vocal" ? moodCounts.vocal
+            : moodCounts.counts[m.key] ?? 0;
+          return (
+            <button key={m.key} type="button"
+              className={`pill${mood === m.key ? " on" : ""}`}
+              onClick={() => setMood(m.key)}
+            >
+              {moodTranslated(m.key)}
+              {count !== null && <span className="pill__count">{count}</span>}
+            </button>
+          );
+        })}
         <button type="button"
           className={`pill${mood === "collection" ? " on" : ""}`}
           onClick={() => setMood("collection")}
