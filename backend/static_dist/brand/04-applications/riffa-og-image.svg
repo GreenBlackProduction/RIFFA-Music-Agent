@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <rect width="1200" height="630" fill="#161413"></rect>
+  
+  <g transform="translate(220, 220)">
+    
+    <circle cx="80" cy="80" r="80" fill="#E9E5DA"></circle>
+    <circle cx="80" cy="80" r="60" fill="#161413"></circle>
+    <polygon points="68,52 68,108 116,80" fill="#FF3B1F"></polygon>
+    
+    <text x="200" y="142" font-family="&#39;Archivo Black&#39;, &#39;Inter&#39;, sans-serif" font-weight="900" font-size="160" letter-spacing="-8" fill="#E9E5DA">riffa</text>
+    
+    <polygon points="600,42 600,142 680,92" fill="#FF3B1F"></polygon>
+  </g>
+  
+  <text x="600" y="490" font-family="&#39;Inter&#39;, system-ui, sans-serif" font-weight="500" font-size="36" fill="#E9E5DA" text-anchor="middle">песни с вокалом за минуту · нейросеть · русский</text>
+  <text x="600" y="560" font-family="&#39;JetBrains Mono&#39;, ui-monospace, monospace" font-size="20" letter-spacing="8" fill="#E9E5DA" opacity="0.55" text-anchor="middle">RIFFASTUDIO.SITE</text>
+</svg>
