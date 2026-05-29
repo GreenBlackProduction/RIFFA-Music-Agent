@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import {
   convertToWav,
   generateSimilar,
+  renameGeneration,
   rateGeneration,
   toggleHistoryRadio,
   voteRadioTrack,
@@ -330,18 +331,21 @@ export function GlobalPlayer() {
       // Suppress load()-induced pause before setting new src.
       suppressNextPauseRef.current = true;
       currentSrcRef.current = nxt.url;
+      // CRITICAL on mobile: DO NOT call el.load() here. Calling load() tears
+      // down the existing audio session, and mobile Safari / Chrome treat
+      // the next el.play() as a fresh autoplay attempt with no user gesture
+      // — it silently rejects, the canplay fallback never gets a gesture
+      // either, and the track quietly fails to start. Assigning .src alone
+      // keeps the audio session alive and play() continues to be allowed
+      // because we are still inside the `ended` event callback.
       el.src = nxt.url;
-      el.currentTime = 0;
-      el.load();
-      // Immediate play() works on a warm cache but silently rejects on
-      // slow mobile networks because el.load() just invalidated the
-      // buffer. Fall back to playing on `canplay` — that keeps us inside
-      // the existing audio-session window (no fresh user gesture needed,
-      // as long as we don't wait too long, which canplay won't).
       const playAttempt = el.play();
       if (playAttempt && typeof playAttempt.catch === "function") {
         playAttempt.catch(() => {
           if (!el) return;
+          // Last-ditch: wait for canplay and retry once. Won't help if the
+          // browser already rejected because of autoplay policy, but covers
+          // the case where the new src just hadn't buffered yet.
           const onCanPlay = () => {
             el.removeEventListener("canplay", onCanPlay);
             el.play().catch(() => undefined);
@@ -710,6 +714,40 @@ export function GlobalPlayer() {
     downloadBlob(currentUrl, filename);
   }
 
+  function openRename() {
+    setBoltOpen(false);
+    const initial = currentTitle ?? "";
+    // Lightweight prompt — keeps the player chrome clean and works on every
+    // platform incl. Telegram Mini App where modals over the bottom bar are
+    // awkward. The library row already has a full modal for power users.
+    const next = window.prompt(
+      t("globalPlayer.renamePromptLabel", { defaultValue: "Новое название трека" }),
+      initial,
+    );
+    if (!next) return;
+    const trimmed = next.trim().slice(0, 80);
+    if (!trimmed || trimmed === initial) return;
+    void (async () => {
+      const gId = extractGenId(currentId!);
+      if (!gId) return;
+      const idx = extractTrackIndex(currentId!);
+      try {
+        await renameGeneration(gId, trimmed, idx);
+        // Mirror the new title in the local store and invalidate any list
+        // queries so the library/radio rows update without a refresh.
+        usePlayer.setState((s) => ({
+          current: s.current ? { ...s.current, title: trimmed } : s.current,
+          queue: s.queue.map((q) => (q.id === currentId ? { ...q, title: trimmed } : q)),
+        }));
+        await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
+        await queryClient.invalidateQueries({ queryKey: ["radio"] });
+      } catch {
+        // Swallow — invalidation would surface a stale title which the next
+        // refresh will correct. Avoid a popup over the player chrome.
+      }
+    })();
+  }
+
   return (
     <div
       className={`global-player${collapsed ? " global-player--collapsed" : ""}`}
@@ -1055,6 +1093,15 @@ export function GlobalPlayer() {
                 >
                   {wavPending ? t("globalPlayer.convertWavRunning") : t("globalPlayer.convertWav")}
                 </button>
+                {genId && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={openRename}
+                  >
+                    ✏️&nbsp; {t("globalPlayer.renameTrack", { defaultValue: "Переименовать трек" })}
+                  </button>
+                )}
                 <button
                   type="button"
                   role="menuitem"

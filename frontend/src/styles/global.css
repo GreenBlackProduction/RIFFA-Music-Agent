@@ -838,6 +838,53 @@ a {
 .file-bolt-menu button:hover { background: var(--paper-2); }
 .file-bolt-menu button + button { border-top: 1px solid var(--rule-soft); }
 
+/* ── Rename modal ── */
+.rename-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  background: rgba(22, 20, 19, 0.6);
+  backdrop-filter: blur(6px);
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+}
+.rename-modal {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--ink);
+  background: var(--paper-3);
+  box-shadow: 0 20px 60px rgba(22, 20, 19, 0.35);
+}
+.rename-modal__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+}
+.rename-modal input {
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  outline: none;
+}
+.rename-modal input:focus { border-color: var(--ink); }
+.rename-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 /* ── Радио — капсула с текстом ── */
 .file-radio {
   display: inline-flex;

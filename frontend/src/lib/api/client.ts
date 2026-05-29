@@ -743,6 +743,20 @@ export function rateGeneration(
   });
 }
 
+export function renameGeneration(
+  id: string,
+  title: string,
+  trackIndex?: number | null,
+): Promise<unknown> {
+  return apiFetch(`/api/v1/history/${id}/title`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      title,
+      track_index: trackIndex ?? null,
+    }),
+  });
+}
+
 export function shareGeneration(id: string): Promise<{ share_id: string; share_url: string }> {
   return apiFetch(`/api/v1/history/${id}/share`, { method: "POST" });
 }
