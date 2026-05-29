@@ -154,6 +154,10 @@ export function GlobalPlayer() {
   const setRadioState = usePlayer((s) => s.setRadioState);
   const [radioPending, setRadioPending] = useState(false);
   const [wavPending, setWavPending] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renamePending, setRenamePending] = useState(false);
+  const renameInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const trackGeneration = useGenerationStore((s) => s.track);
 
@@ -659,14 +663,29 @@ export function GlobalPlayer() {
   function toggleQueueDropdown() {
     if (!trackBtnRef.current) return;
     const r = trackBtnRef.current.getBoundingClientRect();
-    setQueuePos({ bottom: window.innerHeight - r.top + 6, left: r.left, width: Math.max(r.width, 240) });
+    const margin = 8;
+    const desired = Math.max(r.width, 240);
+    const width = Math.min(desired, window.innerWidth - margin * 2);
+    // Clamp the left edge so the dropdown never overflows on the right.
+    const left = Math.max(margin, Math.min(r.left, window.innerWidth - width - margin));
+    setQueuePos({ bottom: window.innerHeight - r.top + 6, left, width });
     setQueueOpen((v) => !v);
   }
 
   function openBolt() {
     if (boltBtnRef.current) {
       const r = boltBtnRef.current.getBoundingClientRect();
-      setBoltPos({ bottom: window.innerHeight - r.top + 6, right: window.innerWidth - r.right });
+      // Pin the menu to the right edge of the button but clamp so it never
+      // pokes past the viewport's left edge on a narrow screen (mobile player
+      // chrome wraps and the bolt button can end up far from the right edge).
+      const margin = 8;
+      const menuMinWidth = 200;
+      const rightFromViewport = Math.max(margin, window.innerWidth - r.right);
+      const maxRight = window.innerWidth - menuMinWidth - margin;
+      setBoltPos({
+        bottom: window.innerHeight - r.top + 6,
+        right: Math.min(rightFromViewport, maxRight),
+      });
     }
     setBoltOpen((v) => !v);
   }
@@ -716,36 +735,41 @@ export function GlobalPlayer() {
 
   function openRename() {
     setBoltOpen(false);
+    setRenameValue(currentTitle ?? "");
+    setRenameOpen(true);
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  }
+
+  async function submitRename(e: React.FormEvent) {
+    e.preventDefault();
+    if (!currentId || renamePending) return;
+    const next = renameValue.trim().slice(0, 80);
     const initial = currentTitle ?? "";
-    // Lightweight prompt — keeps the player chrome clean and works on every
-    // platform incl. Telegram Mini App where modals over the bottom bar are
-    // awkward. The library row already has a full modal for power users.
-    const next = window.prompt(
-      t("globalPlayer.renamePromptLabel", { defaultValue: "Новое название трека" }),
-      initial,
-    );
-    if (!next) return;
-    const trimmed = next.trim().slice(0, 80);
-    if (!trimmed || trimmed === initial) return;
-    void (async () => {
-      const gId = extractGenId(currentId!);
-      if (!gId) return;
-      const idx = extractTrackIndex(currentId!);
-      try {
-        await renameGeneration(gId, trimmed, idx);
-        // Mirror the new title in the local store and invalidate any list
-        // queries so the library/radio rows update without a refresh.
-        usePlayer.setState((s) => ({
-          current: s.current ? { ...s.current, title: trimmed } : s.current,
-          queue: s.queue.map((q) => (q.id === currentId ? { ...q, title: trimmed } : q)),
-        }));
-        await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
-        await queryClient.invalidateQueries({ queryKey: ["radio"] });
-      } catch {
-        // Swallow — invalidation would surface a stale title which the next
-        // refresh will correct. Avoid a popup over the player chrome.
-      }
-    })();
+    if (!next || next === initial) {
+      setRenameOpen(false);
+      return;
+    }
+    const gId = extractGenId(currentId);
+    if (!gId) {
+      setRenameOpen(false);
+      return;
+    }
+    const idx = extractTrackIndex(currentId);
+    setRenamePending(true);
+    try {
+      await renameGeneration(gId, next, idx);
+      usePlayer.setState((s) => ({
+        current: s.current ? { ...s.current, title: next } : s.current,
+        queue: s.queue.map((q) => (q.id === currentId ? { ...q, title: next } : q)),
+      }));
+      await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: ["radio"] });
+      setRenameOpen(false);
+    } catch {
+      // keep the modal open so the user can retry / cancel
+    } finally {
+      setRenamePending(false);
+    }
   }
 
   return (
@@ -1044,7 +1068,12 @@ export function GlobalPlayer() {
             className="gp-queue"
             role="listbox"
             aria-label={t("globalPlayer.queueLabel")}
-            style={{ bottom: queuePos.bottom, left: queuePos.left, minWidth: queuePos.width }}
+            style={{
+              bottom: queuePos.bottom,
+              left: queuePos.left,
+              width: queuePos.width,
+              maxWidth: `calc(100vw - 16px)`,
+            }}
           >
             {queue.map((qt, i) => (
               <button
@@ -1111,6 +1140,56 @@ export function GlobalPlayer() {
                 </button>
               </>
             )}
+          </div>,
+          document.body,
+        )}
+
+      {renameOpen &&
+        createPortal(
+          <div
+            className="rename-modal-backdrop"
+            onClick={() => !renamePending && setRenameOpen(false)}
+          >
+            <form
+              className="rename-modal"
+              onClick={(e) => e.stopPropagation()}
+              onSubmit={submitRename}
+            >
+              <label className="rename-modal__label">
+                {t("globalPlayer.renamePromptLabel", { defaultValue: "Новое название трека" })}
+              </label>
+              <input
+                ref={renameInputRef}
+                type="text"
+                value={renameValue}
+                maxLength={80}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && !renamePending) setRenameOpen(false);
+                }}
+                disabled={renamePending}
+                autoFocus
+              />
+              <div className="rename-modal__actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setRenameOpen(false)}
+                  disabled={renamePending}
+                >
+                  {t("common.cancel", { defaultValue: "Отмена" })}
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-ink btn-sm"
+                  disabled={renamePending || !renameValue.trim()}
+                >
+                  {renamePending
+                    ? t("common.saving", { defaultValue: "Сохраняю…" })
+                    : t("common.save", { defaultValue: "Сохранить" })}
+                </button>
+              </div>
+            </form>
           </div>,
           document.body,
         )}
