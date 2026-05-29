@@ -436,9 +436,32 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
 
         elif gen.type == GenerationType.sound_effect:
             await _publish(ctx, gen_id, {"status": "processing", "step": "enriching"})
-            sfx_prompt = await lyrics_client.enrich_sfx_prompt(params.get("prompt", ""))
+            raw_sfx_brief = params.get("prompt", "")
+            # Detect lyric-leak so we can both log and append an explicit
+            # vocal lock to the brief. The enrich system prompt already
+            # rewrites these into wordless texture, but the safety net
+            # keeps the Suno SFX model from improvising mumbled speech if
+            # GPT slips.
+            _LYRIC_MARKERS = (
+                "слов", "текст", "поёт", "поют", "поющ", "припев",
+                "куплет", "lyric", "word", "sing", "vocal", "narration",
+                "voice line", "говорит", "speak", "phrase", "chant",
+            )
+            lower_brief = raw_sfx_brief.lower()
+            if any(m in lower_brief for m in _LYRIC_MARKERS):
+                logger.warning(
+                    "[SFX] lyric markers detected in brief — relying on "
+                    "enrich pipeline to reinterpret as wordless texture. "
+                    "brief={!r}", raw_sfx_brief[:200],
+                )
+            sfx_prompt = await lyrics_client.enrich_sfx_prompt(raw_sfx_brief)
+            # Force-append the vocal lock — cheap, idempotent, and the SFX
+            # model honours short trailing constraints reliably.
+            if "no words" not in sfx_prompt.lower():
+                sfx_prompt = (sfx_prompt.rstrip(". ")
+                              + ", no words, no language, purely textural")
             _dump_payload(gen_id, "sound_effect", {
-                "original": params.get("prompt", ""),
+                "original": raw_sfx_brief,
                 "enriched": sfx_prompt,
             })
             suno_result = await suno.generate_sound_effect(
