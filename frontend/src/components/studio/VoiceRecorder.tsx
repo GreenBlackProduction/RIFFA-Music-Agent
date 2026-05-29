@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import "./VoiceRecorder.css";
 
 interface VoiceRecorderProps {
@@ -10,6 +11,7 @@ interface VoiceRecorderProps {
 }
 
 export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: VoiceRecorderProps) {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -90,7 +92,7 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
         const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
         gradient.addColorStop(0, "rgba(124, 255, 31, 0.8)");
         gradient.addColorStop(0.5, "rgba(255, 90, 0, 0.6)");
-        gradient.addColorStop(1, "rgba(214, 0, 255, 0.4)");
+        gradient.addColorStop(1, "rgba(15, 93, 71, 0.4)");
 
         ctx.fillStyle = gradient;
         ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
@@ -122,13 +124,13 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
         <div className="voice-recorder-header">
           <div className="voice-recorder-status">
             <span className="voice-recorder-pulse" />
-            <span>Идёт запись</span>
+            <span>{t("voiceRecorder.recording")}</span>
           </div>
           <button
             type="button"
             className="voice-recorder-close"
             onClick={onCancel}
-            aria-label="Отменить"
+            aria-label={t("voiceRecorder.cancelAria")}
           >
             ×
           </button>
@@ -149,14 +151,14 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
             className="voice-recorder-btn voice-recorder-btn--cancel"
             onClick={onCancel}
           >
-            Отменить
+            {t("voiceRecorder.cancel")}
           </button>
           <button
             type="button"
             className="voice-recorder-btn voice-recorder-btn--stop"
             onClick={onStop}
           >
-            ⏹ Остановить и сохранить
+            {t("voiceRecorder.stopSave")}
           </button>
         </div>
       </div>

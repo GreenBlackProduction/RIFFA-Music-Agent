@@ -1,0 +1,28 @@
+{
+  "name": "RIFFA Studio",
+  "short_name": "RIFFA",
+  "description": "Генератор песен и музыки нейросетью",
+  "start_url": "/studio",
+  "display": "standalone",
+  "background_color": "#E9E5DA",
+  "theme_color": "#161413",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/brand/04-applications/riffa-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

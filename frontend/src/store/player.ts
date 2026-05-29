@@ -15,6 +15,8 @@ export interface PlayerTrack {
   isPublic?: boolean;
   /** Suno audio_id — required for WAV conversion and extend from the player. */
   audioId?: string;
+  /** Откуда трек: библиотека, радио, последние генерации, шаринг. */
+  source?: "library" | "radio" | "studio" | "share";
 }
 
 type Rating = "like" | "dislike" | null;
@@ -50,6 +52,26 @@ interface PlayerState {
   setQueue: (tracks: PlayerTrack[]) => void;
 }
 
+/** Синхронизируем radioSet с track.isPublic — чтобы GlobalPlayer мог
+ *  читать состояние радио из единого источника (radioSet) и не зависеть
+ *  от reference-стабильности current. */
+function syncRadioSet(prev: Set<string>, track: PlayerTrack): Set<string> {
+  if (track.isPublic === undefined) return prev;
+  const key = String(track.id);
+  const has = prev.has(key);
+  if (track.isPublic && !has) {
+    const next = new Set(prev);
+    next.add(key);
+    return next;
+  }
+  if (!track.isPublic && has) {
+    const next = new Set(prev);
+    next.delete(key);
+    return next;
+  }
+  return prev;
+}
+
 export const usePlayer = create<PlayerState>((set, get) => ({
   current: null,
   queue: [],
@@ -62,12 +84,13 @@ export const usePlayer = create<PlayerState>((set, get) => ({
   play: (track, queue) => {
     const q = queue ?? get().queue;
     const idx = q.findIndex((t) => String(t.id) === String(track.id));
-    set({
+    set((s) => ({
       current: track,
       isPlaying: true,
       queue: q,
       queueIndex: idx,
-    });
+      radioSet: syncRadioSet(s.radioSet, track),
+    }));
   },
 
   playOrToggle: (track, queue) => {
@@ -92,7 +115,12 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     const { queue } = get();
     const track = queue[index];
     if (!track) return;
-    set({ current: track, isPlaying: true, queueIndex: index });
+    set((s) => ({
+      current: track,
+      isPlaying: true,
+      queueIndex: index,
+      radioSet: syncRadioSet(s.radioSet, track),
+    }));
   },
 
   next: () => {
@@ -105,7 +133,13 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       nextIdx = (queueIndex + 1) % queue.length;
     }
     const track = queue[nextIdx];
-    if (track) set({ current: track, isPlaying: true, queueIndex: nextIdx });
+    if (!track) return;
+    set((s) => ({
+      current: track,
+      isPlaying: true,
+      queueIndex: nextIdx,
+      radioSet: syncRadioSet(s.radioSet, track),
+    }));
   },
 
   prev: () => {
@@ -113,7 +147,13 @@ export const usePlayer = create<PlayerState>((set, get) => ({
     if (queue.length === 0) return;
     const prevIdx = queueIndex <= 0 ? queue.length - 1 : queueIndex - 1;
     const track = queue[prevIdx];
-    if (track) set({ current: track, isPlaying: true, queueIndex: prevIdx });
+    if (!track) return;
+    set((s) => ({
+      current: track,
+      isPlaying: true,
+      queueIndex: prevIdx,
+      radioSet: syncRadioSet(s.radioSet, track),
+    }));
   },
 
   toggle: () => set((s) => ({ isPlaying: !s.isPlaying && !!s.current })),
@@ -142,10 +182,6 @@ export const usePlayer = create<PlayerState>((set, get) => ({
       const next = new Set(s.radioSet);
       if (isPublic) next.add(key);
       else next.delete(key);
-      const current =
-        s.current && String(s.current.id) === key
-          ? { ...s.current, isPublic }
-          : s.current;
-      return { radioSet: next, current };
+      return { radioSet: next };
     }),
 }));

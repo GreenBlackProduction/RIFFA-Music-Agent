@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
+import { usePlayer } from "@/store/player";
 
 import { Panel } from "@/components/ui/Panel";
 import { Chip } from "@/components/ui/Chip";
 import { Button } from "@/components/ui/Button";
 import { Coin } from "@/components/ui/Coin";
 import { AgentChat, type AgentResult } from "@/components/studio/AgentChat";
-import { LibraryCard } from "@/components/studio/LibraryCard";
 import { ModuleIcon } from "@/components/studio/ModuleIcon";
 import { VoiceRecorder } from "@/components/studio/VoiceRecorder";
 import {
   createLyricsDraft,
   fetchLyricsDraft,
+  fetchGeneration,
   generateSong,
   generateInstrumental,
   generateSoundEffect,
@@ -20,11 +24,13 @@ import {
   openGenerationSocket,
   requestAutoTitle,
   uploadCoverFile,
+  uploadCoverRefImage,
   type AgentIntent,
 } from "@/lib/api/client";
 import { SUNO_LIMITS } from "@/lib/sunoConstraints";
 import { blobToWav } from "@/lib/audio/recordToWav";
 import { useGenerationStore } from "@/store/generation";
+import { MUSIC_TYPES, useLibraryItems } from "@/lib/library";
 import "./StudioPage.css";
 
 type LyricsState = "idle" | "generating" | "review" | "approved";
@@ -33,15 +39,16 @@ type LyricsState = "idle" | "generating" | "review" | "approved";
 // mode="auto" — моментально запускает автогенерацию (подсвечена кнопка сгенерировать).
 // mode="prompt" — только заполняет поля как «отправная точка», дальше пользователь докручивает.
 const INSTRUMENTAL_PRESETS = [
-  { key: "sleep",       title: "Для сна",        emoji: "😴", genre: "Ambient",    mood: "dreamy",     tempo: "very_slow", extra: "relaxing sleep music, gentle pads, slow evolving textures, no percussion", mode: "auto"   as const },
-  { key: "cafe",        title: "Для кафе",      emoji: "☕", genre: "Jazz",       mood: "calm",       tempo: "slow",      extra: "cozy cafe background, smooth jazz, upright bass, brushed drums, warm saxophone",                mode: "auto"   as const },
-  { key: "work",        title: "Для работы",    emoji: "💻", genre: "Lofi",       mood: "calm",       tempo: "slow",      extra: "focus beats, soft lofi hip-hop, vinyl crackle, muted piano, non-distracting",                  mode: "auto"   as const },
-  { key: "driving",     title: "Для поездки",   emoji: "🚗", genre: "Synthwave",  mood: "confident",  tempo: "medium",    extra: "road trip synthwave, wide pads, driving analog bass, subtle arpeggios, night highway vibe",    mode: "auto"   as const },
-  { key: "meditation",  title: "Для медитации", emoji: "🧘", genre: "Ambient",    mood: "calm",       tempo: "very_slow", extra: "meditation soundscape, tibetan bowls, airy pads, binaural feel, healing",                     mode: "auto"   as const },
-  { key: "content",     title: "Для контента",  emoji: "🎬", genre: "Cinematic",  mood: "inspiring",  tempo: "medium",    extra: "background music for videos, modern cinematic, light percussion, uplifting strings",          mode: "prompt" as const },
-  { key: "workout",     title: "Тренировка",    emoji: "💪", genre: "EDM",        mood: "energetic",  tempo: "fast",      extra: "energetic workout beat, driving kick, punchy synths, motivational atmosphere",                 mode: "prompt" as const },
-  { key: "gaming",      title: "Для игр",       emoji: "🎮", genre: "Electronic", mood: "energetic",  tempo: "fast",      extra: "epic gaming soundtrack, intense synths, orchestral hits, tension and action",                 mode: "prompt" as const },
-  { key: "creative",    title: "Творчество",    emoji: "🎨", genre: "Downtempo",  mood: "dreamy",     tempo: "medium",    extra: "inspiring creative downtempo, warm keys, dreamy textures, artistic atmosphere",               mode: "prompt" as const },
+  { key: "sleep",       title: "Для сна",        emoji: "😴", genre: "Ambient",    mood: "dreamy",     tempo: "very_slow", extra: "music for falling asleep, deeply calming and peaceful atmosphere, soothing and restful mood", mode: "auto"   as const },
+  { key: "cafe",        title: "Для кафе",      emoji: "☕", genre: "Jazz",       mood: "calm",       tempo: "slow",      extra: "cozy cafe background atmosphere, warm and inviting mood for conversation over coffee",      mode: "auto"   as const },
+  { key: "work",        title: "Для работы",    emoji: "💻", genre: "Lofi",       mood: "calm",       tempo: "slow",      extra: "focus-enhancing background music for deep work, non-distracting and steady concentration mood", mode: "auto"   as const },
+  { key: "driving",     title: "Для поездки",   emoji: "🚗", genre: "Synthwave",  mood: "confident",  tempo: "medium",    extra: "open road trip atmosphere, sense of freedom and motion, evening highway vibe",               mode: "auto"   as const },
+  { key: "meditation",  title: "Для медитации", emoji: "🧘", genre: "Ambient",    mood: "calm",       tempo: "very_slow", extra: "meditative soundscape, deeply tranquil and spiritual healing atmosphere, mindful presence",  mode: "auto"   as const },
+  { key: "party",       title: "Для вечеринки", emoji: "🎉", genre: "Funk",       mood: "energetic",  tempo: "medium",    extra: "modern dance funk for a vibrant party atmosphere, groovy and danceable, lively and full of variety, contemporary and festive energy", mode: "auto" as const },
+  { key: "content",     title: "Для контента",  emoji: "🎬", genre: "",  mood: "",  tempo: "",  extra: "Background music for video content",                mode: "prompt" as const },
+  { key: "workout",     title: "Тренировка",    emoji: "💪", genre: "",  mood: "",  tempo: "",  extra: "Music for a workout session",                       mode: "prompt" as const },
+  { key: "gaming",      title: "Для игр",       emoji: "🎮", genre: "",  mood: "",  tempo: "",  extra: "Music for gaming background",                       mode: "prompt" as const },
+  { key: "creative",    title: "Творчество",    emoji: "🎨", genre: "",  mood: "",  tempo: "",  extra: "Music for creative work and inspiration",           mode: "prompt" as const },
 ] as const;
 
 type PresetKey = typeof INSTRUMENTAL_PRESETS[number]["key"];
@@ -92,9 +99,9 @@ const MODULES: readonly ModuleMeta[] = [
     id: "cover",
     emoji: "🎤",
     title: "Кавер-версия",
-    shortDesc: "Перепой любимый трек в новом стиле.",
+    shortDesc: "Превратите СВОЁ аудио в полноценный трек.",
     longDesc:
-      "Загрузи ссылку на оригинал (mp3/m4a) и опиши новый стиль — Suno V5.5 сделает кавер с нужным вокалом и жанром.",
+      "Запишите свой голос/напевание/инструмент или загрузите оригинальное аудио — Suno сделает на его основе новый трек в выбранном стиле. Чужие хиты не подойдут — Suno автоматически отклоняет аудио, совпадающее с известными произведениями.",
     cost: 2,
   },
   {
@@ -123,53 +130,105 @@ const GENRES = [
   "Rock","Metal","Djent","Experimental",
 ] as const;
 
-const MOODS: ReadonlyArray<readonly [string, string]> = [
+const MOODS_RU: ReadonlyArray<readonly [string, string]> = [
   ["happy", "😊 Радостное"], ["calm", "😌 Спокойное"], ["sad", "😢 Грустное"],
   ["energetic", "😤 Энергичное"], ["confident", "😎 Уверенное"], ["dreamy", "🌙 Мечтательное"],
   ["aggressive", "🔥 Агрессивное"], ["inspiring", "🌅 Вдохновляющее"], ["anxious", "😰 Тревожное"],
   ["dramatic", "🎭 Драматичное"],
 ];
+const MOODS_EN: ReadonlyArray<readonly [string, string]> = [
+  ["happy", "😊 Happy"], ["calm", "😌 Calm"], ["sad", "😢 Sad"],
+  ["energetic", "😤 Energetic"], ["confident", "😎 Confident"], ["dreamy", "🌙 Dreamy"],
+  ["aggressive", "🔥 Aggressive"], ["inspiring", "🌅 Inspiring"], ["anxious", "😰 Anxious"],
+  ["dramatic", "🎭 Dramatic"],
+];
 
-const TEMPOS: ReadonlyArray<readonly [string, string]> = [
+const TEMPOS_RU: ReadonlyArray<readonly [string, string]> = [
   ["very_slow", "🐌 Очень медленный · 60–80 BPM"],
   ["slow", "🚶 Медленный · 80–100 BPM"],
   ["medium", "🚴 Средний · 100–120 BPM"],
   ["fast", "🏃 Быстрый · 120–140 BPM"],
   ["very_fast", "🚀 Очень быстрый · 140–180 BPM"],
 ];
-
-const VOCAL_TYPES: ReadonlyArray<readonly [string, string]> = [
-  ["male", "Мужской"], ["female", "Женский"], ["any", "Выбор за ИИ"],
+const TEMPOS_EN: ReadonlyArray<readonly [string, string]> = [
+  ["very_slow", "🐌 Very slow · 60–80 BPM"],
+  ["slow", "🚶 Slow · 80–100 BPM"],
+  ["medium", "🚴 Medium · 100–120 BPM"],
+  ["fast", "🏃 Fast · 120–140 BPM"],
+  ["very_fast", "🚀 Very fast · 140–180 BPM"],
 ];
 
-const TIMBRES: ReadonlyArray<readonly [string, string]> = [
+const VOCAL_TYPES_RU: ReadonlyArray<readonly [string, string]> = [
+  ["male", "Мужской"], ["female", "Женский"], ["any", "Выбор за ИИ"],
+];
+const VOCAL_TYPES_EN: ReadonlyArray<readonly [string, string]> = [
+  ["male", "Male"], ["female", "Female"], ["any", "AI chooses"],
+];
+
+const TIMBRES_RU: ReadonlyArray<readonly [string, string]> = [
   ["balanced", "Сбалансированный"], ["pop", "Эстрадный"], ["warm", "Тёплый"],
   ["raspy", "Хриплый"], ["scream", "Жёсткое screamo"],
 ];
+const TIMBRES_EN: ReadonlyArray<readonly [string, string]> = [
+  ["balanced", "Balanced"], ["pop", "Pop / Bright"], ["warm", "Warm"],
+  ["raspy", "Raspy"], ["scream", "Heavy screamo"],
+];
 
-const LYRICS_MODES: ReadonlyArray<readonly [string, string]> = [
+const LYRICS_MODES_RU: ReadonlyArray<readonly [string, string]> = [
   ["ai-vocal", "ИИ пишет текст и вокал"],
   ["custom-lyrics", "Свой текст"],
   ["instrumental", "Без текста"],
 ];
+const LYRICS_MODES_EN: ReadonlyArray<readonly [string, string]> = [
+  ["ai-vocal", "AI writes lyrics + vocals"],
+  ["custom-lyrics", "Custom lyrics"],
+  ["instrumental", "No lyrics"],
+];
 
-const SFX_SOURCES: ReadonlyArray<readonly [string, string]> = [
+const SFX_SOURCES_RU: ReadonlyArray<readonly [string, string]> = [
   ["impact", "Удар / impact"], ["glitch", "Glitch transition"], ["nature", "Природа"],
   ["mechanic", "Механика"], ["whoosh", "Whoosh"], ["custom", "Свой звук"],
 ];
+const SFX_SOURCES_EN: ReadonlyArray<readonly [string, string]> = [
+  ["impact", "Impact / hit"], ["glitch", "Glitch transition"], ["nature", "Nature"],
+  ["mechanic", "Mechanical"], ["whoosh", "Whoosh"], ["custom", "Custom sound"],
+];
 
-const SFX_ENVS: ReadonlyArray<readonly [string, string]> = [
+const SFX_ENVS_RU: ReadonlyArray<readonly [string, string]> = [
   ["studio", "Чистая студия"], ["room", "Комната"], ["street", "Улица"],
   ["forest", "Лес"], ["space", "Космос"],
 ];
+const SFX_ENVS_EN: ReadonlyArray<readonly [string, string]> = [
+  ["studio", "Clean studio"], ["room", "Room"], ["street", "Street"],
+  ["forest", "Forest"], ["space", "Space"],
+];
 
-const SFX_DURATIONS: ReadonlyArray<readonly [string, string]> = [
+const SFX_DURATIONS_RU: ReadonlyArray<readonly [string, string]> = [
   ["short", "Короткий 1–2 сек"], ["medium", "Средний 3–6 сек"], ["long", "Длинный ambience 10+ сек"],
 ];
+const SFX_DURATIONS_EN: ReadonlyArray<readonly [string, string]> = [
+  ["short", "Short 1–2 s"], ["medium", "Medium 3–6 s"], ["long", "Long ambience 10+ s"],
+];
 
-const SFX_STYLES: ReadonlyArray<readonly [string, string]> = [
+const SFX_STYLES_RU: ReadonlyArray<readonly [string, string]> = [
   ["cinematic", "Киношный"], ["realistic", "Реалистичный"], ["clean", "Чистый"],
 ];
+const SFX_STYLES_EN: ReadonlyArray<readonly [string, string]> = [
+  ["cinematic", "Cinematic"], ["realistic", "Realistic"], ["clean", "Clean"],
+];
+
+// Module-level aliases used by prompt-building helpers (outside component scope).
+// These always use EN values so that Suno/API prompts are in English regardless
+// of the display language. UI uses locale-aware variants defined inside StudioPage.
+const MOODS        = MOODS_EN;
+const TEMPOS       = TEMPOS_EN;
+const VOCAL_TYPES  = VOCAL_TYPES_EN;
+const TIMBRES      = TIMBRES_EN;
+const LYRICS_MODES = LYRICS_MODES_EN;
+const SFX_SOURCES  = SFX_SOURCES_EN;
+const SFX_ENVS     = SFX_ENVS_EN;
+const SFX_DURATIONS = SFX_DURATIONS_EN;
+const SFX_STYLES   = SFX_STYLES_EN;
 
 interface SongState {
   lyricsMode: string;
@@ -212,6 +271,8 @@ interface SongState {
   coverVocalGender: string;
   coverStyleWeight: string;
   coverWeirdness: string;
+  /** Язык авто-генерируемого вокала: "ru"/"en"/"" (Suno auto). */
+  coverLanguage: string;
   coverArtPrompt: string;
   coverArtModel: string;
   coverArtRefUrl: string;
@@ -259,8 +320,9 @@ const INITIAL_STATE: SongState = {
   coverLyrics: "",
   coverInstrumental: "no",
   coverVocalGender: "auto",
-  coverStyleWeight: "0.65",
-  coverWeirdness: "0.5",
+  coverStyleWeight: "0.85",
+  coverWeirdness: "0.35",
+  coverLanguage: "ru",
   coverArtPrompt: "",
   coverArtModel: "nano-banana",
   coverArtRefUrl: "",
@@ -268,30 +330,46 @@ const INITIAL_STATE: SongState = {
   trackName: "",
 };
 
-const COVER_INSTRUMENTAL: ReadonlyArray<readonly [string, string]> = [
+const COVER_INSTRUMENTAL_RU: ReadonlyArray<readonly [string, string]> = [
   ["no", "С вокалом"],
   ["yes", "Инструментальный кавер"],
 ];
-
-const COVER_VOCAL_GENDERS: ReadonlyArray<readonly [string, string]> = [
+const COVER_INSTRUMENTAL_EN: ReadonlyArray<readonly [string, string]> = [
+  ["no", "With vocals"],
+  ["yes", "Instrumental cover"],
+];
+const COVER_VOCAL_GENDERS_RU: ReadonlyArray<readonly [string, string]> = [
   ["auto", "Как в оригинале"],
   ["m", "Мужской"],
   ["f", "Женский"],
 ];
-
-const COVER_STYLE_WEIGHTS: ReadonlyArray<readonly [string, string]> = [
+const COVER_VOCAL_GENDERS_EN: ReadonlyArray<readonly [string, string]> = [
+  ["auto", "As original"],
+  ["m", "Male"],
+  ["f", "Female"],
+];
+const COVER_STYLE_WEIGHTS_RU: ReadonlyArray<readonly [string, string]> = [
   ["0.35", "Свободнее · 0.35"],
   ["0.5", "Средне · 0.5"],
   ["0.65", "Точнее стилю · 0.65"],
   ["0.85", "Максимально по стилю · 0.85"],
 ];
-
-const COVER_WEIRDNESS: ReadonlyArray<readonly [string, string]> = [
+const COVER_STYLE_WEIGHTS_EN: ReadonlyArray<readonly [string, string]> = [
+  ["0.35", "Looser · 0.35"],
+  ["0.5", "Balanced · 0.5"],
+  ["0.65", "Closer to style · 0.65"],
+  ["0.85", "Max style · 0.85"],
+];
+const COVER_WEIRDNESS_RU: ReadonlyArray<readonly [string, string]> = [
   ["0.2", "Близко к оригиналу · 0.2"],
   ["0.5", "Сбалансированно · 0.5"],
   ["0.8", "Экспериментально · 0.8"],
 ];
-
+const COVER_WEIRDNESS_EN: ReadonlyArray<readonly [string, string]> = [
+  ["0.2", "Close to original · 0.2"],
+  ["0.5", "Balanced · 0.5"],
+  ["0.8", "Experimental · 0.8"],
+];
 function valueLabel(value: string, options: ReadonlyArray<readonly [string, string]>): string {
   return options.find(([v]) => v === value)?.[1] ?? value;
 }
@@ -404,29 +482,6 @@ function buildPrompt(module: Module, state: SongState): string {
   return parts.join("\n");
 }
 
-function HeroAIIcon() {
-  return (
-    <div className="hero-ai-icon" aria-hidden="true">
-      <img src="/icons8-chatgpt.png" alt="" className="hero-ai-icon__img" />
-    </div>
-  );
-}
-
-function formatCost(value: number): string {
-  // Целые показываем как "2", дроби — как "0.5".
-  return Number.isInteger(value) ? String(value) : value.toString();
-}
-
-function ModuleCost({ meta }: { meta: ModuleMeta }) {
-  return (
-    <span className="tile__cost" aria-label={`Стоимость: ${meta.costFrom ? "от " : ""}${formatCost(meta.cost)} токенов`}>
-      {meta.costFrom ? "от " : ""}
-      {formatCost(meta.cost)}
-      <Coin size={14} className="riffa-coin--after" />
-    </span>
-  );
-}
-
 // ─────────────────── Lyrics building blocks ───────────────────
 // Two small render-only sub-components that own the lyrics state machine UI.
 // Logic lives in StudioPage; these only know how to render based on `state.lyricsState`.
@@ -450,20 +505,18 @@ function LyricsAiBlock({
   onEdit,
   onRegenerate,
 }: LyricsAiBlockProps) {
+  const { t } = useTranslation();
   const { lyricsState, lyricsTopic, lyricsText, lyricsTitle, lyricsError } = state;
 
   return (
     <label className="builder-step lyrics-block">
-      <strong>Тема песни</strong>
-      <span className="muted">
-        Опиши идею в одном-двух предложениях. ИИ напишет текст, ты сможешь его принять,
-        отредактировать или сгенерировать заново.
-      </span>
+      <strong>{t("studio.lyrics.aiTitle")}</strong>
+      <span className="muted">{t("studio.lyrics.aiDesc")}</span>
       <textarea
         rows={2}
         value={lyricsTopic}
         onChange={(e) => onTopicChange(e.target.value)}
-        placeholder="Например: песня про летний город, ночные огни и свободу"
+        placeholder={t("studio.lyrics.aiPlaceholder")}
         maxLength={SUNO_LIMITS.DESCRIPTION_MAX}
         disabled={lyricsState === "generating"}
       />
@@ -474,7 +527,7 @@ function LyricsAiBlock({
       {lyricsState === "idle" && (
         <div className="lyrics-actions">
           <Button onClick={onStart} disabled={!lyricsTopic.trim()}>
-            ✨ Сгенерировать текст
+            {t("studio.lyrics.generate")}
           </Button>
           {lyricsError && <span className="lyrics-error">{lyricsError}</span>}
         </div>
@@ -484,11 +537,8 @@ function LyricsAiBlock({
         <div className="lyrics-window lyrics-window--generating" aria-live="polite">
           <span className="lyrics-window__shimmer" aria-hidden="true" />
           <span className="lyrics-window__pulse" aria-hidden="true" />
-          <p className="lyrics-window__status">ИИ пишет текст…</p>
-          <p className="muted">
-            Обычно занимает 5–15 секунд. Окно переливается фирменными цветами,
-            пока модель обдумывает строчки.
-          </p>
+          <p className="lyrics-window__status">{t("studio.lyrics.generating")}</p>
+          <p className="muted">{t("studio.lyrics.generatingDesc")}</p>
         </div>
       )}
 
@@ -496,7 +546,7 @@ function LyricsAiBlock({
         <>
           {lyricsTitle && (
             <p className="lyrics-window__title">
-              <span className="muted">Название:</span> {lyricsTitle}
+              <span className="muted">{t("studio.lyrics.titleLabel")}</span> {lyricsTitle}
             </p>
           )}
           <textarea
@@ -514,15 +564,15 @@ function LyricsAiBlock({
             {lyricsState === "review" ? (
               <>
                 <Button onClick={onApprove} disabled={!lyricsText.trim()}>
-                  ✓ Принять текст
+                  {t("studio.lyrics.accept")}
                 </Button>
                 <button type="button" className="ghost-btn" onClick={onRegenerate}>
-                  ↻ Сгенерировать заново
+                  {t("studio.lyrics.regenerate")}
                 </button>
               </>
             ) : (
               <button type="button" className="ghost-btn" onClick={onEdit}>
-                ✎ Изменить текст
+                {t("studio.lyrics.edit")}
               </button>
             )}
           </div>
@@ -545,15 +595,13 @@ function LyricsCustomBlock({
   onApprove,
   onEdit,
 }: LyricsCustomBlockProps) {
+  const { t } = useTranslation();
   const { lyricsState, lyricsText } = state;
 
   return (
     <label className="builder-step lyrics-block">
-      <strong>Свой текст песни</strong>
-      <span className="muted">
-        Используй структуру: [Куплет], [Припев], [Скит], [Проигрыш], [Бридж]. Утверди текст,
-        чтобы разблокировать остальные параметры.
-      </span>
+      <strong>{t("studio.lyrics.customTitle")}</strong>
+      <span className="muted">{t("studio.lyrics.customDesc")}</span>
       <textarea
         className={`lyrics-text${lyricsState === "approved" ? " lyrics-text--approved" : ""}`}
         rows={10}
@@ -561,7 +609,7 @@ function LyricsCustomBlock({
         onChange={(e) => onTextChange(e.target.value)}
         readOnly={lyricsState === "approved"}
         maxLength={SUNO_LIMITS.LYRICS_MAX}
-        placeholder={"[Куплет 1]\n...\n\n[Припев]\n..."}
+        placeholder={t("studio.lyrics.customPlaceholder")}
       />
       <span className="char-counter">
         {lyricsText.length} / {SUNO_LIMITS.LYRICS_MAX}
@@ -569,11 +617,11 @@ function LyricsCustomBlock({
       <div className="lyrics-actions">
         {lyricsState === "approved" ? (
           <button type="button" className="ghost-btn" onClick={onEdit}>
-            ✎ Изменить текст
+            {t("studio.lyrics.edit")}
           </button>
         ) : (
           <Button onClick={onApprove} disabled={!lyricsText.trim()}>
-            ✓ Принять текст
+            {t("studio.lyrics.accept")}
           </Button>
         )}
       </div>
@@ -581,19 +629,179 @@ function LyricsCustomBlock({
   );
 }
 
+/* ── Color palette for track covers ─────────────────── */
+const TRACK_COLORS = ["c-emr", "c-hi", "c-ink", "c-paper", "c-blue", "c-rose"] as const;
+function colorFor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return TRACK_COLORS[h % TRACK_COLORS.length];
+}
+
+function RecentTracks() {
+  const { items, isLoading } = useLibraryItems();
+  const { playOrToggle, currentId, isPlaying } = usePlayer(
+    useShallow((s) => ({
+      playOrToggle: s.playOrToggle,
+      currentId: s.current?.id ?? null,
+      isPlaying: s.isPlaying,
+    })),
+  );
+  const recent = items.slice(0, 8);
+
+  if (isLoading) return <p className="tracks-empty">Загружаем…</p>;
+  if (!recent.length) return <p className="tracks-empty">Треков ещё нет — создай первый выше.</p>;
+
+  const queue = recent
+    .filter((i) => !!i.audioUrl)
+    .map((i) => ({
+      id: i.id,
+      title: i.title,
+      url: i.audioUrl,
+      cover: i.coverUrl ?? undefined,
+      meta: [i.genre, i.mood].filter(Boolean).join(" · "),
+      isOwn: true,
+      canRadio: MUSIC_TYPES.has(i.type),
+      isMusicType: MUSIC_TYPES.has(i.type),
+      isPublic: i.isPublic,
+    }));
+
+  return (
+    <div className="tracks">
+      {recent.map((item) => {
+        const isActive = item.id === currentId;
+        const color = colorFor(item.generationId);
+        const track = {
+          id: item.id,
+          title: item.title,
+          url: item.audioUrl,
+          cover: item.coverUrl ?? undefined,
+          meta: [item.genre, item.mood].filter(Boolean).join(" · "),
+          isOwn: true,
+          canRadio: MUSIC_TYPES.has(item.type),
+          isMusicType: MUSIC_TYPES.has(item.type),
+          isPublic: item.isPublic,
+        };
+        return (
+          <div
+            key={item.id}
+            className="track"
+            onClick={() => item.audioUrl && playOrToggle(track, queue)}
+          >
+            <div className={`track-cover ${color}`}>
+              {item.coverUrl && (
+                <img src={item.coverUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              )}
+              {item.duration && <span className="duration">{item.duration}</span>}
+              <button
+                type="button"
+                className="play"
+                aria-label={isActive && isPlaying ? "Пауза" : "Играть"}
+                onClick={(e) => { e.stopPropagation(); item.audioUrl && playOrToggle(track, queue); }}
+              >
+                {isActive && isPlaying ? "⏸" : "▶"}
+              </button>
+            </div>
+            <div className="track-meta">
+              <div className="track-num">{item.type.toUpperCase()}</div>
+              <div className="track-title">{item.title || "Без названия"}</div>
+              <div className="track-artist">
+                {[item.genre, item.mood].filter(Boolean).join(" · ") || "—"}
+              </div>
+              {item.isPublic && (
+                <div className="track-stats"><span className="live">в радио</span></div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function StudioPage() {
+  const { t, i18n: i18nInst } = useTranslation();
+  const isEn = (i18nInst.resolvedLanguage ?? "ru").startsWith("en");
+  // Хелпер: даёт переведённое имя/описание модуля по его id (song, instrumental, ...)
+  const moduleTrans = (id: string, field: "title" | "short") => {
+    const v = t(`studio.modulesById.${id}.${field}`, { defaultValue: "" });
+    return typeof v === "string" ? v : "";
+  };
+  const presetTitle = (key: string, fallback: string) => {
+    const v = t(`studioPresets.${key}`, { defaultValue: "" });
+    return (typeof v === "string" && v) ? v : fallback;
+  };
+  const modelDescr = (id: string, fallback: string) => {
+    const v = t(`studioModels.${id}.descr`, { defaultValue: "" });
+    return (typeof v === "string" && v) ? v : fallback;
+  };
+  const moduleFullTitle = (id: string, fallback: string) => {
+    const v = t(`studioModules.${id}.title`, { defaultValue: "" });
+    return (typeof v === "string" && v) ? v : fallback;
+  };
+  const moduleFullDesc = (id: string, field: "shortDesc" | "longDesc" | "badge", fallback = "") => {
+    const v = t(`studioModules.${id}.${field}`, { defaultValue: "" });
+    return (typeof v === "string" && v) ? v : fallback;
+  };
+
+  // Locale-aware chip arrays for UI display (RU or EN based on language).
+  // Note: module-level MOODS/TEMPOS/etc use EN for building Suno prompts.
+  const uiMoods       = isEn ? MOODS_EN        : MOODS_RU;
+  const uiTempos      = isEn ? TEMPOS_EN       : TEMPOS_RU;
+  const uiVocalTypes  = isEn ? VOCAL_TYPES_EN  : VOCAL_TYPES_RU;
+  const uiTimbres     = isEn ? TIMBRES_EN      : TIMBRES_RU;
+  const uiLyricsModes = isEn ? LYRICS_MODES_EN : LYRICS_MODES_RU;
+  const uiSfxSources  = isEn ? SFX_SOURCES_EN  : SFX_SOURCES_RU;
+  const uiSfxEnvs     = isEn ? SFX_ENVS_EN     : SFX_ENVS_RU;
+  const uiSfxDurations = isEn ? SFX_DURATIONS_EN : SFX_DURATIONS_RU;
+  const uiSfxStyles    = isEn ? SFX_STYLES_EN    : SFX_STYLES_RU;
+  const uiCoverInstrumental  = isEn ? COVER_INSTRUMENTAL_EN  : COVER_INSTRUMENTAL_RU;
+  const uiCoverVocalGenders  = isEn ? COVER_VOCAL_GENDERS_EN : COVER_VOCAL_GENDERS_RU;
+  const uiCoverStyleWeights  = isEn ? COVER_STYLE_WEIGHTS_EN : COVER_STYLE_WEIGHTS_RU;
+  const uiCoverWeirdness     = isEn ? COVER_WEIRDNESS_EN     : COVER_WEIRDNESS_RU;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const playerPlay = usePlayer((s) => s.play);
   const [activeModule, setActiveModule] = useState<Module | null>(null);
   const [agentSeed, setAgentSeed] = useState<string | null>(null);
   const [heroIdea, setHeroIdea] = useState("");
   const [state, setState] = useState<SongState>(INITIAL_STATE);
   const [agentOpen, setAgentOpen] = useState(false);
   const [coverArtAgentOpen, setCoverArtAgentOpen] = useState(false);
+  const [coverArtRefUploading, setCoverArtRefUploading] = useState(false);
+  const [coverArtRefError, setCoverArtRefError] = useState<string | null>(null);
+
+  async function uploadCoverArtRef(file: File) {
+    if (!file.type.startsWith("image/")) {
+      setCoverArtRefError(isEn ? "Only images (JPG, PNG, WebP) are supported." : "Поддерживаются только изображения (JPG, PNG, WebP).");
+      return;
+    }
+    // 8 MB hard cap — даже crazy-high-res фото с iPhone редко превышает
+    if (file.size > 8 * 1024 * 1024) {
+      setCoverArtRefError(isEn ? "File exceeds 8 MB. Compress or reduce resolution." : "Файл больше 8 МБ. Сожмите или уменьшите разрешение.");
+      return;
+    }
+    setCoverArtRefError(null);
+    setCoverArtRefUploading(true);
+    try {
+      const publicUrl = await uploadCoverRefImage(file);
+      update("coverArtRefUrl", publicUrl);
+    } catch (err) {
+      setCoverArtRefError(
+        err instanceof Error ? err.message : (isEn ? "Could not upload reference" : "Не удалось загрузить референс"),
+      );
+    } finally {
+      setCoverArtRefUploading(false);
+    }
+  }
   const [presetToast, setPresetToast] = useState<{ title: string; auto: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const submitRef = useRef<HTMLButtonElement | null>(null);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
   const trackGeneration = useGenerationStore((s) => s.track);
+
+  // Cover upload state
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -603,6 +811,61 @@ export function StudioPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   // Ref so cleanup (which runs with stale closure) can read current recording state.
   const isRecordingRef = useRef(false);
+
+  // Глубокий линк из telegram-уведомления:
+  //   /studio?gen_id=<UUID>  →  фетчим генерацию, открываем первый трек в плеере.
+  useEffect(() => {
+    const genId = searchParams.get("gen_id");
+    if (!genId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const gen = await fetchGeneration(genId);
+        if (cancelled) return;
+        const firstTrack = gen.tracks?.[0];
+        const audioUrl = firstTrack?.audio_url;
+        if (!audioUrl) return;
+        const meta = [gen.genre, gen.mood, gen.tempo].filter(Boolean).join(" · ");
+        playerPlay(
+          {
+            id: `${gen.id}#0`,
+            title: gen.title || "Трек",
+            url: audioUrl,
+            author: undefined,
+            meta,
+            cover: gen.image_url ?? undefined,
+            isOwn: true,
+            isMusicType: true,
+            audioId: firstTrack.audio_id ?? undefined,
+            source: "studio",
+          },
+          gen.tracks
+            .filter((t) => !!t.audio_url)
+            .map((t, i) => ({
+              id: `${gen.id}#${i}`,
+              title: gen.title || "Трек",
+              url: t.audio_url!,
+              meta,
+              cover: gen.image_url ?? undefined,
+              isOwn: true,
+              isMusicType: true,
+              audioId: t.audio_id ?? undefined,
+              source: "studio" as const,
+            })),
+        );
+      } catch {
+        // gen_id может быть невалидным или удалён — игнорируем тихо
+      } finally {
+        // Чистим URL чтобы повторное обновление страницы не запускало плеер снова
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams);
+          next.delete("gen_id");
+          setSearchParams(next, { replace: true });
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [searchParams, setSearchParams, playerPlay]);
 
   useEffect(() => {
     if (activeModule) return;
@@ -669,7 +932,7 @@ export function StudioPage() {
           onClick={() => update(key, "custom" as any)}
           className="chip--custom"
         >
-          ✏️ Свой вариант
+          {t("studio.customVariant")}
         </Chip>
       )}
     </div>
@@ -679,6 +942,7 @@ export function StudioPage() {
     setActiveModule(id);
     setAgentOpen(false);
     setAgentSeed(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function backToTiles() {
@@ -764,20 +1028,20 @@ export function StudioPage() {
                 setState((prev) => ({
                   ...prev,
                   lyricsState: "idle",
-                  lyricsError: data.error ?? "Не удалось получить текст",
+                  lyricsError: data.error ?? (isEn ? "Could not fetch lyrics" : "Не удалось получить текст"),
                 }));
               }
             })
             .catch((err: unknown) => {
               if (cancelled) return;
-              const msg = err instanceof Error ? err.message : "Ошибка получения текста";
+              const msg = err instanceof Error ? err.message : (isEn ? "Error fetching lyrics" : "Ошибка получения текста");
               setState((prev) => ({ ...prev, lyricsState: "idle", lyricsError: msg }));
             });
         } else if (event.status === "failed") {
           setState((prev) => ({
             ...prev,
             lyricsState: "idle",
-            lyricsError: event.error ?? "Не удалось сгенерировать текст",
+            lyricsError: event.error ?? (isEn ? "Failed to generate lyrics" : "Не удалось сгенерировать текст"),
           }));
         }
       },
@@ -786,7 +1050,7 @@ export function StudioPage() {
         // WS closed — only relevant if we never reached completed.
         setState((prev) =>
           prev.lyricsState === "generating"
-            ? { ...prev, lyricsState: "idle", lyricsError: "Соединение прервано" }
+            ? { ...prev, lyricsState: "idle", lyricsError: isEn ? "Connection lost" : "Соединение прервано" }
             : prev,
         );
       },
@@ -801,7 +1065,7 @@ export function StudioPage() {
   const startLyricsDraft = useCallback(async () => {
     const topic = state.lyricsTopic.trim();
     if (!topic) {
-      setState((prev) => ({ ...prev, lyricsError: "Опиши тему — пара слов о чём песня" }));
+      setState((prev) => ({ ...prev, lyricsError: t("studio.errLyricsTopicEmpty") }));
       return;
     }
     setState((prev) => ({
@@ -835,7 +1099,7 @@ export function StudioPage() {
       });
       setState((prev) => ({ ...prev, lyricsTaskId: resp.task_id }));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Не удалось запустить генерацию";
+      const msg = err instanceof Error ? err.message : (isEn ? "Failed to start generation" : "Не удалось запустить генерацию");
       setState((prev) => ({ ...prev, lyricsState: "idle", lyricsError: msg }));
     }
   }, [
@@ -878,7 +1142,7 @@ export function StudioPage() {
     // Suno upload-cover docs: max 20 МБ, форматы mp3/wav/m4a/ogg, длительность ≤ 8 мин.
     const max = 50 * 1024 * 1024;
     if (file.size > max) {
-      alert("Файл больше 50 МБ. Сожмите или обрежьте до 8 минут в mp3/m4a/wav/ogg.");
+      alert(isEn ? "File exceeds 50 MB. Compress or trim to 8 min in mp3/m4a/wav/ogg." : "Файл больше 50 МБ. Сожмите или обрежьте до 8 минут в mp3/m4a/wav/ogg.");
       return;
     }
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
@@ -916,21 +1180,58 @@ export function StudioPage() {
     });
 
     // Upload file to S3/MinIO via presigned URL
+    setIsUploading(true);
+    setUploadError(null);
     try {
       const publicUrl = await uploadCoverFile(file);
       setState((prev) => ({ ...prev, coverUrl: publicUrl }));
     } catch (err) {
       console.error("Upload error:", err);
-      const msg = err instanceof Error ? err.message : "Ошибка загрузки файла";
-      alert(`Не удалось загрузить файл: ${msg}`);
+      const msg = err instanceof Error ? err.message : (isEn ? "File upload error" : "Ошибка загрузки файла");
+      setUploadError(isEn ? `Could not upload file: ${msg}` : `Не удалось загрузить файл: ${msg}`);
       setState((prev) => ({ ...prev, coverFileName: "", coverUrl: "" }));
       if (coverFileInputRef.current) coverFileInputRef.current.value = "";
+    } finally {
+      setIsUploading(false);
     }
   }
 
   async function startRecording() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      alert(
+        "Запись звука не поддерживается в этом браузере или контекст не безопасный (нужен HTTPS).\n\n" +
+        "Используйте Safari, Chrome или Firefox последней версии."
+      );
+      return;
+    }
+    let stream: MediaStream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      const e = err as { name?: string; message?: string } | null;
+      const name = e?.name ?? "";
+      const message = e?.message ?? "";
+      // Логируем точную ошибку в консоль — пользователь может прислать скрин
+      console.error("[getUserMedia] error:", err);
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        alert(
+          "❌ Доступ к микрофону заблокирован.\n\n" +
+          `Браузер сообщил: "${message || name}"\n\n` +
+          "Что попробовать:\n" +
+          "1. Нажмите на иконку замка в адресной строке → «Микрофон» → «Разрешить»\n" +
+          "2. Полностью обновите страницу (Ctrl+Shift+R)\n" +
+          "3. Если используете Telegram Mini App — откройте сайт во внешнем браузере"
+        );
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        alert("❌ Микрофон не найден. Подключите микрофон и попробуйте снова.");
+      } else if (name === "NotReadableError" || name === "TrackStartError") {
+        alert("❌ Микрофон занят другим приложением. Закройте Zoom, Skype и т.п., затем попробуйте снова.");
+      } else {
+        alert(`❌ Не удалось получить доступ к микрофону.\n\n${name || "Error"}: ${message || "Неизвестная ошибка"}`);
+      }
+      return;
+    }
+    try {
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -944,7 +1245,6 @@ export function StudioPage() {
       mediaRecorder.onstop = async () => {
         const mimeType = mediaRecorder.mimeType || "audio/webm";
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        stream.getTracks().forEach((track) => track.stop());
         try {
           const wavFile = await blobToWav(audioBlob, `recording-${Date.now()}.wav`);
           await uploadRecordedFile(wavFile);
@@ -954,6 +1254,8 @@ export function StudioPage() {
           alert(`Не удалось обработать запись: ${msg}`);
           setState((prev) => ({ ...prev, coverFileName: "", coverUrl: "" }));
         } finally {
+          // Release microphone only after upload is complete
+          stream.getTracks().forEach((track) => track.stop());
           isRecordingRef.current = false;
           setIsRecording(false);
           if (recordingTimerRef.current !== null) {
@@ -973,8 +1275,10 @@ export function StudioPage() {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Не удалось получить доступ к микрофону";
-      alert(msg);
+      // Stream уже получен, ошибка скорее всего в MediaRecorder API
+      stream.getTracks().forEach((t) => t.stop());
+      const msg = err instanceof Error ? err.message : "Ошибка инициализации записи";
+      alert(`❌ Не удалось начать запись: ${msg}`);
     }
   }
 
@@ -998,15 +1302,19 @@ export function StudioPage() {
   }
 
   async function uploadRecordedFile(file: File) {
+    setIsUploading(true);
+    setUploadError(null);
     try {
       setState((prev) => ({ ...prev, coverFileName: file.name, coverUrl: "" }));
       const uploadedUrl = await uploadCoverFile(file);
       setState((prev) => ({ ...prev, coverUrl: uploadedUrl }));
     } catch (err) {
       console.error("Upload error:", err);
-      const msg = err instanceof Error ? err.message : "Ошибка загрузки записи";
-      alert(`Не удалось загрузить запись: ${msg}`);
+      const msg = err instanceof Error ? err.message : (isEn ? "Recording upload error" : "Ошибка загрузки записи");
+      setUploadError(isEn ? `Could not upload recording: ${msg}` : `Не удалось загрузить запись: ${msg}`);
       setState((prev) => ({ ...prev, coverFileName: "", coverUrl: "" }));
+    } finally {
+      setIsUploading(false);
     }
   }
 
@@ -1024,7 +1332,7 @@ export function StudioPage() {
     if (!moduleMeta || moduleMeta.postponed || submitting) return;
     // cover_art is handled below alongside other modules
     if (activeModule === "cover" && !state.coverUrl) {
-      setSubmitError("Для кавера сначала загрузи исходный трек (mp3/m4a/wav).");
+      setSubmitError(t("studio.errCoverNeedFile"));
       return;
     }
 
@@ -1068,7 +1376,7 @@ export function StudioPage() {
       if (activeModule === "song") {
         // Lyrics-first gating must be honoured — bail out if the user clicked submit somehow.
         if (state.lyricsState !== "approved") {
-          setSubmitError("Сначала утверди текст песни — без него остальные параметры не отправим.");
+          setSubmitError(t("studio.errLyricsApproveFirst"));
           setSubmitting(false);
           return;
         }
@@ -1143,6 +1451,7 @@ export function StudioPage() {
           instrumental: state.coverInstrumental === "yes",
           style_weight: parseRatio(state.coverStyleWeight),
           weirdness_constraint: parseRatio(state.coverWeirdness),
+          lyrics_language: state.coverLanguage || "",
           track_name: resolvedTrackName,
         });
         title =
@@ -1151,7 +1460,7 @@ export function StudioPage() {
           `Кавер · ${state.coverFileName || "upload"}`;
       } else if (activeModule === "cover_art") {
         if (!state.coverArtPrompt?.trim()) {
-          setSubmitError("Опиши идею обложки — используй чат с агентом или напиши промт вручную.");
+          setSubmitError(t("studio.errCoverArtNoPrompt"));
           setSubmitting(false);
           return;
         }
@@ -1160,9 +1469,7 @@ export function StudioPage() {
           prompt: state.coverArtPrompt.trim(),
           model: state.coverArtModel || "nano-banana",
           title,
-          ...(state.coverArtRefUrl && !state.coverArtRefUrl.startsWith("data:")
-            ? { reference_url: state.coverArtRefUrl }
-            : {}),
+          ...(state.coverArtRefUrl ? { reference_url: state.coverArtRefUrl } : {}),
         });
       } else {
         return;
@@ -1174,7 +1481,7 @@ export function StudioPage() {
       setSubmitError(null);
     } catch (err) {
       const msg =
-        err instanceof Error ? err.message : "Ошибка запуска генерации. Попробуй ещё раз.";
+        err instanceof Error ? err.message : t("studio.errSubmitFailed");
       setSubmitError(msg);
     } finally {
       setSubmitting(false);
@@ -1208,6 +1515,8 @@ export function StudioPage() {
 
     const params = intent.params;
     const enrichedPrompt = result.prompt;
+    const agentMusicParams = result.musicParams || {};
+    const agentResearchNotes = result.researchNotes || "";
 
     if (intent.module === "cover_art") {
       try {
@@ -1267,6 +1576,8 @@ export function StudioPage() {
           tempo: params.tempo || "",
           vocal: params.vocal || "",
           agent_prompt: enrichedPrompt,
+          agent_music_params: agentMusicParams,
+          agent_research_notes: agentResearchNotes,
         });
         title =
           (params.description || "").slice(0, 60) ||
@@ -1280,6 +1591,8 @@ export function StudioPage() {
           mood: params.mood || "",
           tempo: params.tempo || "",
           agent_prompt: enrichedPrompt,
+          agent_music_params: agentMusicParams,
+          agent_research_notes: agentResearchNotes,
         });
         title =
           (params.description || "").slice(0, 60) ||
@@ -1290,6 +1603,8 @@ export function StudioPage() {
         response = await generateSoundEffect({
           prompt: sfxPrompt,
           agent_prompt: enrichedPrompt,
+          agent_music_params: agentMusicParams,
+          agent_research_notes: agentResearchNotes,
         });
         title = sfxPrompt.slice(0, 60) || "SFX · агент";
         trackKind = "sound_effect";
@@ -1301,6 +1616,8 @@ export function StudioPage() {
           mood: params.mood || "",
           vocal: params.vocal || "",
           agent_prompt: enrichedPrompt,
+          agent_music_params: agentMusicParams,
+          agent_research_notes: agentResearchNotes,
         });
         title =
           (params.description || "").slice(0, 60) ||
@@ -1326,86 +1643,86 @@ export function StudioPage() {
     }
   }
 
+  // Pickup pending agent launch from /agent navigation (one-shot).
+  useEffect(() => {
+    let raw: string | null = null;
+    try { raw = sessionStorage.getItem("riffa_pending_agent_launch"); } catch { /* noop */ }
+    if (!raw) return;
+    try { sessionStorage.removeItem("riffa_pending_agent_launch"); } catch { /* noop */ }
+    try {
+      const parsed = JSON.parse(raw) as AgentResult;
+      void handleAgentLaunch(parsed);
+    } catch { /* malformed payload — ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ───────────────────── tile picker ─────────────────────
   if (!activeModule) {
-    const featured = MODULES[0];
-    const supporting = MODULES.slice(1);
     return (
-      <div className="studio studio--landing">
-        <div className="studio-grid">
-          <section className="hero-card">
-            <div className="hero-card__inner">
-              <div className="hero-card__title-row">
-                <h1 className="hero-card__title">
-                  Что создаём <span className="hero-card__accent">сегодня</span>?
-                </h1>
-                <HeroAIIcon />
-              </div>
-              <p className="hero-card__subtitle">
-                Выбери модуль и собери prompt через понятные кнопки. Не знаешь, что выбрать —
-                расскажи идею агенту, он соберёт его за тебя.
-              </p>
-              <form className="hero-card__form" onSubmit={startWithIdea}>
-                <input
-                  className="hero-card__input"
-                  type="text"
-                  value={heroIdea}
-                  onChange={(e) => setHeroIdea(e.target.value)}
-                  placeholder="Опиши идею в одном предложении…"
-                  aria-label="Опиши идею для агента"
-                />
-                <button
-                  type="submit"
-                  className="hero-card__submit"
-                  aria-label="Передать агенту"
-                  disabled={!heroIdea.trim()}
-                >
-                  →
-                </button>
-              </form>
-              <span className="hero-card__hint">Агент сам разберётся: задаст уточняющие вопросы только если нужно — и сразу запустит генерацию.</span>
-            </div>
-            <div className="hero-card__glow" aria-hidden="true" />
-          </section>
+      <div className="studio">
+        <div className="top-meta">
+          <div className="breadcrumb">
+            <b>{t("studio.breadcrumb", { defaultValue: "студия" })}</b>
+          </div>
+          
+        </div>
 
-          <button
-            type="button"
-            className={`tile tile--featured-square${activeModule === featured.id ? " tile--active" : ""}`}
-            onClick={() => openModule(featured.id)}
-          >
-            <div className="tile__inner">
-              <ModuleIcon kind={featured.id} />
-              {featured.badge && <span className="tile__badge">{featured.badge}</span>}
-              <div className="tile__body">
-                <h3 className="tile__title">{featured.title}</h3>
-                <p className="tile__short">{featured.shortDesc}</p>
-              </div>
-              <ModuleCost meta={featured} />
-            </div>
+        <h1 className="h-page">
+          {t("studio.heroQuestion")} <em>{t("studio.heroAccent")}</em>?
+        </h1>
+        <p className="h-lead">{t("studio.heroLead")}</p>
+
+        <form className="studio-quick" onSubmit={startWithIdea}>
+          <input
+            className="studio-quick__input"
+            type="text"
+            value={heroIdea}
+            onChange={(e) => setHeroIdea(e.target.value)}
+            placeholder={t("studio.heroInputPlaceholder")}
+            aria-label={t("studio.heroInputAria")}
+          />
+          <button type="submit" className="btn btn-primary" disabled={!heroIdea.trim()}>
+            {t("studio.heroSubmit", { defaultValue: "передать агенту →" })}
           </button>
+        </form>
 
-          {supporting.map((m) => (
+        <div className="h-section">
+          <div className="tag"><span className="num">01</span> · {t("studio.sectionModules", { defaultValue: "модули" })}</div>
+          <h2>{t("studio.sectionModulesTitle", { defaultValue: "выбери тип контента" })}</h2>
+          <div className="right">{t("studio.sectionModulesRight", { defaultValue: "все на единых токенах" })}</div>
+        </div>
+
+        <div className="modules">
+          {MODULES.map((m, i) => (
             <button
               key={m.id}
               type="button"
-              className={`tile tile--row${m.postponed ? " tile--postponed" : ""}${activeModule === m.id ? " tile--active" : ""}`}
+              className={`module${i === 0 ? " is-main" : ""}${m.postponed ? " is-soon" : ""}`}
               onClick={() => !m.postponed && openModule(m.id)}
               disabled={m.postponed}
             >
-              <div className="tile__inner">
-                <ModuleIcon kind={m.id} />
-                {m.postponed && <span className="tile__badge tile__badge--muted">Скоро</span>}
-                <div className="tile__body">
-                  <h3 className="tile__title">{m.title}</h3>
-                  <p className="tile__short">{m.shortDesc}</p>
-                </div>
-                <ModuleCost meta={m} />
+              <div className="module-head">
+                <div className="module-icon"><ModuleIcon kind={m.id} /></div>
+                {m.badge && <span className="module-badge">{t("studio.mainModule", { defaultValue: "главный" })}</span>}
+                {m.postponed && <span className="module-badge is-soon">{t("studio.soonBadge", { defaultValue: "скоро" })}</span>}
+              </div>
+              <h3>{moduleTrans(m.id, "title") || m.title}</h3>
+              <p>{moduleTrans(m.id, "short") || m.shortDesc}</p>
+              <div className="module-cost">
+                <span>{m.id === "song" ? "suno v5.5" : m.id === "instrumental" ? t("studio.noVocal", { defaultValue: "без вокала" }) : m.id === "cover" ? t("studio.withAudio", { defaultValue: "+ ваше аудио" }) : m.id === "sound_effect" ? t("studio.sfxDur", { defaultValue: "до 30 сек" }) : "nano-banana"}</span>
+                <span className="price">{m.costFrom ? "~" : ""}{m.cost}<Coin size={14} /></span>
               </div>
             </button>
           ))}
-
-          <LibraryCard />
         </div>
+
+        <div className="h-section">
+          <div className="tag"><span className="num">02</span> · {t("studio.sectionRecent", { defaultValue: "недавнее" })}</div>
+          <h2>{t("studio.sectionRecentTitle", { defaultValue: "последние треки" })}</h2>
+          <Link className="right" to="/library">{t("studio.sectionRecentRight", { defaultValue: "все →" })}</Link>
+        </div>
+
+        <RecentTracks />
       </div>
     );
   }
@@ -1413,39 +1730,36 @@ export function StudioPage() {
   // ─────────────────── selected module editor ───────────────────
   return (
     <div className="studio">
-      <Panel className="builder-panel">
-        <header className="builder-head">
-          <button type="button" className="builder-back" onClick={backToTiles}>
-            ← Все модули
+      <div className="top-meta">
+        <div className="breadcrumb">
+          <button type="button" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: "inherit", letterSpacing: "inherit", textTransform: "inherit", color: "var(--ink-3)" }} onClick={backToTiles}>
+            {t("studio.breadcrumb", { defaultValue: "студия" })}
           </button>
-          <div className="builder-head__main">
-            <span className="builder-head__icon builder-head__icon--active" aria-hidden="true">
-              <ModuleIcon kind={activeModule} />
-            </span>
-            <div className="builder-head__text">
-              <h2>{moduleMeta!.title}</h2>
-              <p className="muted">{moduleMeta!.longDesc}</p>
-            </div>
-          </div>
-        </header>
+          <span>/</span><b>{moduleFullTitle(moduleMeta!.id, moduleMeta!.title)}</b>
+        </div>
+        
+      </div>
 
+      <h1 className="h-page">
+        {moduleFullTitle(moduleMeta!.id, moduleMeta!.title)}
+      </h1>
+      <p className="h-lead">{moduleFullDesc(moduleMeta!.id, "longDesc", moduleMeta!.longDesc)}</p>
+
+      <Panel className="builder-panel">
         {activeModule === "song" && !agentOpen && (
           <div className="agent-cta agent-cta--hero">
             <div className="agent-cta__glow" aria-hidden="true" />
             <div className="agent-cta__body">
-              <span className="agent-cta__badge">AI агент</span>
-              <strong className="agent-cta__title">Расскажи идею — запущу генерацию за тебя</strong>
-              <p className="agent-cta__text">
-                Не знаешь, что выбрать? Просто опиши идею — агент задаст уточняющие
-                вопросы только если нужно, соберёт детальный prompt для Suno и сам
-                запустит нужный модуль.
-              </p>
+              <span className="agent-cta__badge">{t("studio.agentCta.badge")}</span>
+              <strong className="agent-cta__question">{t("studio.agentCta.question")}</strong>
+              <strong className="agent-cta__title">{t("studio.agentCta.title")}</strong>
+              <p className="agent-cta__text">{t("studio.agentCta.text")}</p>
               {state.agentPrompt && (
-                <p className="agent-cta__check">Бриф собран — он добавится к финальному prompt ниже.</p>
+                <p className="agent-cta__check">{t("studio.agentCta.briefReady")}</p>
               )}
             </div>
             <Button onClick={() => setAgentOpen((v) => !v)}>
-              {agentOpen ? "Закрыть чат" : state.agentPrompt ? "Открыть чат заново" : "Рассказать агенту"}
+              {agentOpen ? t("studio.agentCta.close") : state.agentPrompt ? t("studio.agentCta.reopen") : t("studio.agentCta.open")}
             </Button>
           </div>
         )}
@@ -1471,7 +1785,6 @@ export function StudioPage() {
                 : state.tempo
             }
             selectedVocal={state.vocal}
-            onComplete={(r) => { handleAgentComplete(r); setAgentSeed(null); }}
             onLaunch={handleAgentLaunch}
             onCancel={() => { setAgentOpen(false); setAgentSeed(null); }}
           />
@@ -1480,11 +1793,9 @@ export function StudioPage() {
         {activeModule === "song" && (
           <div className="builder-grid">
             <div className="builder-step">
-              <strong>1. Текст и вокал</strong>
-              <span className="muted">
-                ИИ пишет текст, ты вводишь свой структурированный текст или делаешь без слов
-              </span>
-              {renderChipRow(LYRICS_MODES, "lyricsMode")}
+              <strong>{t("studio.song.step1Label")}</strong>
+              <span className="muted">{t("studio.song.step1Desc")}</span>
+              {renderChipRow(uiLyricsModes, "lyricsMode")}
             </div>
 
             {state.lyricsMode === "ai-vocal" && (
@@ -1510,9 +1821,7 @@ export function StudioPage() {
 
             {state.lyricsMode === "instrumental" && (
               <div className="builder-step">
-                <span className="muted">
-                  Без вокала и без текста. Жанр, настроение и темп уже доступны для выбора.
-                </span>
+                <span className="muted">{t("studio.song.noLyricsHint")}</span>
               </div>
             )}
 
@@ -1520,11 +1829,11 @@ export function StudioPage() {
               className={`builder-step${songParamsLocked ? " builder-step--locked" : ""}`}
               aria-disabled={songParamsLocked}
             >
-              <strong>2. Тип вокала</strong>
-              <span className="muted">Кто должен исполнить песню</span>
-              {renderChipRow(VOCAL_TYPES, "vocal")}
+              <strong>{t("studio.song.step2Label")}</strong>
+              <span className="muted">{t("studio.song.step2Desc")}</span>
+              {renderChipRow(uiVocalTypes, "vocal")}
               {songParamsLocked && (
-                <span className="lock-hint">Сначала утверди текст</span>
+                <span className="lock-hint">{t("studio.song.lockHint")}</span>
               )}
             </div>
 
@@ -1532,9 +1841,9 @@ export function StudioPage() {
               className={`builder-step${songParamsLocked ? " builder-step--locked" : ""}`}
               aria-disabled={songParamsLocked}
             >
-              <strong>3. Тембр и стилистика вокала</strong>
-              <span className="muted">Влияет на vocal tone, delivery, intensity, voice texture</span>
-              {renderChipRow(TIMBRES, "timbre", true)}
+              <strong>{t("studio.song.step3Label")}</strong>
+              <span className="muted">{t("studio.song.step3Desc")}</span>
+              {renderChipRow(uiTimbres, "timbre", true)}
               {state.timbre === "custom" && (
                 <input
                   className="inline-input"
@@ -1551,10 +1860,8 @@ export function StudioPage() {
           <>
             <div className="builder-step preset-section">
               <header className="preset-section__head">
-                <strong>Шаблон задачи</strong>
-                <span className="muted">
-                  Сразу запускается в автоматическом режиме (для сна, кафе, работы, поездки, медитации). Остальные берутся как отправная точка — докрутишь вручную.
-                </span>
+                <strong>{t("studio.instrumental.presetTitle")}</strong>
+                <span className="muted">{t("studio.instrumental.presetDesc")}</span>
               </header>
               <div className="preset-grid">
                 {INSTRUMENTAL_PRESETS.map((preset) => {
@@ -1568,14 +1875,16 @@ export function StudioPage() {
                       aria-pressed={active}
                     >
                       <span className={`preset-card__tag preset-card__tag--${preset.mode}`}>
-                        {preset.mode === "auto" ? "мгновенно" : "как старт"}
+                        {preset.mode === "auto" ? t("studio.instrumental.presetModeAuto") : t("studio.instrumental.presetModePrompt")}
                       </span>
                       <span className="preset-card__title">
                         <span aria-hidden="true">{preset.emoji}</span>
-                        {preset.title}
+                        {presetTitle(preset.key, preset.title)}
                       </span>
                       <span className="preset-card__meta">
-                        {valueLabel(preset.tempo, TEMPOS).replace(/ ·.*$/, "")} · {preset.genre}
+                        {preset.mode === "auto"
+                          ? `${valueLabel(preset.tempo, TEMPOS).replace(/ ·.*$/, "")} · ${preset.genre}`
+                          : t("studio.instrumental.presetPickHint")}
                       </span>
                     </button>
                   );
@@ -1584,20 +1893,20 @@ export function StudioPage() {
               {presetToast && (
                 <div className={`preset-toast preset-toast--${presetToast.auto ? "auto" : "prompt"}`} role="status">
                   {presetToast.auto
-                    ? `Шаблон «${presetToast.title}» готов — жми «Сгенерировать».`
-                    : `Шаблон «${presetToast.title}» применён как отправная точка. Подправь жанр / настроение / детали ниже.`}
+                    ? t("studio.instrumental.presetToastAuto", { title: presetToast.title })
+                    : t("studio.instrumental.presetToastPrompt", { title: presetToast.title })}
                 </div>
               )}
             </div>
 
             <label className="builder-step">
-              <strong>Дополнительное описание</strong>
-              <span className="muted">Инструменты, референсы, задача трека, атмосфера. Шаблон уже предзаполнил поле.</span>
+              <strong>{t("studio.instrumental.extraLabel")}</strong>
+              <span className="muted">{t("studio.instrumental.extraDesc")}</span>
               <textarea
                 rows={5}
                 value={state.instrumentalExtra}
                 onChange={(e) => update("instrumentalExtra", e.target.value)}
-                placeholder="Например: фон для fashion-видео, мягкий синтезатор, глубокий бас, без вокала"
+                placeholder={t("studio.instrumental.extraPlaceholder")}
               />
             </label>
           </>
@@ -1606,9 +1915,9 @@ export function StudioPage() {
         {activeModule === "sound_effect" && (
           <div className="builder-grid">
             <div className="builder-step">
-              <strong>Источник звука</strong>
+              <strong>{t("studio.sfx.sourceLabel")}</strong>
               <div className="chip-row">
-                {SFX_SOURCES.filter(([v]) => v !== "custom").map(([value, label]) => (
+                {uiSfxSources.filter(([v]) => v !== "custom").map(([value, label]) => (
                   <Chip
                     key={value}
                     active={state.sfxSource === value}
@@ -1622,7 +1931,7 @@ export function StudioPage() {
                   onClick={() => update("sfxSource", "custom")}
                   className="chip--custom"
                 >
-                  ✏️ Свой звук
+                  {t("studio.sfx.customSource")}
                 </Chip>
               </div>
               {state.sfxSource === "custom" && (
@@ -1637,22 +1946,21 @@ export function StudioPage() {
               )}
             </div>
             <div className="builder-step">
-              <strong>Среда</strong>
-              {renderChipRow(SFX_ENVS, "sfxEnv")}
+              <strong>{t("studio.sfx.envLabel")}</strong>
+              {renderChipRow(uiSfxEnvs, "sfxEnv")}
             </div>
             <div className="builder-step">
-              <strong>Длительность</strong>
-              {renderChipRow(SFX_DURATIONS, "sfxDuration")}
+              <strong>{t("studio.sfx.durationLabel")}</strong>
+              {renderChipRow(uiSfxDurations, "sfxDuration")}
             </div>
             <div className="builder-step">
-              <strong>Характер</strong>
-              {renderChipRow(SFX_STYLES, "sfxStyle")}
+              <strong>{t("studio.sfx.styleLabel")}</strong>
+              {renderChipRow(uiSfxStyles, "sfxStyle")}
             </div>
             <label className="builder-step">
-              <strong>Дополнительные детали</strong>
+              <strong>{t("studio.sfx.detailsLabel")}</strong>
               <span className="muted">
-                Атака, tail, интенсивность, текстура. До {SUNO_LIMITS.SFX_PROMPT_MAX} символов
-                — лимит /generate/sounds.
+                {t("studio.sfx.detailsDesc", { max: SUNO_LIMITS.SFX_PROMPT_MAX })}
               </span>
               <textarea
                 rows={4}
@@ -1669,19 +1977,35 @@ export function StudioPage() {
 
         {activeModule === "cover" && (
           <div className="builder-grid">
+            <div className="cover-rules">
+              <strong className="cover-rules__title">{t("studio.cover.howWorksTitle")}</strong>
+              <p className="cover-rules__lead">{t("studio.cover.howWorksLead")}</p>
+              <div className="cover-rules__cols">
+                <div className="cover-rules__col cover-rules__col--ok">
+                  <strong>{t("studio.cover.fitsTitle")}</strong>
+                  <ul>
+                    {(t("studio.cover.fitsItems", { returnObjects: true }) as string[]).map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="cover-rules__col cover-rules__col--bad">
+                  <strong>{t("studio.cover.noFitsTitle")}</strong>
+                  <ul>
+                    {(t("studio.cover.noFitsItems", { returnObjects: true }) as string[]).map((item, i) => (
+                      <li key={i}>{item}</li>
+                    ))}
+                  </ul>
+                  <p className="cover-rules__note">{t("studio.cover.errorNote")}</p>
+                </div>
+              </div>
+              <p className="cover-rules__hint">{t("studio.cover.tipHint")}</p>
+            </div>
             <div className="builder-step">
-              <strong>Исходный аудиофайл</strong>
-              <span className="muted">
-                Загрузите файл или укажите публичную ссылку на трек.
-              </span>
-              <span className="muted" style={{ marginTop: "0.5rem", display: "block" }}>
-                <strong>Что можно загрузить:</strong>
-                <br />• Оригинал чужой песни для кавер-версии
-                <br />• Ваше напевание или мелодию
-                <br />• Короткий риф или музыкальную идею
-              </span>
+              <strong>{t("studio.cover.audioLabel")}</strong>
+              <span className="muted">{t("studio.cover.audioDesc")}</span>
               <span className="muted" style={{ marginTop: "0.5rem", display: "block", fontSize: "0.85rem" }}>
-                <strong>Технические ограничения:</strong> форматы {SUNO_LIMITS.COVER_AUDIO_FORMATS.join(", ")}, длительность до {SUNO_LIMITS.COVER_AUDIO_MAX_MIN} минут
+                <strong>{isEn ? "Technical limits:" : "Технические ограничения:"}</strong> {isEn ? "formats" : "форматы"} {SUNO_LIMITS.COVER_AUDIO_FORMATS.join(", ")}, {isEn ? `up to ${SUNO_LIMITS.COVER_AUDIO_MAX_MIN} min` : `длительность до ${SUNO_LIMITS.COVER_AUDIO_MAX_MIN} минут`}
               </span>
               <input
                 className="inline-input"
@@ -1700,51 +2024,80 @@ export function StudioPage() {
                 />
                 <button
                   type="button"
-                  className="cover-upload-btn"
-                  onClick={() => coverFileInputRef.current?.click()}
-                  disabled={isRecording}
+                  className={`cover-upload-btn${isUploading ? " cover-upload-btn--loading" : state.coverFileName && state.coverUrl ? " cover-upload-btn--done" : ""}`}
+                  onClick={() => !isUploading && coverFileInputRef.current?.click()}
+                  disabled={isRecording || isUploading}
                 >
-                  📎 {state.coverFileName ? `Загружено: ${state.coverFileName}` : "Прикрепить свой файл"}
+                  {isUploading ? t("studio.cover.uploading") : state.coverFileName && state.coverUrl ? `✓ ${state.coverFileName}` : (isEn ? "📎 Attach file" : "📎 Прикрепить файл")}
                 </button>
                 <button
                   type="button"
                   className="cover-upload-btn cover-upload-btn--record"
                   onClick={startRecording}
-                  disabled={!!state.coverFileName || isRecording}
-                  title="Записать голос"
+                  disabled={!!state.coverFileName || isRecording || isUploading}
+                  title={t("studio.cover.recordTitle")}
                 >
-                  🎤 Запись звука
+                  {t("studio.cover.recordBtn")}
                 </button>
-                {state.coverFileName && (
+                {state.coverFileName && !isUploading && (
                   <button
                     type="button"
                     className="cover-upload-clear"
                     onClick={() => {
                       setState((prev) => ({ ...prev, coverUrl: "", coverFileName: "" }));
+                      setUploadError(null);
                       if (coverFileInputRef.current) coverFileInputRef.current.value = "";
                     }}
                   >
-                    × сбросить
+                    {t("studio.cover.reset")}
                   </button>
                 )}
+                {isUploading && <span className="muted" style={{ fontSize: "0.8rem" }}>{t("studio.cover.uploadingMsg")}</span>}
+                {uploadError && <span style={{ color: "var(--accent-2)", fontSize: "0.8rem" }}>{uploadError}</span>}
               </div>
             </div>
 
             <div className="builder-step">
-              <strong>Формат</strong>
-              <span className="muted">С вокалом или чистый инструментал поверх оригинала.</span>
-              {renderChipRow(COVER_INSTRUMENTAL, "coverInstrumental")}
+              <strong>{t("studio.cover.formatLabel")}</strong>
+              <span className="muted">{t("studio.cover.formatDesc")}</span>
+              {renderChipRow(uiCoverInstrumental, "coverInstrumental")}
             </div>
 
-            <div className="builder-step">
-              <strong>Пол вокалиста</strong>
-              <span className="muted">Для V5.5. «Как в оригинале» — Suno подберёт сам.</span>
-              {renderChipRow(COVER_VOCAL_GENDERS, "coverVocalGender")}
-            </div>
+            {state.coverInstrumental !== "yes" && (
+              <>
+                <div className="builder-step">
+                  <strong>{t("studio.cover.vocalGenderLabel")}</strong>
+                  <span className="muted">{t("studio.cover.vocalGenderDesc")}</span>
+                  {renderChipRow(uiCoverVocalGenders, "coverVocalGender")}
+                </div>
+
+                <div className="builder-step">
+                  <strong>{t("studio.cover.languageLabel")}</strong>
+                  <span className="muted">{t("studio.cover.languageDesc")}</span>
+                  <div className="chip-row">
+                    {(["ru", "en", "es", "fr", "de", "it", "ja", "ko"] as const).map((code) => (
+                      <Chip
+                        key={code}
+                        active={state.coverLanguage === code}
+                        onClick={() => update("coverLanguage", code)}
+                      >
+                        {t(`studio.cover.lang.${code}`)}
+                      </Chip>
+                    ))}
+                    <Chip
+                      active={state.coverLanguage === ""}
+                      onClick={() => update("coverLanguage", "")}
+                    >
+                      {t("studio.cover.langAuto")}
+                    </Chip>
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="builder-step">
-              <strong>Жанр</strong>
-              <span className="muted">Выбери из списка или укажи свой.</span>
+              <strong>{t("studio.cover.genreLabel")}</strong>
+              <span className="muted">{t("studio.cover.genreDesc")}</span>
               <div className="chip-row">
                 {GENRES.map((g) => (
                   <Chip
@@ -1760,7 +2113,7 @@ export function StudioPage() {
                   onClick={() => update("coverGenre", "custom")}
                   className="chip--custom"
                 >
-                  ✏️ Свой жанр
+                  {t("studio.cover.customGenreBtn")}
                 </Chip>
               </div>
               {state.coverGenre === "custom" && (
@@ -1776,20 +2129,18 @@ export function StudioPage() {
             </div>
 
             <div className="builder-step">
-              <strong>Настроение</strong>
-              {renderChipRow(MOODS, "coverMood")}
+              <strong>{t("studio.cover.moodLabel")}</strong>
+              {renderChipRow(uiMoods, "coverMood")}
             </div>
 
             <div className="builder-step">
-              <strong>Темп</strong>
-              {renderChipRow(TEMPOS, "coverTempo")}
+              <strong>{t("studio.cover.tempoLabel")}</strong>
+              {renderChipRow(uiTempos, "coverTempo")}
             </div>
 
             <label className="builder-step">
-              <strong>Дополнительные детали стиля</strong>
-              <span className="muted">
-                Инструменты, атмосфера, референсы. До 1000 символов (Suno-лимит для V5.5).
-              </span>
+              <strong>{t("studio.cover.styleLabel")}</strong>
+              <span className="muted">{t("studio.cover.styleDesc")}</span>
               <textarea
                 rows={4}
                 value={state.coverStyle}
@@ -1801,30 +2152,28 @@ export function StudioPage() {
 
             {state.coverInstrumental !== "yes" && (
               <label className="builder-step">
-                <strong>Новый текст (опционально)</strong>
-                <span className="muted">
-                  Если хочешь поменять слова — впиши тут. До 5000 символов. Пусто = Suno повторит оригинальный текст в новой подаче.
-                </span>
+                <strong>{t("studio.cover.newLyricsLabel")}</strong>
+                <span className="muted">{t("studio.cover.newLyricsDesc")}</span>
                 <textarea
                   rows={6}
                   value={state.coverLyrics}
                   onChange={(e) => update("coverLyrics", e.target.value)}
-                  placeholder={"[Куплет 1]\nНовый текст\n[Припев]\n..."}
+                  placeholder={t("studio.cover.newLyricsPlaceholder")}
                   maxLength={5000}
                 />
               </label>
             )}
 
             <div className="builder-step">
-              <strong>Стилевая точность (styleWeight)</strong>
-              <span className="muted">Насколько Suno должен следовать стилю из описания (0 — свободно, 1 — строго).</span>
-              {renderChipRow(COVER_STYLE_WEIGHTS, "coverStyleWeight")}
+              <strong>{t("studio.cover.styleWeightLabel")}</strong>
+              <span className="muted">{t("studio.cover.styleWeightDesc")}</span>
+              {renderChipRow(uiCoverStyleWeights, "coverStyleWeight")}
             </div>
 
             <div className="builder-step">
-              <strong>Степень отхода (weirdnessConstraint)</strong>
-              <span className="muted">Насколько далеко можно уйти от оригинала.</span>
-              {renderChipRow(COVER_WEIRDNESS, "coverWeirdness")}
+              <strong>{t("studio.cover.weirdnessLabel")}</strong>
+              <span className="muted">{t("studio.cover.weirdnessDesc")}</span>
+              {renderChipRow(uiCoverWeirdness, "coverWeirdness")}
             </div>
           </div>
         )}
@@ -1832,8 +2181,8 @@ export function StudioPage() {
         {activeModule === "cover_art" && (
           <div className="builder-grid">
             <div className="builder-step">
-              <strong>Модель для генерации</strong>
-              <span className="muted">Каждая модель даёт разный художественный язык и стоит по-разному.</span>
+              <strong>{t("studio.coverArt.modelLabel")}</strong>
+              <span className="muted">{t("studio.coverArt.modelDesc")}</span>
               <div className="model-grid">
                 {COVER_ART_MODELS.map((m) => (
                   <button
@@ -1850,7 +2199,7 @@ export function StudioPage() {
                         <Coin size={14} className="riffa-coin--after" />
                       </span>
                     </span>
-                    <span className="model-card__descr">{m.descr}</span>
+                    <span className="model-card__descr">{modelDescr(m.id, m.descr)}</span>
                   </button>
                 ))}
               </div>
@@ -1858,13 +2207,11 @@ export function StudioPage() {
 
             <div className="builder-step cover-art-agent-cta">
               <header className="preset-section__head">
-                <strong>Чат с агентом</strong>
-                <span className="muted">
-                  Расскажи агенту, какую обложку хочешь — он соберёт prompt под выбранную модель и сразу запустит генерацию.
-                </span>
+                <strong>{t("studio.coverArt.agentLabel")}</strong>
+                <span className="muted">{t("studio.coverArt.agentDesc")}</span>
               </header>
               <Button onClick={() => setCoverArtAgentOpen((v) => !v)}>
-                {coverArtAgentOpen ? "Закрыть чат" : "Открыть чат с агентом"}
+                {coverArtAgentOpen ? t("studio.coverArt.agentClose") : t("studio.coverArt.agentOpen")}
               </Button>
             </div>
 
@@ -1882,8 +2229,8 @@ export function StudioPage() {
             )}
 
             <label className="builder-step">
-              <strong>Prompt обложки</strong>
-              <span className="muted">Можно отредактировать, что собрал агент, или ввести свой с нуля.</span>
+              <strong>{t("studio.coverArt.promptLabel")}</strong>
+              <span className="muted">{t("studio.coverArt.promptDesc")}</span>
               <textarea
                 rows={5}
                 value={state.coverArtPrompt}
@@ -1893,10 +2240,8 @@ export function StudioPage() {
             </label>
 
             <div className="builder-step">
-              <strong>Референс изображение</strong>
-              <span className="muted">
-                Загрузите изображение, вставьте ссылку или нажмите Ctrl+V для вставки из буфера.
-              </span>
+              <strong>{t("studio.coverArt.refLabel")}</strong>
+              <span className="muted">{t("studio.coverArt.refDesc")}</span>
               <div
                 className={`ref-upload${state.coverArtRefUrl ? " ref-upload--has-preview" : ""}`}
                 onPaste={(e) => {
@@ -1906,13 +2251,7 @@ export function StudioPage() {
                     if (item.type.startsWith("image/")) {
                       e.preventDefault();
                       const file = item.getAsFile();
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          if (typeof reader.result === "string") update("coverArtRefUrl", reader.result);
-                        };
-                        reader.readAsDataURL(file);
-                      }
+                      if (file) void uploadCoverArtRef(file);
                       return;
                     }
                     if (item.type === "text/plain") {
@@ -1930,11 +2269,7 @@ export function StudioPage() {
                   e.stopPropagation();
                   const file = e.dataTransfer?.files?.[0];
                   if (file && file.type.startsWith("image/")) {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      if (typeof reader.result === "string") update("coverArtRefUrl", reader.result);
-                    };
-                    reader.readAsDataURL(file);
+                    void uploadCoverArtRef(file);
                   }
                 }}
               >
@@ -1942,37 +2277,39 @@ export function StudioPage() {
                   <input
                     type="text"
                     className="inline-input"
-                    placeholder="Вставьте URL изображения..."
-                    value={state.coverArtRefUrl.startsWith("data:") ? "" : state.coverArtRefUrl}
+                    placeholder={t("studio.coverArt.refPlaceholder")}
+                    value={state.coverArtRefUrl}
                     onChange={(e) => update("coverArtRefUrl", e.target.value)}
+                    disabled={coverArtRefUploading}
                   />
                   <label className="ref-upload__btn">
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/png,image/webp"
                       hidden
+                      disabled={coverArtRefUploading}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          if (typeof reader.result === "string") update("coverArtRefUrl", reader.result);
-                        };
-                        reader.readAsDataURL(file);
                         e.target.value = "";
+                        if (file) void uploadCoverArtRef(file);
                       }}
                     />
-                    📎 Файл
+                    {coverArtRefUploading ? t("studio.coverArt.refUploading") : t("studio.coverArt.refFileBtn")}
                   </label>
                 </div>
+                {coverArtRefError && (
+                  <div className="ref-upload__error" style={{ color: "var(--err, #ff6b6b)", fontSize: 12, marginTop: 6 }}>
+                    {coverArtRefError}
+                  </div>
+                )}
                 {state.coverArtRefUrl && (
                   <div className="ref-upload__preview">
-                    <img src={state.coverArtRefUrl} alt="Референс" />
+                    <img src={state.coverArtRefUrl} alt={t("studio.coverArt.refAlt")} />
                     <button
                       type="button"
                       className="ref-upload__remove"
                       onClick={() => update("coverArtRefUrl", "")}
-                      aria-label="Убрать референс"
+                      aria-label={t("studio.coverArt.refRemoveAria")}
                     >
                       ×
                     </button>
@@ -1980,7 +2317,7 @@ export function StudioPage() {
                 )}
                 {!state.coverArtRefUrl && (
                   <div className="ref-upload__hint">
-                    Перетащите изображение сюда или нажмите Ctrl+V
+                    {t("studio.coverArt.refDragHint")}
                   </div>
                 )}
               </div>
@@ -1994,8 +2331,8 @@ export function StudioPage() {
               className={`builder-step${songParamsLocked ? " builder-step--locked" : ""}`}
               aria-disabled={songParamsLocked}
             >
-              <strong>Стиль музыки / жанр</strong>
-              <span className="muted">Стили из логики Telegram-бота + свой вариант</span>
+              <strong>{t("studio.genreLabel")}</strong>
+              <span className="muted">{t("studio.genreDesc")}</span>
               <div className="chip-row chip-row--dense">
                 {GENRES.map((g) => (
                   <Chip key={g} active={state.genre === g} onClick={() => update("genre", g)}>
@@ -2007,13 +2344,13 @@ export function StudioPage() {
                   onClick={() => update("genre", "custom")}
                   className="chip--custom"
                 >
-                  ✏️ Свой вариант
+                  {t("studio.customVariant")}
                 </Chip>
               </div>
               {state.genre === "custom" && (
                 <input
                   className="inline-input"
-                  placeholder="Опиши свой стиль (например, retrowave 80s)"
+                  placeholder={t("studio.genreCustomPlaceholder")}
                   value={state.customGenre}
                   onChange={(e) => update("customGenre", e.target.value)}
                 />
@@ -2024,12 +2361,12 @@ export function StudioPage() {
               className={`builder-step${songParamsLocked ? " builder-step--locked" : ""}`}
               aria-disabled={songParamsLocked}
             >
-              <strong>Настроение</strong>
-              {renderChipRow(MOODS, "mood", true)}
+              <strong>{t("studio.mood")}</strong>
+              {renderChipRow(uiMoods, "mood", true)}
               {state.mood === "custom" && (
                 <input
                   className="inline-input"
-                  placeholder="Например: nostalgic and bittersweet, triumphant"
+                  placeholder={t("studio.moodCustomPlaceholder")}
                   value={state.customMood}
                   onChange={(e) => update("customMood", e.target.value)}
                 />
@@ -2040,12 +2377,12 @@ export function StudioPage() {
               className={`builder-step${songParamsLocked ? " builder-step--locked" : ""}`}
               aria-disabled={songParamsLocked}
             >
-              <strong>Темп</strong>
-              {renderChipRow(TEMPOS, "tempo", true)}
+              <strong>{t("studio.tempo")}</strong>
+              {renderChipRow(uiTempos, "tempo", true)}
               {state.tempo === "custom" && (
                 <input
                   className="inline-input"
-                  placeholder="Например: 130 BPM, upbeat и пульсирующий"
+                  placeholder={t("studio.tempoCustomPlaceholder")}
                   value={state.customTempo}
                   onChange={(e) => update("customTempo", e.target.value)}
                 />
@@ -2063,7 +2400,7 @@ export function StudioPage() {
           activeModule === "cover" ||
           activeModule === "sound_effect") && (
           <div className="track-name-block">
-            <label className="block-label">Название трека</label>
+            <label className="block-label">{t("studio.trackName.label")}</label>
             <div className="track-name-modes">
               <label className="track-name-mode">
                 <input
@@ -2074,9 +2411,9 @@ export function StudioPage() {
                   onChange={() => update("trackNameMode", "auto")}
                 />
                 <span>
-                  <strong>Авто</strong>
+                  <strong>{t("studio.trackName.auto")}</strong>
                   <span className="muted">
-                    «Артист — Идея <span className="track-name-suffix">(RIFFAMusic)</span>»
+                    {t("studio.trackName.autoDesc")}
                   </span>
                 </span>
               </label>
@@ -2089,8 +2426,8 @@ export function StudioPage() {
                   onChange={() => update("trackNameMode", "manual")}
                 />
                 <span>
-                  <strong>Своё название</strong>
-                  <span className="muted">Введи вручную (до {SUNO_LIMITS.TITLE_MAX} символов)</span>
+                  <strong>{t("studio.trackName.manual")}</strong>
+                  <span className="muted">{t("studio.trackName.manualDesc", { max: SUNO_LIMITS.TITLE_MAX })}</span>
                 </span>
               </label>
             </div>
@@ -2099,7 +2436,7 @@ export function StudioPage() {
                 <input
                   type="text"
                   className="inline-input"
-                  placeholder="Например: Снежный какао"
+                  placeholder={t("studio.trackName.manualPlaceholder")}
                   value={state.trackName}
                   onChange={(e) => update("trackName", e.target.value)}
                   maxLength={SUNO_LIMITS.TITLE_MAX}
@@ -2114,15 +2451,15 @@ export function StudioPage() {
 
         <div className="prompt-preview">
           <header>
-            <strong>Итоговый prompt</strong>
-            <span className="muted">То, что отправится в Suno / SFX API</span>
+            <strong>{t("studio.promptPreview.label")}</strong>
+            <span className="muted">{t("studio.promptPreview.desc")}</span>
           </header>
           {(activeModule === "song" || activeModule === "instrumental" || activeModule === "cover" || activeModule === "sound_effect") && (
             <div className="prompt-preview__track-name">
-              <span className="prompt-preview__track-label">Название трека:</span>
+              <span className="prompt-preview__track-label">{t("studio.trackName.previewLabel")}</span>
               {state.trackNameMode === "manual" && state.trackName.trim()
                 ? <span className="prompt-preview__track-value">{state.trackName.trim()}</span>
-                : <span className="prompt-preview__track-auto">Авто — «Артист&nbsp;— Идея (RIFFAMusic)»</span>
+                : <span className="prompt-preview__track-auto">{t("studio.trackName.previewAuto")}</span>
               }
             </div>
           )}
@@ -2138,16 +2475,16 @@ export function StudioPage() {
         <Button
           ref={submitRef}
           onClick={handleSubmit}
-          disabled={moduleMeta!.postponed || submitting || songParamsLocked}
+          disabled={moduleMeta!.postponed || submitting || songParamsLocked || isUploading}
           className={presetToast?.auto ? "submit-btn submit-btn--flash" : "submit-btn"}
         >
           {moduleMeta!.postponed
-            ? "Скоро"
+            ? t("studio.submitSoon")
             : submitting
-              ? "Запускаем…"
+              ? t("studio.submitGenerating")
               : songParamsLocked
-                ? "Сначала утверди текст"
-                : "Сгенерировать"}
+                ? t("studio.submitApproveLyrics")
+                : t("studio.generate")}
         </Button>
       </Panel>
 

@@ -18,7 +18,7 @@ function playCompletionChime() {
 }
 
 import type { ProgressEvent } from "@/lib/api/client";
-import { openGenerationSocket, pollGenerationStatus } from "@/lib/api/client";
+import { fetchActiveGenerations, openGenerationSocket, pollGenerationStatus } from "@/lib/api/client";
 
 export type GenStatus = "queued" | "processing" | "completed" | "failed";
 
@@ -54,6 +54,8 @@ export interface ActiveGeneration {
 
 interface GenerationStore {
   active: Record<string, ActiveGeneration>;
+  /** Dismissed generation ids — чтобы sync с сервера не возвращал их в сайдбар. */
+  dismissed: string[];
   /** Start tracking a new generation and open its WebSocket. */
   track: (id: string, wsUrl: string, type: string, title: string) => void;
   /** Remove a completed/failed generation from active state. */
@@ -61,6 +63,9 @@ interface GenerationStore {
   _update: (id: string, patch: Partial<ActiveGeneration>) => void;
   /** Reconnect WebSockets for any processing entries after page reload. */
   reconnectAll: () => void;
+  /** Fetch active/recent generations from server and populate the store.
+   *  Called on app startup so the sidebar shows state from any device. */
+  syncFromServer: () => Promise<void>;
 }
 
 function estimateProgress(event: ProgressEvent): number {
@@ -135,6 +140,7 @@ export const useGenerationStore = create<GenerationStore>()(
   persist(
     (set, get) => ({
       active: {},
+      dismissed: [],
 
       track(id, wsUrl, type, title) {
         const gen: ActiveGeneration = {
@@ -159,7 +165,9 @@ export const useGenerationStore = create<GenerationStore>()(
         set((s) => {
           const next = { ...s.active };
           delete next[id];
-          return { active: next };
+          // Запоминаем последние ~50 dismissed id, чтобы sync с сервера их не возвращал.
+          const dismissed = [id, ...s.dismissed.filter((d) => d !== id)].slice(0, 50);
+          return { active: next, dismissed };
         });
       },
 
@@ -177,6 +185,45 @@ export const useGenerationStore = create<GenerationStore>()(
           }
         }
       },
+
+      async syncFromServer() {
+        try {
+          const list = await fetchActiveGenerations();
+          const dismissedSet = new Set(get().dismissed);
+          for (const item of list) {
+            const existing = get().active[item.id];
+            if (existing) continue;
+            if (dismissedSet.has(item.id)) continue;
+            const gen: ActiveGeneration = {
+              id: item.id,
+              wsUrl: "",
+              type: item.type,
+              title: item.title,
+              status: item.status as GenStatus,
+              step: item.step ?? null,
+              progress: item.progress,
+              result: (item.result as CompletedGenerationResult) ?? null,
+              error: item.error,
+              ws: null,
+            };
+            if (gen.status === "queued" || gen.status === "processing") {
+              const poller = pollGenerationStatus(gen.id, (event) => {
+                const cur = get().active[gen.id];
+                if (cur && cur.status !== "completed" && cur.status !== "failed") {
+                  handleProgressEvent(gen.id, event, get);
+                  if (event.status === "completed" || event.status === "failed") {
+                    poller.stop();
+                  }
+                }
+              }, 4000);
+              gen.ws = { close: () => poller.stop() } as unknown as WebSocket;
+            }
+            set((s) => ({ active: { ...s.active, [gen.id]: gen } }));
+          }
+        } catch {
+          // Best-effort — network errors shouldn't break the app
+        }
+      },
     }),
     {
       name: "riffa-active-gens",
@@ -186,7 +233,22 @@ export const useGenerationStore = create<GenerationStore>()(
         active: Object.fromEntries(
           Object.entries(state.active).map(([id, gen]) => [id, { ...gen, ws: null }]),
         ),
+        dismissed: state.dismissed,
       }) as GenerationStore,
+      // На старте убираем completed/failed карточки из прошлой сессии —
+      // их WebSocket уже нет, повторно показывать нет смысла.
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const stale = Object.keys(state.active).filter(
+          (id) => state.active[id].status === "completed" || state.active[id].status === "failed",
+        );
+        if (stale.length === 0) return;
+        const next = { ...state.active };
+        for (const id of stale) delete next[id];
+        const dismissed = [...new Set([...stale, ...state.dismissed])].slice(0, 50);
+        state.active = next;
+        state.dismissed = dismissed;
+      },
     },
   ),
 );

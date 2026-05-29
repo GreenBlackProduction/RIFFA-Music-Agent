@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import i18next from "i18next";
 
 import { Button } from "@/components/ui/Button";
 import {
@@ -11,11 +13,15 @@ import {
 import "./AgentChat.css";
 
 // ─── Session persistence (localStorage, TTL 1 hour) ───────────────────────
+// Единый ключ независимо от модуля: агент помнит диалог при переходе
+// между страницами / модулями. Module передаётся только как hint бэкенду
+// для первого приветствия — если есть сохранённая история, оно пропускается.
 
-const SESSION_TTL_MS = 60 * 60 * 1000;
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;  // 24 часа
+const UNIFIED_SESSION_KEY = "riffa_agent_unified_v1";
 
-function sessionKey(module: string) {
-  return `riffa_agent_v2_${module}`;
+function sessionKey(_module: string) {
+  return UNIFIED_SESSION_KEY;
 }
 
 interface SavedAgentSession {
@@ -25,7 +31,7 @@ interface SavedAgentSession {
   wizardParamsCurrent: WizardParams;
   lyricsGenerated: boolean;
   done: boolean;
-  result: { summary: string; prompt: string; intent: AgentIntent | null } | null;
+  result: AgentResult | null;
   savedAt: number;
 }
 
@@ -55,29 +61,51 @@ function clearAgentSession(module: string) {
 }
 
 // ─── Wizard chips ──────────────────────────────────────────────────────────
+// Genre chips are always in English / universal — music genres are an
+// international vocabulary. Only mood/tempo/vocal labels are localised
+// because they describe emotional concepts.
 
-const GENRE_CHIPS = [
-  "Pop", "Rock", "Lo-fi / Chill", "Electronic / EDM",
-  "Hip-Hop / Trap", "Классика / Оркестр", "Не знаю — подбери сам",
+const GENRE_CHIPS_EN = [
+  "Pop / R&B", "Hip-Hop / Trap", "Classical / Orchestra", "Not sure — pick for me",
+  "Rock / Metal", "Electronic / Synth", "Jazz / Blues", "Acoustic / Folk", "Lofi / Chillout",
 ];
-const MOOD_CHIPS = [
-  "Энергичное", "Меланхоличное", "Агрессивное",
-  "Спокойное", "Вдохновляющее", "Романтичное",
+const GENRE_CHIPS_RU = [
+  "Pop / R&B", "Hip-Hop / Trap", "Классика / Оркестр", "Не знаю — подбери сам",
+  "Rock / Metal", "Electronic / Synth", "Jazz / Blues", "Acoustic / Folk", "Lofi / Chillout",
 ];
-const TEMPO_CHIPS = ["Медленный", "Средний", "Быстрый"];
-const VOCAL_CHIPS = ["Мужской", "Женский"];
 
-// Mapping ru → en for backend params
-const TEMPO_MAP: Record<string, string> = {
-  "Медленный": "slow", "Средний": "medium", "Быстрый": "fast",
-};
-const MOOD_MAP: Record<string, string> = {
-  "Энергичное": "energetic", "Меланхоличное": "sad", "Агрессивное": "aggressive",
-  "Спокойное": "calm", "Вдохновляющее": "inspiring", "Романтичное": "romantic",
-};
-const VOCAL_MAP: Record<string, string> = {
-  "Мужской": "male", "Женский": "female",
-};
+// Mood labels → backend values (both languages)
+const MOOD_CHIPS_RU = ["Энергичное", "Меланхоличное", "Агрессивное", "Спокойное", "Вдохновляющее", "Романтичное"];
+const MOOD_CHIPS_EN = ["Energetic", "Melancholic", "Aggressive", "Calm", "Inspiring", "Romantic"];
+const MOOD_VALUES =   ["energetic",  "sad",          "aggressive",  "calm",  "inspiring",  "romantic"];
+
+const TEMPO_CHIPS_RU = ["Медленный", "Средний", "Быстрый"];
+const TEMPO_CHIPS_EN = ["Slow",      "Medium",  "Fast"];
+const TEMPO_VALUES =   ["slow",      "medium",  "fast"];
+
+const VOCAL_CHIPS_RU = ["Мужской", "Женский"];
+const VOCAL_CHIPS_EN = ["Male",    "Female"];
+const VOCAL_VALUES =   ["male",    "female"];
+
+function useWizardChips(lang: string) {
+  const isEn = lang.startsWith("en");
+  return {
+    genreChips:  isEn ? GENRE_CHIPS_EN : GENRE_CHIPS_RU,
+    moodChips:   isEn ? MOOD_CHIPS_EN  : MOOD_CHIPS_RU,
+    tempoChips:  isEn ? TEMPO_CHIPS_EN : TEMPO_CHIPS_RU,
+    vocalChips:  isEn ? VOCAL_CHIPS_EN : VOCAL_CHIPS_RU,
+    moodValue:   (label: string) => MOOD_VALUES[
+      (isEn ? MOOD_CHIPS_EN : MOOD_CHIPS_RU).indexOf(label)
+    ] ?? label.toLowerCase(),
+    tempoValue:  (label: string) => TEMPO_VALUES[
+      (isEn ? TEMPO_CHIPS_EN : TEMPO_CHIPS_RU).indexOf(label)
+    ] ?? label.toLowerCase(),
+    vocalValue:  (label: string) => VOCAL_VALUES[
+      (isEn ? VOCAL_CHIPS_EN : VOCAL_CHIPS_RU).indexOf(label)
+    ] ?? label.toLowerCase(),
+    genreUnknown: isEn ? "Not sure — pick for me" : "Не знаю — подбери сам",
+  };
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -99,7 +127,8 @@ function extractError(err: unknown): { message: string; is401: boolean } {
     return { message: e.detail, is401: e.status === 401 };
   }
   if (err instanceof Error) return { message: err.message, is401: false };
-  return { message: "Не удалось связаться с ассистентом", is401: false };
+  const isEn = (i18next.resolvedLanguage ?? "ru").startsWith("en");
+  return { message: isEn ? "Could not reach the assistant" : "Не удалось связаться с ассистентом", is401: false };
 }
 
 function hasLyrics(text: string): boolean {
@@ -123,18 +152,47 @@ function extractLyrics(text: string): string {
 
 function AgentAvatar({ thinking }: { thinking?: boolean }) {
   return (
-    <img
-      src="/icons/chatgpt.png"
-      alt="AI Agent"
-      className={`agent-chat__avatar-icon ${thinking ? 'agent-chat__avatar-icon--thinking' : ''}`}
-    />
+    <div className={`agent-chat__avatar-icon${thinking ? " agent-chat__avatar-icon--thinking" : ""}`}>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="3" fill="var(--paper)" />
+        <circle cx="8" cy="8" r="6" stroke="var(--paper)" strokeWidth="1.2" strokeOpacity="0.4" />
+      </svg>
+    </div>
   );
 }
+
+const IconCheck = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20 6L9 17l-5-5" />
+  </svg>
+);
+const IconClose = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M18 6L6 18M6 6l12 12" />
+  </svg>
+);
+const IconPencil = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </svg>
+);
+const IconRefresh = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 12a9 9 0 0 1 15.5-6.36L21 8M21 3v5h-5M21 12a9 9 0 0 1-15.5 6.36L3 16M3 21v-5h5" />
+  </svg>
+);
+const IconWarn = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
 
 // ─── Props / result types ──────────────────────────────────────────────────
 
 export interface AgentChatProps {
-  onComplete: (result: AgentResult) => void;
+  onComplete?: (result: AgentResult) => void;
   onCancel: () => void;
   onLaunch?: (result: AgentResult) => void | Promise<void>;
   initialAnswer?: string;
@@ -149,8 +207,11 @@ export interface AgentChatProps {
 export interface AgentResult {
   summary: string;
   prompt: string;
+  shortPrompt?: string;
   intent: AgentIntent | null;
-  transcript: AgentChatMessage[];
+  transcript?: AgentChatMessage[];
+  musicParams?: Record<string, unknown>;
+  researchNotes?: string;
 }
 
 interface UiMessage {
@@ -175,11 +236,14 @@ export function AgentChat({
   selectedVocal = "",
   agentInitiates = false,
 }: AgentChatProps) {
+  const { i18n: i18nInst } = useTranslation();
+  const chips = useWizardChips(i18nInst.resolvedLanguage ?? i18nInst.language ?? "ru");
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [history, setHistory] = useState<AgentChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);
-  const [thinkingStatus, setThinkingStatus] = useState("Думаю…");
+  const isEn = (i18nInst.resolvedLanguage ?? "ru").startsWith("en");
+  const [thinkingStatus, setThinkingStatus] = useState(isEn ? "Thinking…" : "Думаю…");
   const [thinkingElapsed, setThinkingElapsed] = useState(0);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -192,9 +256,7 @@ export function AgentChat({
   const wizardParams = useRef<WizardParams>({ lyrics: "", genre: "", mood: "", tempo: "", vocal: "" });
   const lyricsGeneratedRef = useRef(false); // true once agent has drafted lyrics
 
-  const [result, setResult] = useState<
-    { summary: string; prompt: string; intent: AgentIntent | null } | null
-  >(null);
+  const [result, setResult] = useState<AgentResult | null>(null);
 
   const thinkingTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const thinkingTick = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -218,23 +280,23 @@ export function AgentChat({
 
     const phases = isBootstrap
       ? [
-          { delay: 0,    text: "Обрабатываю сообщение…" },
-          { delay: 2000, text: "Формулирую ответ…" },
+          { delay: 0,    text: isEn ? "Processing your message…"  : "Обрабатываю сообщение…" },
+          { delay: 2000, text: isEn ? "Formulating a reply…"       : "Формулирую ответ…" },
         ]
       : lyricsPhase
       ? [
-          { delay: 0,     text: "Анализирую тему…" },
-          { delay: 2500,  text: "Пишу текст песни…" },
-          { delay: 7000,  text: "Подбираю слова и рифмы…" },
-          { delay: 14000, text: "Дорабатываю черновик…" },
-          { delay: 22000, text: "Почти готово, ещё немного…" },
+          { delay: 0,     text: isEn ? "Analysing the topic…"          : "Анализирую тему…" },
+          { delay: 2500,  text: isEn ? "Writing the lyrics…"           : "Пишу текст песни…" },
+          { delay: 7000,  text: isEn ? "Picking words and rhymes…"     : "Подбираю слова и рифмы…" },
+          { delay: 14000, text: isEn ? "Refining the draft…"           : "Дорабатываю черновик…" },
+          { delay: 22000, text: isEn ? "Almost done, just a bit more…" : "Почти готово, ещё немного…" },
         ]
       : [
-          { delay: 0,     text: "Анализирую запрос…" },
-          { delay: 2500,  text: "Думаю над ответом…" },
-          { delay: 6000,  text: "Подбираю параметры…" },
-          { delay: 12000, text: "Обрабатываю детали…" },
-          { delay: 20000, text: "Это занимает немного больше обычного…" },
+          { delay: 0,     text: isEn ? "Analysing the request…"           : "Анализирую запрос…" },
+          { delay: 2500,  text: isEn ? "Thinking about a response…"       : "Думаю над ответом…" },
+          { delay: 6000,  text: isEn ? "Picking parameters…"              : "Подбираю параметры…" },
+          { delay: 12000, text: isEn ? "Processing details…"              : "Обрабатываю детали…" },
+          { delay: 20000, text: isEn ? "This is taking a bit longer than usual…" : "Это занимает немного больше обычного…" },
         ];
 
     phases.forEach(({ delay, text }) => {
@@ -248,8 +310,8 @@ export function AgentChat({
     thinkingTimers.current = [];
     if (thinkingTick.current) { clearInterval(thinkingTick.current); thinkingTick.current = null; }
     setThinkingElapsed(0);
-    setThinkingStatus("Думаю…");
-  }, []);
+    setThinkingStatus(isEn ? "Thinking…" : "Думаю…");
+  }, [isEn]);
 
   // ── scroll ──
   useEffect(() => {
@@ -315,7 +377,7 @@ export function AgentChat({
         } catch (err) {
           const { message, is401 } = extractError(err);
           setNeedsAuth(is401);
-          setError(is401 ? "Войдите в аккаунт чтобы использовать агента" : message);
+          setError(is401 ? (isEn ? "Sign in to use the agent" : "Войдите в аккаунт чтобы использовать агента") : message);
         } finally {
           setThinking(false);
           stopThinking();
@@ -352,54 +414,52 @@ export function AgentChat({
     });
   }
 
-  // Called when user clicks "✓ Принять текст"
+  // Called when user clicks "Accept lyrics"
   function handleAcceptLyrics() {
     addLocalPair(
-      "✓ Принимаю текст",
-      "Отлично, текст принят! Теперь выбери жанр музыки:",
-      GENRE_CHIPS,
+      isEn ? "Accept lyrics" : "Принимаю текст",
+      isEn ? "Great, lyrics accepted! Now pick a music genre:" : "Отлично, текст принят! Теперь выбери жанр музыки:",
+      chips.genreChips,
     );
     setWizardPhase("genre");
   }
 
-  // Called when user clicks "✏ Редактировать"
   function handleEditLyrics() {
-    // Return to free mode so user can type their edits
     setWizardPhase("free");
   }
 
   function handleGenreSelect(genre: string) {
-    wizardParams.current.genre = genre === "Не знаю — подбери сам" ? "" : genre;
-    const agentMsg = genre === "Не знаю — подбери сам"
-      ? "Агент подберёт жанр! Какое настроение хочешь?"
-      : `${genre} — хороший выбор! Настроение трека?`;
-    addLocalPair(genre, agentMsg, MOOD_CHIPS);
+    wizardParams.current.genre = genre === chips.genreUnknown ? "" : genre;
+    const agentMsg = genre === chips.genreUnknown
+      ? (isEn ? "Agent will pick a genre! What mood do you want?" : "Агент подберёт жанр! Какое настроение хочешь?")
+      : (isEn ? `${genre} — nice pick! What mood for the track?` : `${genre} — хороший выбор! Настроение трека?`);
+    addLocalPair(genre, agentMsg, chips.moodChips);
     setWizardPhase("mood");
   }
 
   function handleMoodSelect(mood: string) {
-    wizardParams.current.mood = MOOD_MAP[mood] || mood.toLowerCase();
-    addLocalPair(mood, "Темп?", TEMPO_CHIPS);
+    wizardParams.current.mood = chips.moodValue(mood);
+    addLocalPair(mood, isEn ? "Tempo?" : "Темп?", chips.tempoChips);
     setWizardPhase("tempo");
   }
 
   function handleTempoSelect(tempo: string) {
-    wizardParams.current.tempo = TEMPO_MAP[tempo] || "medium";
-    addLocalPair(tempo, "Вокал?", VOCAL_CHIPS);
+    wizardParams.current.tempo = chips.tempoValue(tempo);
+    addLocalPair(tempo, isEn ? "Vocals?" : "Вокал?", chips.vocalChips);
     setWizardPhase("vocal");
   }
 
   async function handleVocalSelect(vocal: string) {
-    wizardParams.current.vocal = VOCAL_MAP[vocal] || "";
-    // Add local user message immediately, then finalize via GPT
+    wizardParams.current.vocal = chips.vocalValue(vocal);
+    const buildingMsg = isEn ? "Building the final prompt…" : "Собираю финальный промт…";
     const now = Date.now();
     const uMsg: UiMessage = { id: `u-${now}`, role: "user", text: vocal };
-    const thinkMsg: UiMessage = { id: `a-${now + 1}`, role: "agent", text: "Собираю финальный промт…" };
+    const thinkMsg: UiMessage = { id: `a-${now + 1}`, role: "agent", text: buildingMsg };
     setMessages((prev) => [...prev, uMsg, thinkMsg]);
     const nextHistory: AgentChatMessage[] = [
       ...historyRef.current,
       { role: "user", content: vocal },
-      { role: "agent", content: "Собираю финальный промт…" },
+      { role: "agent", content: buildingMsg },
     ];
     setHistory(nextHistory);
     historyRef.current = nextHistory;
@@ -439,14 +499,14 @@ export function AgentChat({
     setThinking(true);
     setError(null);
 
-    // Only show lyrics-phase thinking indicator BEFORE lyrics have been generated
-    const mightGenerateLyrics =
-      !lyricsGeneratedRef.current &&
-      /текст|лирик|слова|куплет|припев|стих|напиши|черновик/i.test(text);
+    // Only show lyrics-phase ("Пишу текст…") when the agent has ALREADY drafted
+    // lyrics in this thread — predicting from the user's wording produced false
+    // positives (any «текст / напиши» triggered the lyrics phase even for plain
+    // chitchat).
     const historyHasLyricsAlready = !lyricsGeneratedRef.current && nextHistory.some(
-      (m) => hasLyrics(m.content)
+      (m) => m.role === "agent" && hasLyrics(m.content)
     );
-    startThinking(mightGenerateLyrics || historyHasLyricsAlready, false);
+    startThinking(historyHasLyricsAlready, false);
 
     const p = wizardParams.current;
     try {
@@ -498,7 +558,11 @@ export function AgentChat({
           intent.params.lyrics = wizardParams.current.lyrics;
           intent.params.text_mode = "custom";
         }
-        setResult({ summary: resp.summary, prompt: resp.prompt, intent });
+        setResult({
+          summary: resp.summary, prompt: resp.prompt,
+          shortPrompt: resp.short_prompt, intent,
+          musicParams: resp.music_params, researchNotes: resp.research_notes,
+        });
         setDone(true);
         setWizardPhase("free");
       }
@@ -523,8 +587,8 @@ export function AgentChat({
   }
 
   function handleAccept() {
-    if (!result) return;
-    onComplete({ summary: result.summary, prompt: result.prompt, intent: result.intent, transcript: history });
+    if (!result || !onComplete) return;
+    onComplete({ ...result, transcript: history });
   }
 
   async function handleLaunch() {
@@ -532,7 +596,7 @@ export function AgentChat({
     setLaunching(true);
     setError(null);
     try {
-      await onLaunch({ summary: result.summary, prompt: result.prompt, intent: result.intent, transcript: history });
+      await onLaunch({ ...result, transcript: history });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось запустить генерацию");
     } finally {
@@ -549,7 +613,7 @@ export function AgentChat({
     if (wizardPhase === "genre") {
       return (
         <div className="agent-suggestions">
-          {GENRE_CHIPS.map((g) => (
+          {chips.genreChips.map((g) => (
             <button key={g} type="button" className="agent-suggestion-chip" onClick={() => handleGenreSelect(g)}>{g}</button>
           ))}
         </div>
@@ -558,7 +622,7 @@ export function AgentChat({
     if (wizardPhase === "mood") {
       return (
         <div className="agent-suggestions">
-          {MOOD_CHIPS.map((m) => (
+          {chips.moodChips.map((m) => (
             <button key={m} type="button" className="agent-suggestion-chip" onClick={() => handleMoodSelect(m)}>{m}</button>
           ))}
         </div>
@@ -567,8 +631,8 @@ export function AgentChat({
     if (wizardPhase === "tempo") {
       return (
         <div className="agent-suggestions">
-          {TEMPO_CHIPS.map((t) => (
-            <button key={t} type="button" className="agent-suggestion-chip" onClick={() => handleTempoSelect(t)}>{t}</button>
+          {chips.tempoChips.map((tp) => (
+            <button key={tp} type="button" className="agent-suggestion-chip" onClick={() => handleTempoSelect(tp)}>{tp}</button>
           ))}
         </div>
       );
@@ -576,7 +640,7 @@ export function AgentChat({
     if (wizardPhase === "vocal") {
       return (
         <div className="agent-suggestions">
-          {VOCAL_CHIPS.map((v) => (
+          {chips.vocalChips.map((v) => (
             <button key={v} type="button" className="agent-suggestion-chip" onClick={() => void handleVocalSelect(v)}>{v}</button>
           ))}
         </div>
@@ -591,7 +655,9 @@ export function AgentChat({
   const showLyricsIndicator =
     thinking &&
     !lyricsGeneratedRef.current &&
-    (thinkingStatus.includes("Пишу текст") || thinkingStatus.includes("Анализирую тему") || thinkingStatus.includes("Подбираю слова"));
+    (thinkingStatus.includes("Пишу текст") || thinkingStatus.includes("Анализирую тему") ||
+     thinkingStatus.includes("Подбираю слова") || thinkingStatus.includes("Writing") ||
+     thinkingStatus.includes("Analysing") || thinkingStatus.includes("Picking words"));
 
   return (
     <div className="agent-chat">
@@ -602,12 +668,12 @@ export function AgentChat({
             <strong>RIFFA Agent</strong>
             <p className="agent-chat__head-hint">
               {done
-                ? "Бриф готов"
+                ? (isEn ? "Brief ready" : "Бриф готов")
                 : thinking
                 ? thinkingStatus
                 : messages.length === 0
-                ? "Жду твоего сообщения"
-                : "Собираю промт"}
+                ? (isEn ? "Waiting for your message" : "Жду твоего сообщения")
+                : (isEn ? "Building prompt" : "Собираю промт")}
             </p>
           </div>
         </div>
@@ -632,11 +698,12 @@ export function AgentChat({
               title="Начать новый диалог"
               aria-label="Новый чат"
             >
-              ↺ Новый чат
+              <IconRefresh />
+              <span>Новый чат</span>
             </button>
           )}
           <button type="button" className="agent-chat__close" onClick={onCancel} aria-label="Закрыть чат">
-            <span aria-hidden="true">✕</span>
+            <IconClose />
             <span className="agent-chat__close-text">закрыть чат</span>
           </button>
         </div>
@@ -667,14 +734,14 @@ export function AgentChat({
                     className="agent-lyrics-btn agent-lyrics-btn--accept"
                     onClick={handleAcceptLyrics}
                   >
-                    ✓ Принять текст
+                    <IconCheck /> Принять текст
                   </button>
                   <button
                     type="button"
                     className="agent-lyrics-btn agent-lyrics-btn--edit"
                     onClick={handleEditLyrics}
                   >
-                    ✏ Редактировать
+                    <IconPencil /> Редактировать
                   </button>
                 </div>
               )}
@@ -710,7 +777,7 @@ export function AgentChat({
               <span className="agent-typing"><span /><span /><span /></span>
               <span className="agent-thinking__status">{thinkingStatus}</span>
               {showLyricsIndicator && (
-                <span className="agent-thinking__lyrics-badge">✍ Генерирую текст</span>
+                <span className="agent-thinking__lyrics-badge"><IconPencil /> Генерирую текст</span>
               )}
               {thinkingElapsed >= 5 && (
                 <span className="agent-thinking__elapsed">{thinkingElapsed}с</span>
@@ -721,7 +788,7 @@ export function AgentChat({
 
         {error && (
           <div className="agent-chat__error">
-            <p>⚠ {error}</p>
+            <p><IconWarn /> {error}</p>
             {needsAuth && (
               <Button variant="secondary" onClick={() => navigate("/login")}>
                 Войти в аккаунт
@@ -740,8 +807,16 @@ export function AgentChat({
             )}
             <h4>Бриф</h4>
             <pre className="agent-result__summary">{result.summary || "—"}</pre>
-            <h4>Готовый prompt для Suno</h4>
-            <pre className="agent-result__prompt">{result.prompt}</pre>
+            {result.shortPrompt && (
+              <div className="agent-result__suno">
+                <span className="agent-result__suno-label">
+                  {isEn ? "Suno prompt" : "Suno-промт"}
+                </span>
+                <p className="agent-result__suno-text">{result.shortPrompt}</p>
+              </div>
+            )}
+            {/* The FULL prompt (with research notes + every param) stays
+                hidden — only the short distillation goes to the user. */}
           </div>
         )}
       </div>
@@ -770,12 +845,27 @@ export function AgentChat({
         <div className="agent-chat__actions">
           {onLaunch && result?.intent ? (
             <Button onClick={handleLaunch} disabled={launching}>
-              {launching ? "Запускаю…" : "🚀 Запустить генерацию"}
+              {launching ? (isEn ? "Launching…" : "Запускаю…") : (isEn ? "Launch generation" : "Запустить генерацию")}
             </Button>
           ) : null}
-          <Button variant="secondary" onClick={handleAccept} disabled={launching}>
-            Вставить в форму
+          <Button
+            variant="secondary"
+            onClick={() => {
+              // Re-open the chat but KEEP the previous result so the user
+              // can still launch the original brief if they change their
+              // mind, and so the backend agent has the brief in context.
+              setDone(false);
+              setWizardPhase("free");
+            }}
+            disabled={launching}
+          >
+            {isEn ? "Refine the brief" : "Дополнить бриф"}
           </Button>
+          {onComplete && (
+            <Button variant="secondary" onClick={handleAccept} disabled={launching}>
+              {isEn ? "Insert into form" : "Вставить в форму"}
+            </Button>
+          )}
         </div>
       )}
     </div>

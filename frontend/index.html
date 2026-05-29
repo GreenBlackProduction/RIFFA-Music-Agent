@@ -2,36 +2,191 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RIFFA — AI Music Studio</title>
-    <meta name="description" content="Создавай песни, инструменталы, обложки и звуковые эффекты с помощью ИИ. Веб-версия RIFFA Music Bot." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>RIFFA Studio — Suno AI на русском, генератор песен и музыки нейросетью</title>
+    <meta name="description" content="RIFFA Studio — Suno на русском: создавайте песни с вокалом, инструменталы, обложки и звуковые эффекты через ИИ за минуту. ИИ радио с треками сообщества, генерация музыки и каверов. Бесплатные стартовые токены, оплата картой РФ и Telegram Stars." />
+    <meta name="keywords" content="Suno, Suno ai, Suno на русском, генерация суно, создать песню с помощью ИИ, генерация музыки, ИИ музыка, ИИ радио, нейросеть для музыки, AI музыка на русском, создать песню онлайн, сгенерировать песню по тексту, искусственный интеллект музыка, песня в подарок, обложка для трека ИИ, инструментал онлайн, кавер ИИ, генератор треков, музыка нейросетью, аналог Suno, альтернатива Suno" />
+    <meta name="author" content="RIFFA Studio" />
+    <link rel="canonical" href="https://riffastudio.site/" />
+
+    <!-- Search engine verifications -->
+    <meta name="yandex-verification" content="c3f38bcf4546809b" />
+    <meta name="google-site-verification" content="googlecb771728a9cc21da" />
+
+    <!-- OpenGraph для шеринга в соцсетях (VK, Telegram, Facebook) -->
+    <!-- og:image points to the BETA domain so beta link previews work. The
+         brand assets are deployed to /root/static_beta/brand/ — accessible
+         at https://beta.riffastudio.site/brand/... -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://beta.riffastudio.site/" />
+    <meta property="og:title" content="RIFFA Studio — Suno AI на русском, генератор песен нейросетью" />
+    <meta property="og:description" content="Создавай песни, инструменталы, обложки и каверы через ИИ за минуту. Suno на русском, ИИ радио, оплата картой РФ и Telegram Stars." />
+    <meta property="og:image" content="https://beta.riffastudio.site/brand/04-applications/riffa-og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="RIFFA Studio" />
+    <meta property="og:site_name" content="RIFFA Studio" />
+    <meta property="og:locale" content="ru_RU" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="RIFFA Studio — Suno AI на русском" />
+    <meta name="twitter:description" content="Генерация музыки и песен нейросетью за минуту. ИИ радио, каверы, обложки." />
+    <meta name="twitter:image" content="https://beta.riffastudio.site/brand/04-applications/riffa-og-image.png" />
+
+    <!-- Schema.org разметка (для богатых результатов в поиске) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "RIFFA Studio",
+      "alternateName": ["Suno на русском", "ИИ генератор музыки"],
+      "url": "https://riffastudio.site/",
+      "description": "Онлайн-генератор песен, инструменталов, каверов, обложек и звуковых эффектов на основе ИИ. Suno на русском, ИИ радио, оплата картой РФ.",
+      "keywords": "Suno, Suno ai, Suno на русском, генерация суно, создать песню с помощью ИИ, генерация музыки, ИИ музыка, ИИ радио, нейросеть для музыки, AI музыка на русском, аналог Suno, альтернатива Suno, генератор треков, кавер ИИ",
+      "applicationCategory": "MusicApplication",
+      "operatingSystem": "Web, iOS, Android",
+      "offers": {
+        "@type": "Offer",
+        "priceCurrency": "RUB",
+        "price": "0",
+        "description": "Стартовые токены бесплатно. Платные пакеты от 100 ₽ до 999 ₽."
+      },
+      "inLanguage": "ru",
+      "creator": {
+        "@type": "Organization",
+        "name": "RIFFA Studio"
+      }
+    }
+    </script>
+
+    <link rel="icon" type="image/svg+xml" href="/brand/04-applications/riffa-favicon-32.svg" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="preload" href="/favicon.png" as="image" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- PWA / Home-screen install (iOS Safari требует отдельные мета-теги). -->
+    <!-- apple-mobile-web-app-capable=yes критичен для того, чтобы iOS
+         связывал «Now Playing» в Control Center с нашим PWA, а не с
+         посторонним приложением. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="RIFFA" />
+    <meta name="application-name" content="RIFFA Studio" />
+    <link rel="apple-touch-icon" href="/brand/04-applications/riffa-app-icon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />
+
     <link rel="preload" href="/sounds/notification.mp3" as="audio" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Non-blocking font load: текст сразу рендерится с fallback, шрифт подгружается асинхронно -->
     <!--
-      Шрифты RIFFA:
-      • Sora 600/700/800 — заголовки, лого, hero-секции (геометрика с характером)
-      • Manrope 400/500/600/700 — body + UI: отличная читаемость при 11-12px
-      • JetBrains Mono — пресеты, промт-превью, mono-код
+      Шрифты RIFFA v1.0 (финальная идентичность):
+      • Archivo Black 900 — wordmark, display-заголовки
+      • Inter 400/500/600/700 — body + UI
+      • JetBrains Mono 400/500/600 — подписи, мета, цифры, чипы
     -->
     <link
       rel="preload"
       as="style"
-      href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Archivo+Black&display=swap"
       onload="this.onload=null;this.rel='stylesheet'"
     />
     <noscript>
       <link
         rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Archivo+Black&display=swap"
       />
     </noscript>
+    <!-- Telegram Mini App SDK — must load before React so initData is available -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Yandex.Metrika counter -->
+    <script type="text/javascript">
+      (function(m,e,t,r,i,k,a){
+          m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+          m[i].l=1*new Date();
+          for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+          k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+      })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=109298074', 'ym');
+
+      ym(109298074, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+    </script>
+    <!-- /Yandex.Metrika counter -->
+    <!-- (noscript-fallback пропущен — сайт это SPA на React, без JS не работает в принципе) -->
   </head>
   <body>
-    <div id="root"></div>
+    <!-- Splash-экран загрузки: красивая заставка пока React монтируется.
+         React заменяет содержимое #root, поэтому этот splash сам исчезнет. -->
+    <style>
+      .riffa-splash {
+        position: fixed; inset: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        background: #E9E5DA;
+        color: #161413; font-family: system-ui, -apple-system, "Inter", "Helvetica Neue", Arial, sans-serif;
+        z-index: 9999;
+      }
+      .riffa-splash__logo {
+        width: 72px; height: 72px;
+        animation: riffa-pulse 1.6s ease-in-out infinite;
+      }
+      .riffa-splash__brand {
+        margin-top: 20px; font-size: 13px; font-weight: 600;
+        letter-spacing: 0.02em; font-family: ui-monospace, "SF Mono", monospace;
+        color: #161413;
+      }
+      .riffa-splash__sub {
+        margin-top: 6px; color: #8E887F; font-size: 12px;
+      }
+      @keyframes riffa-pulse {
+        0%, 100% { transform: scale(1);   opacity: 1; }
+        50%      { transform: scale(1.04); opacity: 0.85; }
+      }
+      /* visually-hidden — для SEO-контента: боты Google/Яндекс читают, люди не видят.
+         Использование класса sr-only — стандартная accessibility-практика, не считается клоакингом. */
+      .sr-only {
+        position: absolute !important;
+        width: 1px !important; height: 1px !important;
+        padding: 0 !important; margin: -1px !important;
+        overflow: hidden !important; clip: rect(0,0,0,0) !important;
+        white-space: nowrap !important; border: 0 !important;
+      }
+    </style>
+    <div id="root">
+      <!-- Splash для пользователя (исчезает когда React смонтируется) -->
+      <div class="riffa-splash" aria-hidden="true">
+        <img src="/brand/01-mark/riffa-mark.svg" alt="" class="riffa-splash__logo" width="72" height="72" />
+        <div class="riffa-splash__brand">RIFFA<small>Studio</small></div>
+        <div class="riffa-splash__sub">Загружаем студию…</div>
+      </div>
+      <!-- SEO-контент для поисковых ботов (визуально скрыт, в HTML видим) -->
+      <div class="sr-only">
+        <h1>RIFFA Studio — генератор музыки и песен нейросетью, Suno AI на русском</h1>
+        <p>RIFFA Studio — онлайн-сервис на русском языке для генерации музыки с помощью ИИ. Создавайте полноценные песни с вокалом, инструменталы, кавер-версии, звуковые эффекты и обложки треков нейросетью за одну минуту. Альтернатива Suno AI с русским интерфейсом, оплатой картой РФ и встроенным ИИ радио.</p>
+        <h2>Suno на русском и генерация музыки нейросетью</h2>
+        <p>RIFFA Studio даёт российским пользователям доступ к мировым моделям генерации музыки (Suno, ElevenLabs) без VPN и зарубежных карт. Просто опишите идею песни — нейросеть сама напишет текст и музыку. Поддерживаются все жанры: поп, рок, электроника, рэп, лофи, эмбиент, хип-хоп, фолк.</p>
+        <h2>Что можно сгенерировать</h2>
+        <ul>
+          <li>Песни с вокалом через ИИ — жанр, настроение, темп, мужской или женский голос, трек 2-4 минуты с куплетами, припевами и собственным текстом.</li>
+          <li>Инструменталы нейросетью — фоновая музыка для блогов, видео, подкастов, стримов без копирайта.</li>
+          <li>Обложки альбомов ИИ — квадратные изображения 1024×1024, в стиле трека.</li>
+          <li>Кавер-версии (ИИ кавер) — переработка существующих треков в новом стиле и голосе.</li>
+          <li>Звуковые эффекты — короткие звуки до 30 секунд.</li>
+          <li>ИИ радио — лента треков сообщества с лайками, голосованием и сортировкой по жанрам.</li>
+        </ul>
+        <h2>Как создать песню с помощью ИИ</h2>
+        <p>Опишите идею своими словами или воспользуйтесь умным ИИ-агентом — он сам задаст уточняющие вопросы и соберёт промт для генерации суно. Готовый трек придёт через 1-2 минуты, обложка — через 20 секунд. Сразу можно скачать в MP3 или WAV, поделиться ссылкой или опубликовать в ИИ радио.</p>
+        <h2>Для кого</h2>
+        <p>RIFFA Studio пригодится контент-мейкерам TikTok и Reels, ведущим YouTube-каналов, стримерам, инди-разработчикам игр, поэтам и блогерам, организаторам мероприятий, тем кто хочет подарить близкому уникальную песню на день рождения, свадьбу или годовщину.</p>
+        <h2>Оплата и доступ</h2>
+        <p>Стартовые токены — бесплатно после регистрации. Платные пакеты от 100 рублей. Оплата картой РФ через Robokassa, СБП или Telegram Stars. Доступ через сайт riffastudio.site или Telegram-бот The_Riffa_bot.</p>
+        <h2>Популярные запросы</h2>
+        <p>Пользователи находят RIFFA Studio по запросам: Suno, Suno ai, Suno на русском, генерация суно, создать песню с помощью ИИ, генерация музыки, ИИ музыка, ИИ радио, нейросеть для музыки, AI музыка на русском, аналог Suno, альтернатива Suno, генератор треков ИИ, кавер ИИ.</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

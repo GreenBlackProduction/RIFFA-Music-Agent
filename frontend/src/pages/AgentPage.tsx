@@ -1,58 +1,60 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
-import { AgentChat, type AgentResult } from "@/components/studio/AgentChat";
+import { AgentChat } from "@/components/studio/AgentChat";
 import "./AgentPage.css";
 
 export function AgentPage() {
   const navigate = useNavigate();
-  const [result, setResult] = useState<AgentResult | null>(null);
-
-  if (result) {
-    return (
-      <div className="agent-page-result">
-        <div className="agent-page-result__card">
-          <h2 className="agent-page-result__title">Бриф готов</h2>
-          {result.intent?.note && (
-            <p className="agent-page-result__note">{result.intent.note}</p>
-          )}
-          <div className="agent-page-result__section">
-            <span className="agent-page-result__label">Описание</span>
-            <pre className="agent-page-result__pre">{result.summary}</pre>
-          </div>
-          <div className="agent-page-result__section">
-            <span className="agent-page-result__label">Suno prompt</span>
-            <pre className="agent-page-result__pre">{result.prompt}</pre>
-          </div>
-          <div className="agent-page-result__actions">
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => navigate("/studio")}
-            >
-              Открыть Студию
-            </button>
-            <button
-              type="button"
-              className="btn btn--secondary"
-              onClick={() => setResult(null)}
-            >
-              Начать заново
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const { i18n } = useTranslation();
+  const isEN = (i18n.resolvedLanguage || i18n.language || "ru").startsWith("en");
+  useEffect(() => {
+    document.body.classList.add("agent-page-open");
+    return () => document.body.classList.remove("agent-page-open");
+  }, []);
 
   return (
     <div className="agent-page">
-      <AgentChat
-        agentInitiates
-        module="song"
-        onComplete={setResult}
-        onCancel={() => navigate("/studio")}
-      />
+      <div className="top-meta">
+        <div className="breadcrumb">
+          <b>{isEN ? "ai agent" : "ии-агент"}</b>
+        </div>
+      </div>
+
+      <h1 className="h-page">
+        {isEN ? <>Tell an idea — <em>I'll launch</em> generation.</> : <>Расскажи идею — <em>запущу</em> генерацию.</>}
+      </h1>
+      <p className="h-lead">
+        {isEN
+          ? "Don't know what to choose? Describe the idea — I'll ask only necessary questions, collect a detailed prompt and launch the right module."
+          : "Не знаешь, что выбрать? Опиши идею — задам уточняющие вопросы только если нужно, соберу детальный prompt и запущу нужный модуль."}
+      </p>
+
+      <div className="agent-chat-wrap">
+        <AgentChat
+          agentInitiates
+          module="song"
+          onLaunch={async (r) => {
+            // Сохраняем бриф и переходим в студию — StudioPage подхватит
+            // sessionStorage и автоматически запустит generation через
+            // handleAgentLaunch (его логика уже есть).
+            try {
+              sessionStorage.setItem(
+                "riffa_pending_agent_launch",
+                JSON.stringify({
+                  summary: r.summary,
+                  prompt: r.prompt,
+                  intent: r.intent,
+                  transcript: r.transcript,
+                }),
+              );
+            } catch { /* sessionStorage может быть недоступен */ }
+            navigate("/studio");
+          }}
+          onCancel={() => navigate("/studio")}
+        />
+      </div>
     </div>
   );
 }

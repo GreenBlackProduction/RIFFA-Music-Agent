@@ -14,6 +14,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   adminCreatePromocode,
@@ -27,6 +28,7 @@ import {
   adminUpdatePromocode,
   type AdminUserDetail,
   type AdminUserRow,
+  type AdminUserStatus,
 } from "@/lib/api/admin";
 
 import "./AdminPage.css";
@@ -53,6 +55,7 @@ function fmtDate(iso: string | null): string {
 // ─── Stats ──────────────────────────────────────────────────────────────────
 
 function StatsRow() {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({
     queryKey: ADMIN_STATS_KEY,
     queryFn: adminFetchStats,
@@ -62,18 +65,18 @@ function StatsRow() {
   if (isLoading || !data) {
     return (
       <div className="admin-stats admin-stats--loading">
-        <span>Загружаем сводку…</span>
+        <span>{t("admin.loadingSummary")}</span>
       </div>
     );
   }
 
   const tiles = [
-    { label: "Пользователей", value: data.total_users },
-    { label: "В банe", value: data.banned_users },
-    { label: "Админов", value: data.admins },
-    { label: "Генераций", value: data.total_generations },
-    { label: "Готовых", value: data.completed_generations },
-    { label: "Промокодов", value: data.active_promocodes },
+    { label: t("admin.users"),            value: data.total_users },
+    { label: t("admin.banned"),           value: data.banned_users },
+    { label: t("admin.admins"),           value: data.admins },
+    { label: t("admin.totalGenerations"), value: data.total_generations },
+    { label: t("admin.completed"),        value: data.completed_generations },
+    { label: t("admin.activePromocodes"), value: data.active_promocodes },
   ];
   return (
     <div className="admin-stats">
@@ -89,47 +92,82 @@ function StatsRow() {
 
 // ─── Users panel ────────────────────────────────────────────────────────────
 
+const USER_FILTERS: { value: AdminUserStatus; key: string }[] = [
+  { value: "all",            key: "admin.filterAll" },
+  { value: "active_30d",     key: "admin.filterActive30d" },
+  { value: "inactive_30d",   key: "admin.filterInactive30d" },
+  { value: "morning_on",     key: "admin.filterMorningOn" },
+  { value: "morning_off",    key: "admin.filterMorningOff" },
+  { value: "telegram_only",  key: "admin.filterTelegramOnly" },
+  { value: "email_only",     key: "admin.filterEmailOnly" },
+  { value: "banned",         key: "admin.filterBanned" },
+  { value: "admins",         key: "admin.filterAdmins" },
+];
+
 function UsersPanel({
   onSelectUser,
 }: {
   onSelectUser: (u: AdminUserRow) => void;
 }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<AdminUserStatus>("all");
   const { data, isLoading } = useQuery({
-    queryKey: [...ADMIN_USERS_KEY, query] as const,
-    queryFn: () => adminFetchUsers({ q: query.trim() || undefined, limit: 100 }),
+    queryKey: [...ADMIN_USERS_KEY, query, filter] as const,
+    queryFn: () =>
+      adminFetchUsers({
+        q: query.trim() || undefined,
+        status: filter,
+        limit: 100,
+      }),
     placeholderData: (prev) => prev,
   });
 
   return (
     <section className="admin-panel">
       <header className="admin-panel__header">
-        <h2 className="admin-panel__title">Пользователи</h2>
+        <h2 className="admin-panel__title">{t("admin.sectionUsers")}</h2>
         <input
           type="search"
-          placeholder="Поиск: имя, email, @username"
+          placeholder={t("admin.searchPlaceholder")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="admin-search"
         />
       </header>
 
+      <div className="admin-filters" role="tablist" aria-label={t("admin.filterAria")}>
+        {USER_FILTERS.map((f) => (
+          <button
+            key={f.value}
+            type="button"
+            role="tab"
+            aria-selected={filter === f.value}
+            className={`filter-chip${filter === f.value ? " filter-chip--active" : ""}`}
+            onClick={() => setFilter(f.value)}
+          >
+            {t(f.key)}
+          </button>
+        ))}
+      </div>
+
       {isLoading && !data ? (
-        <div className="admin-empty">Загружаем…</div>
+        <div className="admin-empty">{t("admin.loadingUsers")}</div>
       ) : !data || data.users.length === 0 ? (
-        <div className="admin-empty">Ничего не найдено</div>
+        <div className="admin-empty">{t("admin.notFound")}</div>
       ) : (
         <div className="admin-table-wrap">
           <table className="admin-table">
             <thead>
               <tr>
                 <th>#</th>
-                <th>Пользователь</th>
-                <th>Регистрация</th>
-                <th>Баланс</th>
-                <th>Генераций</th>
-                <th>Статус</th>
-                <th>Создан</th>
+                <th>{t("admin.colUser")}</th>
+                <th>{t("admin.colRegistered")}</th>
+                <th>{t("admin.colBalance")}</th>
+                <th>{t("admin.colGenerations")}</th>
+                <th>{t("admin.colStatus")}</th>
+                <th>{t("admin.colCreated")}</th>
+                <th>{t("admin.colLastSeen")}</th>
                 <th />
               </tr>
             </thead>
@@ -156,23 +194,24 @@ function UsersPanel({
                   <td className="admin-table__num">{u.generations_count}</td>
                   <td>
                     {u.is_banned ? (
-                      <span className="admin-pill admin-pill--ban">Бан</span>
+                      <span className="admin-pill admin-pill--ban">{t("admin.statusBan")}</span>
                     ) : u.notice_kind === "warning" ? (
-                      <span className="admin-pill admin-pill--warn">Предупр.</span>
+                      <span className="admin-pill admin-pill--warn">{t("admin.statusWarn")}</span>
                     ) : u.is_admin ? (
-                      <span className="admin-pill admin-pill--admin">Админ</span>
+                      <span className="admin-pill admin-pill--admin">{t("admin.statusAdmin")}</span>
                     ) : (
                       <span className="admin-pill admin-pill--ok">OK</span>
                     )}
                   </td>
                   <td className="admin-table__date">{fmtDate(u.created_at)}</td>
+                  <td className="admin-table__date">{fmtDate(u.last_seen_at)}</td>
                   <td>
                     <button
                       type="button"
                       className="admin-btn admin-btn--small"
                       onClick={() => onSelectUser(u)}
                     >
-                      Открыть
+                      {t("admin.openUser")}
                     </button>
                   </td>
                 </tr>
@@ -607,7 +646,9 @@ function PromocodesPanel() {
 // ─── AdminPage ──────────────────────────────────────────────────────────────
 
 export function AdminPage() {
+  const { t } = useTranslation();
   const [openUserId, setOpenUserId] = useState<number | null>(null);
+  void t; // used by child components via prop — suppress unused warning
 
   return (
     <div className="admin-page">

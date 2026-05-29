@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 480" width="1240" height="480">
+  
+  <circle cx="180" cy="240" r="140" fill="#E9E5DA"></circle>
+  <circle cx="180" cy="240" r="106" fill="#161413"></circle>
+  <polygon points="152,189 152,291 240,240" fill="#FF3B1F"></polygon>
+  
+  <text x="394" y="350" font-family="&#39;Archivo Black&#39;, &#39;Inter&#39;, sans-serif" font-weight="900" font-size="280" letter-spacing="-14" fill="#E9E5DA">riffa</text>
+  <polygon points="1070,140 1070,350 1210,245" fill="#FF3B1F"></polygon>
+</svg>

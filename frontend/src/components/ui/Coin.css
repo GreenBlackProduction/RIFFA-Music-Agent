@@ -3,15 +3,14 @@
   vertical-align: -0.2em;
   flex-shrink: 0;
   object-fit: contain;
-  /* Убираем белый фон GIF */
-  mix-blend-mode: screen;
+  color: var(--ink);
   transition: transform 220ms ease, filter 220ms ease;
   animation: coin-idle 3s ease-in-out infinite;
 }
 
 @keyframes coin-idle {
-  0%, 100% { filter: drop-shadow(0 0 3px rgba(245, 190, 0, 0.35)); }
-  50%       { filter: drop-shadow(0 0 8px rgba(245, 190, 0, 0.65)); }
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(22, 20, 19, 0.15)); }
+  50%       { filter: drop-shadow(0 0 5px rgba(22, 20, 19, 0.30)); }
 }
 
 a:hover .riffa-coin,

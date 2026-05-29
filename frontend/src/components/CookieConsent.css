@@ -1,0 +1,75 @@
+/* Cookie-consent banner — fixed bottom bar, above GlobalPlayer.
+   Paper/ink editorial style, RIFFA v3 design tokens. */
+
+.cookie-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-modal); /* above GlobalPlayer (also z-modal=100) — CSS order decides stacking */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 14px 24px;
+  background: var(--paper-3);
+  border-top: 1px solid var(--ink);
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.5;
+  animation: cookie-banner-in 300ms ease-out;
+  box-shadow: 0 -4px 24px rgba(22, 20, 19, 0.12);
+}
+
+@keyframes cookie-banner-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cookie-banner__text {
+  max-width: 560px;
+}
+
+.cookie-banner__text a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.cookie-banner__accept {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid var(--ink);
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+  white-space: nowrap;
+}
+
+.cookie-banner__accept:hover {
+  background: var(--hi);
+  border-color: var(--hi);
+}
+
+@media (max-width: 640px) {
+  .cookie-banner {
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 16px;
+    text-align: center;
+  }
+  .cookie-banner__text {
+    font-size: 12px;
+  }
+}

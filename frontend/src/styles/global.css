@@ -1,96 +1,123 @@
-/* RIFFA — design tokens, typography, animated background.
- * Эстетика: Apple-минимализм + неоновые акценты из логотипа.
+/* RIFFA v3 — design tokens, typography.
+ * Эстетика: editorial paper + ink, чистый геометрический гротеск (Geist).
  */
 
 :root {
-  /* Палитра */
-  --bg: #1d1d38;
-  --bg-2: #222246;
-  --bg-card: #1a1a30;    /* тёмная подложка карточек с градиентами поверх */
+  /* ── Paper palette (light base) ─────────────────── */
+  --paper:   #E9E5DA;
+  --paper-2: #DDD8C9;
+  --paper-3: #F2EFE5;
+  --paper-4: #fbf9f2;
 
-  --panel: rgba(255, 255, 255, 0.05);
-  --panel-strong: rgba(255, 255, 255, 0.09);
-  --panel-elev: rgba(24, 24, 40, 0.7);
+  /* ── Ink (dark text / surfaces) ─────────────────── */
+  --ink:   #161413;
+  --ink-2: #4A4641;
+  --ink-3: #6A655E;
+  --ink-4: #8E887F;
+  --ink-5: #b0aaa0;
 
-  --text: #f6f4ff;
-  --muted: #9b95b6;
-  --muted-2: #6c6786;
+  /* ── Rules / borders ────────────────────────────── */
+  --rule:        rgba(22, 20, 19, 0.18);
+  --rule-soft:   rgba(22, 20, 19, 0.10);
+  --rule-strong: rgba(22, 20, 19, 0.40);
 
-  --accent: #7cff1f;        /* neon green */
-  --accent-2: #ff5a00;      /* neon orange */
-  --accent-3: #d600ff;      /* neon purple */
-  --accent-soft: rgba(124, 255, 31, 0.16);
+  /* ── Accent: red ─────────────────────────────────── */
+  --hi:      #FF3B1F;
+  --hi-2:    #D62D14;
+  --hi-soft: rgba(255, 59, 31, 0.12);
 
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  /* ── Accent: emerald ─────────────────────────────── */
+  --emr:      #0F5D47;
+  --emr-2:    #1A7E64;
+  --emr-soft: rgba(15, 93, 71, 0.12);
 
-  --danger: #fb7185;
-  --success: #34d399;
+  /* ── Semantic aliases (совместимость с существующим кодом) ── */
+  --bg:           var(--paper);
+  --bg-2:         var(--paper-2);
+  --bg-card:      var(--paper-3);
+  --text:         var(--ink);
+  --muted:        var(--ink-4);
+  --muted-2:      var(--ink-5);
+  --accent:       var(--hi);
+  --accent-2:     var(--emr);
+  --accent-3:     var(--hi-2);
+  --accent-soft:  var(--hi-soft);
+  --border:       var(--rule);
+  --border-strong:var(--rule-strong);
+  --danger:       var(--hi);
+  --success:      var(--emr);
+  --text-on-accent: var(--paper);
+  --panel:        var(--paper-3);
+  --panel-strong: var(--paper-2);
+  --panel-elev:   var(--paper-4);
+  --accent-light:   var(--hi);
+  --accent-light-2: var(--emr-2);
+  --accent-light-3: var(--ink-3);
+  --accent-bright:  var(--hi);
+  --accent-gold:    #c8953a;
 
-  /* Светлые акцентные тона (текст на полупрозрачных акцентных фонах) */
-  --accent-light: #cfff9a;
-  --accent-light-2: #ffbe8f;
-  --accent-light-3: #f0b9ff;
-  --accent-bright: #b8ff6a;
-  --accent-gold: #ffd166;
-  --text-on-accent: #0a0c10;
-
-  /* Радиусы */
-  --radius-sm: 14px;
-  --radius-md: 20px;
-  --radius-lg: 28px;
-  --radius-xl: 36px;
+  /* ── Радиусы ─────────────────────────────────────── */
+  --radius-sm:   10px;
+  --radius-md:   14px;
+  --radius-lg:   18px;
+  --radius-xl:   22px;
   --radius-pill: 999px;
 
-  /* Тени */
-  --shadow-soft: 0 24px 80px rgba(0, 0, 0, 0.32);
-  --shadow-glow: 0 0 60px rgba(124, 255, 31, 0.18);
+  /* ── Тени ────────────────────────────────────────── */
+  --shadow-soft: 0 4px 24px rgba(22, 20, 19, 0.12);
+  --shadow-glow: 0 4px 24px rgba(22, 20, 19, 0.12);
 
-  /* Spacing */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 24px;
-  --space-6: 32px;
-  --space-8: 48px;
+  /* ── Spacing ─────────────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  24px;
+  --space-6:  32px;
+  --space-8:  48px;
   --space-10: 64px;
 
-  /* Blur levels */
-  --blur-sm: 8px;
-  --blur-md: 16px;
-  --blur-lg: 28px;
+  /* ── Blur levels (снижены — light-тема не нуждается в сильном blur) ── */
+  --blur-sm: 4px;
+  --blur-md: 8px;
+  --blur-lg: 12px;
 
-  /* Z-index layers */
+  /* ── Z-index layers ──────────────────────────────── */
   --z-content: 1;
-  --z-sticky: 10;
+  --z-sticky:  10;
   --z-overlay: 40;
   --z-sidebar: 50;
-  --z-modal: 100;
-  --z-toast: 200;
+  --z-modal:   100;
+  --z-toast:   200;
 
-  /* ─── Typography ──────────────────────────────────────
-   *  --font-brand:   Sora 800 — логотип, hero-заголовки
-   *  --font-display: Sora 600/700 — заголовки карточек, h2-h3
-   *  --font-body:    Manrope 400/500/600 — основной текст
-   *  --font-ui:      Manrope 500/600 — чипы, кнопки, мелкие ярлыки
-   *  --font-mono:    JetBrains Mono — промт-код, пресеты
+  /* ── Typography ──────────────────────────────────────
+   *  Archivo Black — wordmark riffa, display заголовки
+   *  Inter — основной body + UI
+   *  JetBrains Mono — подписи, мета, цифры, чипы
    * ─────────────────────────────────────────────────── */
-  --font-brand:   "Sora",          "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Sora",          "Manrope",       ui-sans-serif, system-ui, sans-serif;
-  --font-body:    "Manrope",       "Inter",         ui-sans-serif, system-ui, sans-serif;
-  --font-ui:      "Manrope",       "Inter",         ui-sans-serif, system-ui, sans-serif;
-  --font-mono:    "JetBrains Mono","SF Mono",       ui-monospace, monospace;
+  --font-brand:   "Archivo Black", "Inter", -apple-system, system-ui, sans-serif;
+  --font-display: "Archivo Black", "Inter", -apple-system, system-ui, sans-serif;
+  --font-body:    "Inter",         -apple-system, system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-ui:      "Inter",         -apple-system, system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+/* Mobile overrides — на мобильных немного теплее/теснее. */
+@media (max-width: 768px) {
+  :root {
+    --paper:   #EAE7DC;
+    --paper-2: #DFDBCC;
+    --paper-3: #F0EDE2;
+  }
 }
 
 /* ── Brand name — используется в сайдбаре, топбаре и логин-странице ── */
 .brand-name {
-  font-family: var(--font-brand);
-  font-weight: 900;
-  font-size: 20px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #ffffff;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
   line-height: 1;
   display: inline-flex;
   align-items: baseline;
@@ -98,14 +125,11 @@
 }
 
 .brand-name__sub {
-  font-family: var(--font-brand);
-  font-weight: 900;
+  font-family: var(--font-mono);
+  font-weight: 600;
   font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
-  margin-left: 3px;
-  opacity: 0.9;
+  color: var(--ink-3);
+  margin-left: 1px;
 }
 
 *,
@@ -125,201 +149,201 @@ body,
 
 html,
 body {
-  overflow-x: clip;
+  overflow-x: hidden; /* hidden — широкая поддержка, включая Telegram WKWebView */
+  /* На тач-устройствах iOS/Android по умолчанию подсвечивает тапнутую
+     область полупрозрачным серо-синим. Выглядит грязно поверх нашей
+     тёмной темы — убираем глобально, везде где это не нужно специально. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  color: var(--text);
+  color: var(--ink);
   font-family: var(--font-body);
-  font-feature-settings: "ss01", "cv11", "liga";
+  font-feature-settings: "ss01", "cv11";
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  letter-spacing: -0.008em;   /* Manrope немного теснее Inter на -0.008 */
-  background: var(--bg);
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.005em;
+  background: var(--paper);
   position: relative;
 }
 
-/* Manrope хорошо идёт без лигатур в tiny-UI — применяем явно */
-.filter-chip,
-.file-radio,
-.file-play-pill,
-.file-del,
-.gp-act,
+/* Mono-элементы: метки в плеере, время */
 .gp-time,
-.gp-sub,
-.gp-title,
-.gp-queue-item,
-.file-item__meta,
-.file-item__title,
-.agent-suggestion-chip {
-  font-family: var(--font-ui);
+.gp-sub {
+  font-family: var(--font-mono);
 }
-
-/* filter-chip — чуть свободнее в трекинге для читаемости при 12px */
-.filter-chip {
-  font-weight: 500;
-  letter-spacing: 0.01em;
-}
-
-/* file-item заголовок и мета */
-.file-item__title { font-weight: 600; letter-spacing: -0.01em; }
-.file-item__meta  { font-weight: 400; letter-spacing:  0.005em; }
-
-/* Radio-кнопка "В эфире" / "Radio" */
-.file-radio { font-weight: 600; letter-spacing: 0.02em; }
-
-/* Мелкие кнопки в плеере */
-.gp-act--radio { font-weight: 600; letter-spacing: 0.015em; }
-.gp-time        { letter-spacing: 0.02em; }
 
 /* Suggestion chips агента */
-.agent-suggestion-chip { font-weight: 500; letter-spacing: 0.01em; }
+.agent-suggestion-chip {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  font-size: 11px;
+  text-transform: uppercase;
+}
 
-/* ── Animated gradient blobs ──────────────────────────
- * Три blur-облака медленно дрейфуют, перетекая друг в друга.
- * Цвета — из логотипа: салатовый, оранжевый, пурпурный.
+/* ── Dot-grid texture overlay (v3 editorial aesthetic) ───────────────
+ * Тонкая точечная сетка поверх paper-фона. Вместо анимированных blobs.
+ * mix-blend-mode: multiply — работает только на светлом фоне.
  */
-
-/* Gradient blobs — без filter:blur (GPU repaint на каждый кадр).
- * Мягкость достигается через широкие radial-gradient + увеличенный размер.
- * will-change: transform → браузер заранее создаёт compositor layer. */
-body::before,
-body::after {
-  content: "";
-  position: fixed;
-  pointer-events: none;
-  z-index: -1;
-  border-radius: 50%;
-  will-change: transform;
-}
-
 body::before {
-  width: 90vw;
-  height: 90vw;
-  top: -40vw;
-  left: -20vw;
-  background: radial-gradient(circle,
-    rgba(124, 255, 31, 0.28) 0%,
-    rgba(124, 255, 31, 0.10) 45%,
-    transparent 72%);
-  animation: float-1 14s ease-in-out infinite;
-}
-
-body::after {
-  width: 85vw;
-  height: 85vw;
-  bottom: -38vw;
-  right: -22vw;
-  background: radial-gradient(circle,
-    rgba(214, 0, 255, 0.26) 0%,
-    rgba(214, 0, 255, 0.08) 45%,
-    transparent 72%);
-  animation: float-2 16s ease-in-out infinite;
-}
-
-#root::before,
-#root::after {
   content: "";
   position: fixed;
+  inset: 0;
   pointer-events: none;
-  z-index: -1;
-  border-radius: 50%;
-  will-change: transform;
+  z-index: 5;
+  background-image:
+    radial-gradient(rgba(22, 20, 19, 0.045) 1px, transparent 1px),
+    radial-gradient(rgba(22, 20, 19, 0.030) 1px, transparent 1px);
+  background-size: 3px 3px, 7px 7px;
+  background-position: 0 0, 1px 2px;
+  mix-blend-mode: multiply;
 }
 
-#root::before {
-  width: 75vw;
-  height: 75vw;
-  top: 20vh;
-  left: 25vw;
-  background: radial-gradient(circle,
-    rgba(255, 90, 0, 0.20) 0%,
-    rgba(255, 90, 0, 0.07) 45%,
-    transparent 72%);
-  animation: float-3 18s ease-in-out infinite;
-}
-
-/* мятно-лаймовый blob */
-#root::after {
-  width: 70vw;
-  height: 70vw;
-  top: 50vh;
-  left: 0vw;
-  background: radial-gradient(circle,
-    rgba(184, 255, 106, 0.20) 0%,
-    rgba(184, 255, 106, 0.07) 45%,
-    transparent 72%);
-  animation: float-4 20s ease-in-out infinite;
-}
-
-@keyframes float-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(10vw, 8vh) scale(1.14); }
-  66% { transform: translate(-6vw, 14vh) scale(0.92); }
-}
-
-@keyframes float-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  40% { transform: translate(-12vw, -10vh) scale(1.1); }
-  75% { transform: translate(8vw, -6vh) scale(0.9); }
-}
-
-@keyframes float-3 {
-  0%, 100% { transform: translate(0, 0) scale(0.95); }
-  50% { transform: translate(-14vw, 10vh) scale(1.2); }
-}
-
-@keyframes float-4 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(12vw, -12vh) scale(1.12); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  body::before,
-  body::after,
-  #root::before,
-  #root::after {
-    animation: none;
+/* ── Отключаем :hover-анимации на тач-устройствах ───────────────────── */
+@media (hover: none) {
+  .tile:hover .module-icon *,
+  .module-icon:hover *,
+  .hero-card__icon:hover,
+  .mood-card:hover {
+    animation: none !important;
   }
 }
 
+/* ── Мобильная оптимизация: убираем backdrop-filter где не нужен ──────── */
+@media (max-width: 768px), (pointer: coarse) {
+  .panel,
+  .sidebar,
+  .global-player,
+  .gp-queue,
+  .notice-banner,
+  .user-menu__pop,
+  .image-viewer-backdrop,
+  .voice-recorder-backdrop,
+  .scroll-to-top,
+  .login-bot-gate,
+  .overlay,
+  .file-bolt-menu,
+  .collapsed-gen-progress__row,
+  .active-gen-preview {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .overlay { background: rgba(22, 20, 19, 0.5); }
+}
+
+/* ── Telegram Mini App — защита от горизонтального скролла ───────────────
+   В v3 dot-grid — fixed overlay, блобов нет. Блокируем только скролл. */
+
+html.tg-miniapp,
+html.tg-miniapp body {
+  overflow-x: hidden !important;
+  max-width: 100vw !important;
+  /* touch-action: pan-y запрещает горизонтальный свайп */
+  touch-action: pan-y !important;
+  overscroll-behavior-x: none !important;
+}
+
+/* Все элементы в Mini App ограничены шириной viewport */
+html.tg-miniapp #root,
+html.tg-miniapp .app-shell,
+html.tg-miniapp .main {
+  overflow-x: hidden !important;
+  max-width: 100% !important;
+  touch-action: pan-y !important;
+}
+
+/* Гарантируем что file-actions не вызывает горизонтальное переполнение */
+html.tg-miniapp .file-actions {
+  flex-wrap: wrap !important;
+  max-width: 100% !important;
+}
+
+/* file-item в Mini App: обрезаем переполнение, не превышаем ширину панели */
+html.tg-miniapp .file-item {
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Mini App: каждый трек (новая .r-track вёрстка) обязан помещаться в панель */
+html.tg-miniapp .r-track,
+html.tg-miniapp .r-row {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+html.tg-miniapp .r-track__title,
+html.tg-miniapp .r-track__meta {
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Mini App radio: подрезаем padding панелей, чтобы карточки треков влезали */
+html.tg-miniapp .radio-panel,
+html.tg-miniapp .radio-panel--half,
+html.tg-miniapp .panel.radio-panel,
+html.tg-miniapp .panel.radio-panel--half {
+  padding-left: 12px !important;
+  padding-right: 12px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Mini App: ВСЕ элементы радио-страницы подчиняются ширине родителя */
+html.tg-miniapp .radio,
+html.tg-miniapp .radio-columns,
+html.tg-miniapp .radio-panel--half,
+html.tg-miniapp .radio-hero,
+html.tg-miniapp .mood-grid,
+html.tg-miniapp .playlist,
+html.tg-miniapp .playlist--chart {
+  max-width: 100% !important;
+  min-width: 0 !important;
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* Mood-карточки в Mini App не вылазят за границу */
+html.tg-miniapp .mood-card {
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
 /* Ставим CSS-анимации на паузу когда вкладка скрыта */
-body.page-hidden::before,
-body.page-hidden::after {
-  animation-play-state: paused;
-}
-#root.page-hidden::before,
-#root.page-hidden::after {
-  animation-play-state: paused;
-}
 body.page-hidden * {
   animation-play-state: paused;
 }
 
-/* ── Scrollbar (фирменный стиль, видим везде) ─────────── */
+/* ── Scrollbar ─────────────────────────────────────────── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(124, 255, 31, 0.55) transparent;
+  scrollbar-color: var(--rule-strong) transparent;
 }
 
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 *::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 12px;
+  background: transparent;
+  border-radius: 4px;
 }
 *::-webkit-scrollbar-thumb {
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(124, 255, 31, 0.7), rgba(214, 0, 255, 0.7));
-  border: 2px solid transparent;
+  border-radius: 4px;
+  background: var(--rule-strong);
+  border: 2px solid var(--paper);
   background-clip: padding-box;
-  transition: background 0.2s ease;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(124, 255, 31, 0.95), rgba(255, 90, 0, 0.85));
+  background: var(--ink-4);
   background-clip: padding-box;
 }
 *::-webkit-scrollbar-corner {
@@ -329,17 +353,29 @@ body.page-hidden * {
 /* ── Typography ───────────────────────────────────── */
 
 h1, h2, h3, h4 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   margin: 0;
   overflow-wrap: break-word;
   word-wrap: break-word;
 }
 
-h1 { font-size: clamp(28px, 5vw, 56px); line-height: 1.05; }
-h2 { font-size: clamp(22px, 3vw, 32px); line-height: 1.15; }
+h1 { font-size: clamp(34px, 5.5vw, 72px); line-height: 0.95; letter-spacing: -0.035em; }
+h2 { font-size: clamp(24px, 3.2vw, 36px); line-height: 1.1; letter-spacing: -0.025em; }
 h3 { font-size: 18px; line-height: 1.3; }
+
+/* ── Editorial utility classes (для меток секций, KV-таблиц и т.п.) ─── */
+.editorial-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+.editorial-divider {
+  height: 1px;
+  background: var(--ink);
+  margin: 24px 0;
+}
 
 p { margin: 0; line-height: 1.6; }
 
@@ -359,8 +395,8 @@ a {
 }
 
 ::selection {
-  background: rgba(124, 255, 31, 0.35);
-  color: var(--text);
+  background: rgba(255, 59, 31, 0.18);
+  color: var(--ink);
 }
 
 /* Утилиты */
@@ -368,19 +404,19 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  color: var(--text);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
+  padding: 5px 12px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.10em;
   text-transform: uppercase;
-  border: 1px solid var(--border);
+  border: 1px solid var(--rule);
   border-radius: var(--radius-pill);
-  background: var(--panel);
-  backdrop-filter: blur(12px);
+  background: var(--paper-3);
 }
 
-.muted { color: var(--muted); }
+.muted { color: var(--ink-4); }
 
 /* ══════════════════════════════════════════════════════
    File item — единый компонент файла для всего сайта.
@@ -397,9 +433,9 @@ a {
   padding: 8px 14px;
   height: 52px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--text);
+  border: 1px solid var(--rule);
+  background: var(--paper-3);
+  color: var(--ink);
   text-align: left;
   font: inherit;
   min-width: 0;
@@ -411,20 +447,19 @@ a {
   grid-template-columns: 36px minmax(0, 1fr) auto auto;
 }
 .file-item:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(124, 255, 31, 0.25);
+  background: var(--paper-4);
+  border-color: var(--rule-strong);
 }
 .file-item--active {
-  border-color: var(--accent);
-  background: rgba(124, 255, 31, 0.08);
+  border-color: var(--ink);
+  background: var(--paper-2);
 }
-/* Тень активного через ::before — только opacity (дешевле box-shadow) */
 .file-item::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: 0 8px 24px rgba(124, 255, 31, 0.14);
+  box-shadow: 0 2px 12px rgba(22, 20, 19, 0.10);
   opacity: 0;
   transition: opacity 200ms ease;
   pointer-events: none;
@@ -439,7 +474,7 @@ a {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--paper-2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -448,10 +483,8 @@ a {
   flex-shrink: 0;
   overflow: hidden;
 }
-/* Cover art rendered inside .file-item__icon. ``cover`` modifier removes the
- * background tint so the image fills the slot edge-to-edge. */
 .file-item__icon--cover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--paper-2);
 }
 .file-item__icon img {
   width: 100%;
@@ -465,19 +498,20 @@ a {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid rgba(124, 255, 31, 0.45);
-  background: linear-gradient(135deg, rgba(124, 255, 31, 0.25), rgba(214, 0, 255, 0.2));
-  color: #fff;
+  border: 1px solid var(--rule-strong);
+  background: var(--ink);
+  color: var(--paper);
   font-size: 13px;
   display: grid;
   place-items: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  transition: transform 160ms ease, background 160ms ease;
 }
 .file-item__play-btn:hover {
   transform: scale(1.06);
-  box-shadow: 0 6px 20px rgba(124, 255, 31, 0.25);
+  background: var(--hi);
+  border-color: var(--hi);
 }
 
 /* col 2 — название + мета */
@@ -488,19 +522,22 @@ a {
   min-width: 0;
 }
 .file-item__title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text);
+  color: var(--ink);
 }
 .file-item__meta {
-  font-size: 11.5px;
-  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* col 3 — .file-actions (dl + bolt + radio) — стили в секции ниже */
@@ -586,37 +623,32 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 5px 12px;
+  padding: 6px 14px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--muted);
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-2);
   cursor: pointer;
-  font: inherit;
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   line-height: 1;
   white-space: nowrap;
-  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+  transition: background 120ms, color 120ms, border-color 120ms;
 }
 .filter-chip:hover {
-  color: var(--text);
-  border-color: var(--border-strong);
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  border-color: var(--ink);
+  background: transparent;
 }
 .filter-chip--active {
-  border-color: rgba(124, 255, 31, 0.5);
-  background: linear-gradient(
-    135deg,
-    rgba(124, 255, 31, 0.18),
-    rgba(255, 90, 0, 0.14),
-    rgba(214, 0, 255, 0.16)
-  );
-  background-origin: border-box;
-  color: #fff;
-  font-weight: 600;
-  box-shadow: 0 0 16px rgba(124, 255, 31, 0.2);
+  border-color: var(--emr);
+  background: var(--emr);
+  color: var(--paper);
+  font-weight: 500;
+  box-shadow: none;
   transition: background 0ms, border-color 0ms;
 }
 
@@ -630,31 +662,29 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--muted);
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink-3);
   font: inherit;
   font-size: 13px;
   cursor: pointer;
   text-align: left;
-  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+  transition: border-color 120ms, color 120ms;
 }
 .fsel__btn:hover {
-  border-color: rgba(124, 255, 31, 0.3);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
+  border-color: var(--ink);
+  color: var(--ink);
 }
 .fsel__btn--open {
-  border-color: rgba(124, 255, 31, 0.55);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
-  box-shadow: 0 0 0 1px rgba(124, 255, 31, 0.12) inset;
+  border-color: var(--hi);
+  color: var(--ink);
+  box-shadow: 0 0 0 3px var(--hi-soft);
 }
-.fsel__btn--set { /* когда выбрано не дефолтное значение */
-  border-color: rgba(124, 255, 31, 0.35);
-  color: var(--accent-light);
+.fsel__btn--set {
+  border-color: var(--rule-strong);
+  color: var(--ink);
 }
 
 .fsel__label {
@@ -676,12 +706,11 @@ a {
   position: fixed;
   z-index: 500;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border-strong);
-  background: rgba(14, 12, 24, 0.98);
-  backdrop-filter: blur(20px);
+  border: 1px solid var(--ink);
+  background: var(--paper-3);
   overflow-y: auto;
   max-height: 260px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(124, 255, 31, 0.06);
+  box-shadow: 0 4px 24px rgba(22, 20, 19, 0.16);
   animation: fsel-in 120ms ease;
 }
 @keyframes fsel-in {
@@ -697,26 +726,26 @@ a {
   padding: 9px 14px;
   background: transparent;
   border: none;
-  color: var(--text);
+  color: var(--ink);
   font: inherit;
   font-size: 13px;
   cursor: pointer;
   text-align: left;
-  transition: background 100ms ease;
+  transition: background 100ms;
 }
-.fsel__item:hover { background: rgba(255, 255, 255, 0.07); }
+.fsel__item:hover { background: var(--paper-2); }
 .fsel__item--active {
-  color: var(--accent-light);
-  background: rgba(124, 255, 31, 0.08);
+  color: var(--ink);
+  background: var(--paper-2);
 }
-.fsel__item + .fsel__item { border-top: 1px solid rgba(255, 255, 255, 0.04); }
+.fsel__item + .fsel__item { border-top: 1px solid var(--rule-soft); }
 
 .fsel__check {
   width: 14px;
   flex-shrink: 0;
   font-size: 11px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--hi);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -739,17 +768,17 @@ a {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  border: 1px solid var(--border);
+  border: 1px solid var(--rule);
   background: transparent;
-  color: var(--muted);
+  color: var(--ink-4);
   text-decoration: none;
   flex-shrink: 0;
-  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+  transition: border-color 120ms, color 120ms, background 120ms;
 }
 .file-dl:hover {
-  border-color: rgba(124, 255, 31, 0.4);
-  color: var(--text);
-  background: rgba(124, 255, 31, 0.08);
+  border-color: var(--ink);
+  color: var(--ink);
+  background: var(--paper-2);
 }
 
 /* ── Молния ── */
@@ -762,30 +791,29 @@ a {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  border: 1px solid var(--border);
+  border: 1px solid var(--rule);
   background: transparent;
-  color: var(--muted);
+  color: var(--ink-4);
   cursor: pointer;
   flex-shrink: 0;
-  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 120ms ease;
+  transition: border-color 120ms, color 120ms, background 120ms;
 }
 .file-bolt:hover,
 .file-bolt--open {
-  border-color: rgba(255, 214, 0, 0.55);
-  color: rgba(255, 214, 0, 0.95);
-  background: rgba(255, 214, 0, 0.09);
+  border-color: var(--ink);
+  color: var(--ink);
+  background: var(--paper-2);
 }
 
 .file-bolt-menu {
-  position: fixed;   /* rendered via portal — coords set by JS */
-  z-index: 500;      /* above GlobalPlayer (z: 100) and overlays (z: 40) */
+  position: fixed;
+  z-index: 500;
   min-width: 200px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border-strong);
-  background: rgba(16, 14, 26, 0.97);
-  backdrop-filter: blur(16px);
+  border: 1px solid var(--ink);
+  background: var(--paper-3);
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 214, 0, 0.08);
+  box-shadow: 0 4px 24px rgba(22, 20, 19, 0.16);
   animation: file-bolt-menu-in 140ms ease;
 }
 @keyframes file-bolt-menu-in {
@@ -800,15 +828,15 @@ a {
   padding: 10px 14px;
   background: transparent;
   border: none;
-  color: var(--text);
+  color: var(--ink);
   font: inherit;
   font-size: 13px;
   cursor: pointer;
   text-align: left;
-  transition: background 120ms ease;
+  transition: background 100ms;
 }
-.file-bolt-menu button:hover { background: rgba(255, 255, 255, 0.07); }
-.file-bolt-menu button + button { border-top: 1px solid var(--border); }
+.file-bolt-menu button:hover { background: var(--paper-2); }
+.file-bolt-menu button + button { border-top: 1px solid var(--rule-soft); }
 
 /* ── Радио — капсула с текстом ── */
 .file-radio {
@@ -818,95 +846,69 @@ a {
   height: 26px;
   padding: 0 10px;
   border-radius: var(--radius-pill);
-  border: 1px solid var(--border);
+  border: 1px solid var(--rule);
   background: transparent;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
   cursor: pointer;
   flex-shrink: 0;
   white-space: nowrap;
-  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, color 160ms ease;
+  transition: border-color 120ms, background 120ms, color 120ms;
 }
 .file-radio:hover {
-  border-color: rgba(124, 255, 31, 0.5);
-  background: rgba(124, 255, 31, 0.08);
-  color: var(--text);
+  border-color: var(--emr);
+  color: var(--emr);
+  background: var(--emr-soft);
 }
 .file-radio--on {
-  border-color: rgba(124, 255, 31, 0.55);
-  background: linear-gradient(
-    135deg,
-    rgba(124, 255, 31, 0.22),
-    rgba(255, 90, 0, 0.16),
-    rgba(214, 0, 255, 0.18)
-  );
-  background-origin: border-box;
-  color: #fff;
-  box-shadow: 0 0 14px rgba(124, 255, 31, 0.28);
+  border-color: var(--emr);
+  background: var(--emr);
+  color: var(--paper);
+  box-shadow: none;
 }
 
-/* ── Play/Pause овальная пилюля с фирменным неоном ── */
+/* ── Play/Pause pill ── */
 .file-play-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 28px;
-  min-width: 38px;
-  padding: 0 12px;
+  height: 26px;
+  min-width: 36px;
+  padding: 0 10px;
   border-radius: var(--radius-pill);
-  border: 1px solid rgba(124, 255, 31, 0.45);
-  background:
-    radial-gradient(120% 100% at 0% 0%, rgba(124, 255, 31, 0.15), transparent 60%),
-    radial-gradient(120% 100% at 100% 100%, rgba(214, 0, 255, 0.15), transparent 60%),
-    rgba(255, 255, 255, 0.04);
-  color: var(--text);
+  border: 1px solid var(--rule-strong);
+  background: var(--ink);
+  color: var(--paper);
   cursor: pointer;
   flex-shrink: 0;
-  transition: transform 120ms ease, box-shadow 180ms ease, border-color 180ms ease,
-    background 180ms ease;
+  transition: transform 120ms, background 150ms, border-color 150ms;
 }
 .file-play-pill__icon {
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1;
-  letter-spacing: 0.04em;
   font-weight: 700;
 }
+.file-play-pill__icon svg {
+  width: 11px;
+  height: 11px;
+}
 .file-play-pill:hover {
-  border-color: rgba(124, 255, 31, 0.85);
-  box-shadow:
-    0 0 18px rgba(124, 255, 31, 0.35),
-    0 0 28px rgba(214, 0, 255, 0.18);
+  background: var(--hi);
+  border-color: var(--hi);
   transform: scale(1.04);
 }
 .file-play-pill:active { transform: scale(0.96); }
 .file-play-pill--active {
-  border-color: rgba(124, 255, 31, 0.7);
-  background:
-    radial-gradient(120% 100% at 0% 0%, rgba(124, 255, 31, 0.32), transparent 55%),
-    radial-gradient(120% 100% at 100% 100%, rgba(214, 0, 255, 0.28), transparent 55%),
-    rgba(255, 255, 255, 0.06);
-  color: #fff;
-  box-shadow: 0 0 16px rgba(124, 255, 31, 0.35);
-}
-.file-play-pill--playing {
-  animation: file-play-pulse 2s ease-in-out infinite;
-}
-@keyframes file-play-pulse {
-  0%, 100% {
-    box-shadow:
-      0 0 16px rgba(124, 255, 31, 0.32),
-      0 0 22px rgba(214, 0, 255, 0.18);
-  }
-  50% {
-    box-shadow:
-      0 0 26px rgba(124, 255, 31, 0.55),
-      0 0 36px rgba(214, 0, 255, 0.32);
-  }
+  border-color: var(--hi);
+  background: var(--hi);
+  color: var(--paper);
 }
 
-/* ── Красная круглая кнопка удаления (40-55% прозрачность) ── */
+/* ── Кнопка удаления ── */
 .file-del {
   position: relative;
   display: inline-flex;
@@ -915,36 +917,32 @@ a {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 80, 60, 0.45);
-  background: rgba(255, 80, 60, 0.18);   /* ~45% «прозрачность» */
-  color: rgba(255, 139, 107, 0.78);
+  border: 1px solid rgba(255, 59, 31, 0.30);
+  background: transparent;
+  color: var(--hi);
   cursor: pointer;
   flex-shrink: 0;
   opacity: 0.55;
-  transition: opacity 160ms ease, background 160ms ease, border-color 160ms ease,
-    transform 180ms ease, color 160ms ease;
+  transition: opacity 120ms, background 120ms, border-color 120ms, transform 120ms;
 }
 .file-del:hover {
   opacity: 1;
-  background: rgba(255, 80, 60, 0.32);
-  border-color: rgba(255, 80, 60, 0.85);
-  color: #ff8b6b;
+  background: var(--hi-soft);
+  border-color: var(--hi);
   transform: scale(1.08);
 }
 .file-del:active { transform: scale(0.92); }
 .file-del:disabled { cursor: default; }
 
-/* ── Ghost overlay (анимация испарения файла на исходной позиции) ──
+/* ── Ghost overlay (анимация удаления файла) ──
  * Когда пользователь удаляет файл, исходный .file-item сразу удаляется из
  * списка → CSS Grid перепаковывает оставшиеся элементы вверх (магнит).
  * Поверх старой позиции отображается ghost-копия, которая разлетается за
  * 1 с — это .file-item--ghost + .file-item--deleting. */
 .file-item--ghost {
-  background:
-    radial-gradient(120% 120% at 50% 50%, rgba(255, 80, 60, 0.22), transparent 70%),
-    rgba(20, 20, 32, 0.85);
-  border-color: rgba(255, 80, 60, 0.55);
-  box-shadow: 0 0 24px rgba(255, 80, 60, 0.4);
+  background: var(--paper-3);
+  border-color: var(--hi);
+  box-shadow: 0 0 0 2px var(--hi-soft);
 }
 
 .file-item--deleting {
@@ -974,4 +972,476 @@ a {
   0%   { opacity: 0.85; transform: scale(0.85); border-width: 3px; }
   60%  { opacity: 0.4;  transform: scale(1.35); border-width: 1.5px; }
   100% { opacity: 0;    transform: scale(1.8);  border-width: 0; }
+}
+
+/* ══════════════════════════════════════════════════════
+   Prototype layout classes — top-meta, h-section, h-page,
+   modules grid, tracks grid, stats grid, pills, buttons.
+   Direct port from prototype.html.
+══════════════════════════════════════════════════════ */
+
+/* ── Top meta bar ── */
+.top-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ink);
+  margin-bottom: 32px;
+}
+.top-meta .breadcrumb {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.top-meta .breadcrumb b { color: var(--ink); font-weight: 600; }
+
+/* ── Page headline + lead ── */
+.h-page {
+  font-family: var(--font-body);
+  font-size: clamp(36px, 5.5vw, 64px);
+  font-weight: 500;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+  margin-bottom: 12px;
+}
+.h-page em { font-style: normal; color: var(--hi); }
+.h-page .emr { color: var(--emr); }
+
+.h-lead {
+  font-size: 16px;
+  color: var(--ink-2);
+  max-width: 640px;
+  line-height: 1.55;
+  margin-bottom: 32px;
+}
+
+/* ── Section divider ── */
+.h-section {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 14px 0 12px;
+  border-top: 1px solid var(--ink);
+  border-bottom: 1px solid var(--rule);
+  margin: 36px 0 24px;
+}
+.h-section .tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.h-section .tag .num { color: var(--ink); font-weight: 600; }
+.h-section h2 {
+  font-family: var(--font-body);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  flex: 1;
+  margin: 0;
+}
+.h-section .right {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.h-section a.right:hover,
+.h-section button.right:hover { color: var(--ink); }
+
+/* ── Module tiles (Studio) ── */
+.modules {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0;
+  border: 1px solid var(--ink);
+  border-radius: 14px;
+  background: var(--paper-3);
+  overflow: hidden;
+}
+.module {
+  padding: 24px 20px;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  cursor: pointer;
+  transition: background 150ms;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 180px;
+  background: none;
+  border-top: none;
+  border-left: none;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+}
+.module:hover { background: var(--paper-4); }
+.module.is-main { background: none; }
+.module.is-main:hover { background: var(--paper-4); }
+.module.is-soon { opacity: 0.7; cursor: default; }
+.module-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.module-icon {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+.module.is-main .module-icon {
+  color: var(--hi);
+}
+.module-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-3);
+  border: 1px solid var(--rule);
+}
+.module.is-main .module-badge {
+  background: var(--hi);
+  color: var(--paper);
+  border-color: var(--hi);
+}
+.module-badge.is-soon { background: var(--paper-2); }
+.module h3 {
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+.module p {
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.45;
+  margin: 0;
+}
+.module.is-main p { color: var(--ink-2); }
+.module-cost {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+.module-cost .price {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--paper);
+  background: var(--ink);
+  border-radius: 999px;
+  font-weight: 700;
+}
+.module-cost .price .riffa-coin { color: var(--paper); }
+.module:hover .module-cost .price {
+  background: var(--hi);
+}
+
+/* ── Track tiles ── */
+.tracks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0;
+  border: 1px solid var(--ink);
+  border-radius: 14px;
+  background: var(--paper-3);
+  overflow: hidden;
+}
+.track {
+  padding: 16px;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  display: grid;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 150ms;
+  text-align: left;
+  background: none;
+  border-top: none;
+  border-left: none;
+  font: inherit;
+  color: var(--ink);
+}
+.track:hover { background: var(--paper-4); }
+.track-cover {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #c8c2b1 0%, #8E887F 100%);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  padding: 10px;
+}
+.track-cover.c-emr { background: linear-gradient(135deg, var(--emr) 0%, #064030 100%); }
+.track-cover.c-hi  { background: linear-gradient(135deg, var(--hi) 0%, var(--hi-2) 100%); }
+.track-cover.c-ink { background: linear-gradient(135deg, var(--ink-2) 0%, var(--ink) 100%); }
+.track-cover.c-paper { background: var(--paper); border: 1px solid var(--rule); }
+.track-cover.c-blue { background: linear-gradient(135deg, #4F73B0 0%, #2A4574 100%); }
+.track-cover.c-rose { background: linear-gradient(135deg, #C97262 0%, #883E2F 100%); }
+.track-play {
+  width: 32px;
+  height: 32px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: transform 150ms;
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+.track:hover .track-play { transform: scale(1.1); }
+.track-duration {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--paper);
+  background: rgba(22,20,19,0.55);
+  padding: 3px 7px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+}
+.track-meta { display: grid; gap: 2px; }
+.track-num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.track-title { font-weight: 600; font-size: 13px; line-height: 1.3; }
+.track-artist { font-size: 11px; color: var(--ink-3); }
+.track-stats {
+  display: flex;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+.track-stats .live { color: var(--emr); }
+
+/* ── Stats tiles ── */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0;
+  border: 1px solid var(--ink);
+  border-radius: 14px;
+  background: var(--paper-3);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.stat {
+  padding: 20px;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stat .label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+}
+.stat .val {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1;
+  margin-top: 4px;
+}
+.stat .val small { font-size: 14px; font-weight: 400; color: var(--ink-3); margin-left: 3px; }
+.stat .delta {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.stat .delta.hi { color: var(--hi); }
+
+/* ── Pill controls ── */
+.pill-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill {
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all 120ms;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pill:hover { border-color: var(--ink); color: var(--ink); }
+.pill.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.pill.on-hi { background: var(--hi); color: var(--paper); border-color: var(--hi); }
+.pill.on-emr { background: var(--emr); color: var(--paper); border-color: var(--emr); }
+.pill .num { color: var(--ink-4); margin-left: 6px; }
+.pill.on .num { color: rgba(233,229,218,0.6); }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 22px;
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 150ms;
+  white-space: nowrap;
+  line-height: 1;
+}
+.btn-primary { background: var(--hi); color: var(--paper); border-color: var(--hi); }
+.btn-primary:hover { background: var(--hi-2); border-color: var(--hi-2); }
+.btn-ink { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn-ink:hover { background: transparent; color: var(--ink); }
+.btn-emr { background: var(--emr); color: var(--paper); border-color: var(--emr); }
+.btn-emr:hover { background: var(--emr-2); border-color: var(--emr-2); }
+.btn-ghost { background: transparent; color: var(--ink); border-color: var(--ink); }
+.btn-ghost:hover { background: var(--ink); color: var(--paper); }
+.btn-soft { background: var(--paper-3); color: var(--ink); border-color: var(--rule); }
+.btn-soft:hover { border-color: var(--ink); }
+.btn-block { width: 100%; }
+.btn-sm { padding: 8px 14px; font-size: 12px; }
+.btn-lg { padding: 16px 28px; font-size: 14px; }
+
+/* ── Panels ── */
+.p-panel {
+  background: var(--paper-3);
+  border: 1px solid var(--ink);
+  border-radius: 14px;
+  padding: 24px;
+}
+.p-panel-soft {
+  background: var(--paper-3);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  padding: 22px;
+}
+
+/* ── Studio quick-idea form ── */
+.studio-quick {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+.studio-quick__input {
+  flex: 1;
+  padding: 14px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--ink);
+  background: var(--paper-3);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  color: var(--ink);
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.studio-quick__input:focus {
+  border-color: var(--hi);
+  box-shadow: 0 0 0 3px var(--hi-soft);
+}
+.studio-quick__input::placeholder { color: var(--ink-4); }
+
+/* ── Share toast ─────────────────────────────────────────────────── */
+
+.share-toast {
+  position: fixed;
+  bottom: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 10px 22px;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 4px 24px rgba(22, 20, 19, 0.20);
+  animation: share-toast-in 0.3s ease-out;
+  pointer-events: none;
+}
+
+@keyframes share-toast-in {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Mobile responsive — ≤640px
+   ═══════════════════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+  /* h-section: скрыть .right, уменьшить h2, разрешить перенос */
+  .h-section {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  .h-section .right { display: none; }
+  .h-section h2 { font-size: 18px; }
+
+  /* studio-quick: кнопка под полем ввода */
+  .studio-quick { flex-wrap: wrap; }
+  .studio-quick .btn { width: 100%; }
+
+  /* stats плитки: 2 в ряд на 640, 1 ряд ниже */
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* p-panel: уменьшить padding */
+  .p-panel { padding: 16px; }
 }
