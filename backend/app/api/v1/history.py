@@ -12,9 +12,10 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.config import Settings, get_settings
 from app.core.deps import current_user, db_session
@@ -129,6 +130,11 @@ class HistoryPage(BaseModel):
 
 class RatingRequest(BaseModel):
     rating: Literal["like", "dislike", "remove"]
+
+
+class RenameRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+    track_index: int | None = None
 
 
 class ShareResponse(BaseModel):
@@ -305,6 +311,68 @@ async def rate_generation(
 
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/{gen_id}/title", response_model=GenerationOut)
+async def rename_generation(
+    gen_id: str,
+    body: RenameRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+) -> GenerationOut:
+    """Rename a generation or a single track inside it.
+
+    - body.track_index = None → rename the whole generation (`gen.title`).
+    - body.track_index = 0/1 → rename one of the variants stored in
+      `result.tracks[idx].title`. The umbrella `gen.title` is also bumped
+      when the very first variant is renamed so library card titles stay
+      consistent with what the player shows.
+    """
+    try:
+        gid = uuid.UUID(gen_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found") from exc
+
+    gen = (
+        await session.execute(
+            select(Generation).where(
+                Generation.id == gid,
+                Generation.user_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if gen is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+
+    new_title = body.title.strip()[:80]
+    if not new_title:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="title is empty")
+
+    if body.track_index is None:
+        gen.title = new_title
+    else:
+        result = dict(gen.result or {})
+        tracks = list(result.get("tracks") or [])
+        if not (0 <= body.track_index < len(tracks)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="track_index out of range",
+            )
+        tracks[body.track_index] = {**tracks[body.track_index], "title": new_title}
+        result["tracks"] = tracks
+        gen.result = result
+        # SQLAlchemy's JSON column needs an explicit flag — a fresh dict
+        # assignment is fine in practice, but the helper is the documented
+        # safe path.
+        flag_modified(gen, "result")
+        # Keep the umbrella title aligned with the first variant so library
+        # rows render the same string the player shows.
+        if body.track_index == 0:
+            gen.title = new_title
+
+    await session.commit()
+    await session.refresh(gen)
+    return _to_out(gen)
 
 
 @router.post("/{gen_id}/share", response_model=ShareResponse)

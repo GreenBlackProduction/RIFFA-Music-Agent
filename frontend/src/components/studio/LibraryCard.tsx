@@ -5,6 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import {
   deleteGeneration,
+  renameGeneration,
   fetchTrash,
   purgeTrash,
   restoreGeneration,
@@ -150,6 +151,22 @@ export function LibraryCard() {
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: ["history", "trash"] });
+      await queryClient.invalidateQueries({ queryKey: ["radio"] });
+    },
+  });
+
+  const renameMutation = useMutation({
+    mutationFn: ({
+      generationId,
+      trackIndex,
+      title,
+    }: {
+      generationId: string;
+      trackIndex: number | null;
+      title: string;
+    }) => renameGeneration(generationId, title, trackIndex),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: ["radio"] });
     },
   });
@@ -385,6 +402,13 @@ export function LibraryCard() {
                   showGhost(it, rect);
                   deleteMutation.mutate({ generationId: it.generationId, trackIndex: it.trackIndex });
                 }}
+                onRename={(next) =>
+                  renameMutation.mutateAsync({
+                    generationId: it.generationId,
+                    trackIndex: it.trackIndex,
+                    title: next,
+                  })
+                }
               />
             </div>
           );

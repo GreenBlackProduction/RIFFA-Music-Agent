@@ -44,6 +44,10 @@ interface Props {
    *  "radio" → /radio?s=<share_id> so the link opens the radio player and
    *  auto-plays this track. */
   shareKind?: "library" | "radio";
+  /** Owner-only rename handler. When omitted the menu hides the option,
+   *  which gives us the "disabled on radio" requirement for free —
+   *  radio rows never wire this callback. */
+  onRename?: (next: string) => void | Promise<unknown>;
   /** Extra elements rendered inside the file-actions div (e.g. Radio vote buttons). */
   children?: React.ReactNode;
 }
@@ -67,6 +71,7 @@ export function FileActions({
   onDelete,
   isImageType,
   shareKind = "library",
+  onRename,
   children,
 }: Props) {
   const dlHref = downloadUrl || audioUrl;
@@ -76,6 +81,10 @@ export function FileActions({
   const [sharePending, setSharePending] = useState(false);
   const [shareToast, setShareToast] = useState<string | null>(null);
   const [enhancePending, setEnhancePending] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renamePending, setRenamePending] = useState(false);
+  const renameInputRef = useRef<HTMLInputElement>(null);
   const boltBtnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
@@ -172,6 +181,33 @@ export function FileActions({
       setShareToast(t("fileActions.shareError"));
     } finally {
       setSharePending(false);
+    }
+  }
+
+  function openRename() {
+    setMenuOpen(false);
+    setRenameValue(title ?? "");
+    setRenameOpen(true);
+    // Wait one tick so the dialog mounts before focusing.
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  }
+
+  async function submitRename(e: React.FormEvent) {
+    e.preventDefault();
+    if (!onRename) return;
+    const next = renameValue.trim();
+    if (!next || next === title) {
+      setRenameOpen(false);
+      return;
+    }
+    setRenamePending(true);
+    try {
+      await onRename(next);
+      setRenameOpen(false);
+    } catch {
+      // Stays open so the user can retry / cancel manually.
+    } finally {
+      setRenamePending(false);
     }
   }
 
@@ -352,6 +388,15 @@ export function FileActions({
                 >
                   💿&nbsp; {t("fileActions.convertToWav")}
                 </button>
+                {onRename && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={openRename}
+                  >
+                    ✏️&nbsp; {t("fileActions.rename", { defaultValue: "Переименовать" })}
+                  </button>
+                )}
                 {generationId && (
                   <button
                     type="button"
@@ -364,6 +409,56 @@ export function FileActions({
                 )}
               </>
             )}
+          </div>,
+          document.body,
+        )}
+
+      {renameOpen &&
+        createPortal(
+          <div
+            className="rename-modal-backdrop"
+            onClick={() => !renamePending && setRenameOpen(false)}
+          >
+            <form
+              className="rename-modal"
+              onClick={(e) => e.stopPropagation()}
+              onSubmit={submitRename}
+            >
+              <label className="rename-modal__label">
+                {t("fileActions.renameLabel", { defaultValue: "Новое название" })}
+              </label>
+              <input
+                ref={renameInputRef}
+                type="text"
+                value={renameValue}
+                maxLength={80}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && !renamePending) setRenameOpen(false);
+                }}
+                disabled={renamePending}
+                autoFocus
+              />
+              <div className="rename-modal__actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setRenameOpen(false)}
+                  disabled={renamePending}
+                >
+                  {t("common.cancel", { defaultValue: "Отмена" })}
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-ink btn-sm"
+                  disabled={renamePending || !renameValue.trim()}
+                >
+                  {renamePending
+                    ? t("common.saving", { defaultValue: "Сохраняю…" })
+                    : t("common.save", { defaultValue: "Сохранить" })}
+                </button>
+              </div>
+            </form>
           </div>,
           document.body,
         )}
