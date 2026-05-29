@@ -6,6 +6,8 @@ import i18next from "i18next";
 import { Button } from "@/components/ui/Button";
 import {
   agentChat,
+  type AgentChatResponse,
+  streamAgentChat,
   type AgentChatMessage,
   type AgentIntent,
   type AgentModuleKind,
@@ -212,6 +214,9 @@ export interface AgentResult {
   transcript?: AgentChatMessage[];
   musicParams?: Record<string, unknown>;
   researchNotes?: string;
+  /** A/B-test stamps from the agent's last turn — echoed back on launch. */
+  promptVersion?: string;
+  model?: string;
 }
 
 interface UiMessage {
@@ -510,14 +515,62 @@ export function AgentChat({
 
     const p = wizardParams.current;
     try {
-      const resp = await agentChat({
+      const chatReq = {
         module,
         messages: nextHistory,
         selected_genre: isFinalizeCall ? (p.genre || selectedGenre) : selectedGenre,
         selected_mood: isFinalizeCall ? (p.mood || selectedMood) : selectedMood,
         selected_tempo: isFinalizeCall ? (p.tempo || selectedTempo) : selectedTempo,
         selected_vocal: isFinalizeCall ? (p.vocal || selectedVocal) : selectedVocal,
-      });
+      };
+
+      // Streaming-first: open SSE, append reply deltas to a placeholder
+      // message as they arrive, then finalize on `complete`. Falls back
+      // to the one-shot endpoint on any stream error so the user always
+      // gets a response.
+      let resp: AgentChatResponse | null = null;
+      let streamedSomething = false;
+      const placeholderId = `agent-${Date.now()}`;
+      try {
+        for await (const ev of streamAgentChat(chatReq)) {
+          if (ev.type === "reply") {
+            if (!streamedSomething) {
+              // First delta — drop the thinking spinner and inject an
+              // empty agent bubble we can append into.
+              stopThinking();
+              setThinking(false);
+              setMessages((prev) => [
+                ...prev,
+                { id: placeholderId, role: "agent", text: "" },
+              ]);
+              streamedSomething = true;
+            }
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === placeholderId ? { ...m, text: m.text + ev.delta } : m,
+              ),
+            );
+          } else if (ev.type === "complete") {
+            resp = ev.data;
+          } else if (ev.type === "error") {
+            // bubble up to outer catch via throw — triggers the fallback
+            throw new Error(ev.detail);
+          }
+        }
+      } catch {
+        // Stream errored mid-flight or refused to start. Fall back to the
+        // classic one-shot endpoint so the conversation still progresses.
+        resp = await agentChat(chatReq);
+        // Strip the partial placeholder so we don't end up with two agent
+        // bubbles when the fallback succeeds.
+        if (streamedSomething) {
+          setMessages((prev) => prev.filter((m) => m.id !== placeholderId));
+          streamedSomething = false;
+        }
+      }
+      if (!resp) {
+        throw new Error("agent: no complete event received");
+      }
 
       // Detect lyrics in this response
       const containsLyrics = hasLyrics(resp.reply);
@@ -531,18 +584,35 @@ export function AgentChat({
         // Still in free mode — suggestions come from GPT normally
       }
 
-      const replyMsg: UiMessage = {
-        id: `agent-${Date.now()}`,
-        role: "agent",
-        text: resp.reply,
-        // Only attach GPT suggestions when NOT in wizard mode
-        suggestions:
-          wizardPhase === "free" && !containsLyrics && resp.suggestions?.length
-            ? resp.suggestions
-            : undefined,
-        isLyricsMessage: containsLyrics,
-      };
-      setMessages((prev) => [...prev, replyMsg]);
+      const finalSuggestions =
+        wizardPhase === "free" && !containsLyrics && resp.suggestions?.length
+          ? resp.suggestions
+          : undefined;
+      if (streamedSomething) {
+        // Stream already painted the bubble — just patch the final text
+        // (in case the stream truncated mid-escape) and attach metadata.
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === placeholderId
+              ? {
+                  ...m,
+                  text: resp!.reply,
+                  suggestions: finalSuggestions,
+                  isLyricsMessage: containsLyrics,
+                }
+              : m,
+          ),
+        );
+      } else {
+        const replyMsg: UiMessage = {
+          id: `agent-${Date.now()}`,
+          role: "agent",
+          text: resp.reply,
+          suggestions: finalSuggestions,
+          isLyricsMessage: containsLyrics,
+        };
+        setMessages((prev) => [...prev, replyMsg]);
+      }
 
       const finalHistory: AgentChatMessage[] = [
         ...nextHistory,
@@ -562,6 +632,7 @@ export function AgentChat({
           summary: resp.summary, prompt: resp.prompt,
           shortPrompt: resp.short_prompt, intent,
           musicParams: resp.music_params, researchNotes: resp.research_notes,
+          promptVersion: resp.prompt_version, model: resp.model,
         });
         setDone(true);
         setWizardPhase("free");

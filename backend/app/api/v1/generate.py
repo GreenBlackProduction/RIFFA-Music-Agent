@@ -66,6 +66,11 @@ class SongRequest(BaseModel):
     agent_prompt: str = Field(default="", max_length=5000)
     agent_music_params: dict[str, object] = Field(default_factory=dict)
     agent_research_notes: str = Field(default="", max_length=2000)
+    # A/B-test stamps echoed from /agent/chat — saved into generation.params
+    # so we can correlate later user ratings back to a specific prompt
+    # version and model. Empty when the user bypassed the agent.
+    agent_prompt_version: str = Field(default="", max_length=32)
+    agent_model: str = Field(default="", max_length=64)
     # User-facing track name. Suno V5.5 limit (`title`) is 80 chars.
     track_name: str = Field(default="", max_length=80)
     idempotency_key: str = Field(default="", max_length=64)
@@ -80,6 +85,11 @@ class InstrumentalRequest(BaseModel):
     agent_prompt: str = Field(default="", max_length=5000)
     agent_music_params: dict[str, object] = Field(default_factory=dict)
     agent_research_notes: str = Field(default="", max_length=2000)
+    # A/B-test stamps echoed from /agent/chat — saved into generation.params
+    # so we can correlate later user ratings back to a specific prompt
+    # version and model. Empty when the user bypassed the agent.
+    agent_prompt_version: str = Field(default="", max_length=32)
+    agent_model: str = Field(default="", max_length=64)
     track_name: str = Field(default="", max_length=80)
     idempotency_key: str = Field(default="", max_length=64)
 
@@ -89,6 +99,11 @@ class SoundEffectRequest(BaseModel):
     agent_prompt: str = Field(default="", max_length=5000)
     agent_music_params: dict[str, object] = Field(default_factory=dict)
     agent_research_notes: str = Field(default="", max_length=2000)
+    # A/B-test stamps echoed from /agent/chat — saved into generation.params
+    # so we can correlate later user ratings back to a specific prompt
+    # version and model. Empty when the user bypassed the agent.
+    agent_prompt_version: str = Field(default="", max_length=32)
+    agent_model: str = Field(default="", max_length=64)
     track_name: str = Field(default="", max_length=80)
     idempotency_key: str = Field(default="", max_length=64)
 
@@ -109,6 +124,11 @@ class OccasionRequest(BaseModel):
     agent_prompt: str = Field(default="", max_length=5000)
     agent_music_params: dict[str, object] = Field(default_factory=dict)
     agent_research_notes: str = Field(default="", max_length=2000)
+    # A/B-test stamps echoed from /agent/chat — saved into generation.params
+    # so we can correlate later user ratings back to a specific prompt
+    # version and model. Empty when the user bypassed the agent.
+    agent_prompt_version: str = Field(default="", max_length=32)
+    agent_model: str = Field(default="", max_length=64)
     idempotency_key: str = Field(default="", max_length=64)
 
 

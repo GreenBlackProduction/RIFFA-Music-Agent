@@ -385,6 +385,9 @@ export interface SongParams {
   agent_prompt?: string;
   agent_music_params?: Record<string, unknown>;
   agent_research_notes?: string;
+  /** Echo of agent prompt_version + model — saved to generation.params for A/B telemetry. */
+  agent_prompt_version?: string;
+  agent_model?: string;
   track_name?: string;
 }
 
@@ -404,6 +407,9 @@ export interface InstrumentalParams {
   agent_prompt?: string;
   agent_music_params?: Record<string, unknown>;
   agent_research_notes?: string;
+  /** Echo of agent prompt_version + model — saved to generation.params for A/B telemetry. */
+  agent_prompt_version?: string;
+  agent_model?: string;
   track_name?: string;
 }
 
@@ -419,6 +425,9 @@ export interface SoundEffectParams {
   agent_prompt?: string;
   agent_music_params?: Record<string, unknown>;
   agent_research_notes?: string;
+  /** Echo of agent prompt_version + model — saved to generation.params for A/B telemetry. */
+  agent_prompt_version?: string;
+  agent_model?: string;
   track_name?: string;
 }
 
@@ -438,6 +447,9 @@ export interface OccasionParams {
   agent_prompt?: string;
   agent_music_params?: Record<string, unknown>;
   agent_research_notes?: string;
+  /** Echo of agent prompt_version + model — saved to generation.params for A/B telemetry. */
+  agent_prompt_version?: string;
+  agent_model?: string;
 }
 
 export function generateOccasion(params: OccasionParams): Promise<GenerateResponse> {
@@ -595,6 +607,9 @@ export interface LyricsDraftParams {
   agent_prompt?: string;
   agent_music_params?: Record<string, unknown>;
   agent_research_notes?: string;
+  /** Echo of agent prompt_version + model — saved to generation.params for A/B telemetry. */
+  agent_prompt_version?: string;
+  agent_model?: string;
 }
 
 export interface LyricsDraftResponse {
@@ -679,6 +694,12 @@ export interface AgentChatResponse {
   research_notes: string;
   intent: AgentIntent | null;
   suggestions: string[];
+  /** A/B-test tag — version of the agent's system prompt that produced
+   *  this turn. Echoed back on launch so the backend can stamp it onto
+   *  generation.params for later quality analysis. */
+  prompt_version?: string;
+  /** Which OpenAI model handled this turn (gpt-4o vs gpt-4o-mini). */
+  model?: string;
 }
 
 export function agentChat(req: AgentChatRequest): Promise<AgentChatResponse> {
@@ -693,6 +714,76 @@ export function agentChat(req: AgentChatRequest): Promise<AgentChatResponse> {
     method: "POST",
     body: JSON.stringify({ ...req, lang }),
   });
+}
+
+/**
+ * SSE-streaming variant of agentChat. Yields `reply` deltas as the model
+ * types them, then a final `complete` event with the full structured
+ * response. Falls back to the non-streaming endpoint on any transport
+ * error so the UI never gets stuck mid-stream.
+ */
+export type AgentStreamEvent =
+  | { type: "reply"; delta: string }
+  | { type: "complete"; data: AgentChatResponse }
+  | { type: "error"; detail: string };
+
+export async function* streamAgentChat(
+  req: AgentChatRequest,
+): AsyncGenerator<AgentStreamEvent, void, void> {
+  const lang = req.lang ?? (() => {
+    try {
+      const stored = localStorage.getItem("riffa_lang");
+      return stored && stored.startsWith("en") ? "en" : "ru";
+    } catch { return "ru"; }
+  })();
+  const response = await fetch("/api/v1/agent/chat/stream", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...req, lang }),
+  });
+  if (!response.ok || !response.body) {
+    const detail = response.status === 401
+      ? "unauthenticated"
+      : `stream failed: ${response.status}`;
+    yield { type: "error", detail };
+    return;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // SSE events are separated by a blank line.
+    let sepIdx = buffer.indexOf("\n\n");
+    while (sepIdx !== -1) {
+      const raw = buffer.slice(0, sepIdx);
+      buffer = buffer.slice(sepIdx + 2);
+      sepIdx = buffer.indexOf("\n\n");
+      let eventName = "message";
+      const dataLines: string[] = [];
+      for (const line of raw.split("\n")) {
+        if (line.startsWith("event: ")) eventName = line.slice(7).trim();
+        else if (line.startsWith("data: ")) dataLines.push(line.slice(6));
+      }
+      const dataStr = dataLines.join("\n");
+      if (!dataStr) continue;
+      try {
+        const parsed = JSON.parse(dataStr) as { delta?: string; detail?: string } & Record<string, unknown>;
+        if (eventName === "reply" && typeof parsed.delta === "string") {
+          yield { type: "reply", delta: parsed.delta };
+        } else if (eventName === "complete") {
+          yield { type: "complete", data: parsed as unknown as AgentChatResponse };
+        } else if (eventName === "error") {
+          yield { type: "error", detail: typeof parsed.detail === "string" ? parsed.detail : "unknown" };
+        }
+      } catch {
+        // Malformed event payload — ignore this event but keep streaming.
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------

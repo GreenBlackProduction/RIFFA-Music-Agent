@@ -22,7 +22,10 @@ import re
 from collections import Counter
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from collections.abc import AsyncIterator
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from loguru import logger
 from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
@@ -34,6 +37,13 @@ from app.core.deps import current_user, db_session
 from app.db.models import Generation, GenerationStatus, GenerationType, User
 
 router = APIRouter(prefix="/agent", tags=["agent"])
+
+
+# Bumped whenever the system prompt or coercion semantics change in a way
+# that meaningfully alters output quality. Saved into generation.params at
+# launch so we can A/B test prompt revisions and correlate user rating
+# back to a specific version.
+AGENT_PROMPT_VERSION = "v3.1"
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +111,13 @@ class AgentChatResponse(BaseModel):
     research_notes: str = ""       # NEW — genre research from agent for prompt engineer
     intent: AgentIntent | None = None
     suggestions: list[str] = []
+    # Version of the agent's system prompt + coercion rules used for this
+    # turn. Frontend echoes this back on launch so generate.py can stamp it
+    # onto generation.params for later quality analysis.
+    prompt_version: str = AGENT_PROMPT_VERSION
+    # Which OpenAI model handled this turn (gpt-4o vs gpt-4o-mini). Useful
+    # for the same A/B telemetry.
+    model: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -280,6 +297,61 @@ suggested_bpm just because user didn't mention them) — INFER them
 from what you know about the artist/genre/style, OR set done=false
 and ask one more question. NEVER ship done=true with an empty
 music_params object — that's a critical bug, not a feature.
+
+═══════════════════════════════════════════════════════════════════════
+SELF-CRITIQUE on done=true (REQUIRED)
+═══════════════════════════════════════════════════════════════════════
+When you finalize the brief (done=true) `intent.note` is the only piece
+of "agent transparency" the user sees next to the launch button. Treat
+it as your honesty report — name what you ASSUMED so the user can
+correct you before paying for a generation.
+
+Exact shape (≤200 chars, language-lock language):
+  "<one-line plan starting with «Запущу» / «Launching»>. <Assumption
+   sentence: «Я предположил X, Y и Z» / «I assumed X, Y, Z>».
+   <Invitation: «поправь если нужно» / «let me know if anything's off»>."
+
+The assumption sentence MUST list the music_params fields you filled
+in WITHOUT the user explicitly stating them. Pick the 2-4 RISKIEST
+assumptions — don't dump all eight. Pick what most affects the sound.
+
+  Worked example 1 — user said "lo-fi, медленный":
+    Explicit: genre=Lo-fi, tempo=slow.
+    Assumed:  mood=calm, era=2010s, suggested_bpm=78, vocal=(empty),
+              key_instruments=[dusty drum break, Rhodes piano],
+              techniques=[tape saturation, vinyl crackle].
+    Note (Russian):
+      "Запущу lo-fi инструментал. Я предположил спокойное настроение,
+       ~78 BPM и 2010s продакшен — поправь если нужно."
+
+  Worked example 2 — user said "funky hip-hop":
+    Explicit: genre=Hip-Hop, mood=funky→energetic.
+    Assumed:  tempo=medium, era=1990s, vocal=male, key_instruments=
+              [funky Clavinet, wah-wah guitar, breakbeat drums],
+              suggested_bpm=95.
+    Note (Russian):
+      "Запущу funky hip-hop трек. Я предположил средний темп, мужской
+       вокал и 90s продакшен — поправь если нужно."
+
+  Worked example 3 — user gave a rich brief ("post-rock, медленно,
+  с фуззовой гитарой и Moog басом, ~75 BPM, мрачно"):
+    Explicit: genre=Post-Rock, tempo=slow, mood=dark,
+              key_instruments include fuzz guitar + Moog bass,
+              suggested_bpm=75.
+    Assumed:  era=2010s, techniques=[wall-of-sound build, plate
+              reverb on snare], vocal=(empty).
+    Note (Russian):
+      "Запущу медленный post-rock с фуззом и Moog басом. Из своего —
+       2010s продакшен и build-and-release динамика, поправь если нужно."
+
+Confidence is implicit in the assumption count: 0-1 = high confidence,
+2-3 = medium, 4+ = low (this is the «vague brief» case — usually you
+should have asked one more question instead of finalizing).
+
+When the user comes back to "Дополнить бриф" and changes a parameter,
+move that field from "assumed" to "explicit" in the next note. After
+several refinements the note shrinks to "Запущу X. Всё согласовано." —
+that's the success state.
 
 ═══════════════════════════════════════════════════════════════════════
 ANTI-LOOP RULE — stop asking when you have enough
@@ -1114,6 +1186,67 @@ def _detect_reply_language(messages: list[ChatMessage]) -> str:
     return "English" if lat > cyr else "Russian"
 
 
+# Markers that signal the user is *committing* to a real music brief
+# (named a genre, asked for a specific module, used an imperative verb,
+# or asked for lyrics/words). When any of these is in the latest user
+# message we use the full gpt-4o — gpt-4o-mini degrades quickly under
+# the combined load of MODULE ROUTER + MUSIC_PARAMS validation +
+# LYRICS DRAFTING. Pure chit-chat ("привет", "что ты умеешь?", "ок") is
+# routed to gpt-4o-mini instead (3-5× cheaper, 2× faster).
+_COMMIT_MARKERS = (
+    # RU imperative verbs of intent
+    "сделай", "сделать", "напиши", "собери", "сгенерируй",
+    "запусти", "запускай", "поехали", "погнали", "го",
+    # EN imperative verbs of intent
+    "make ", "generate", "create", "launch", "let's go", "go ahead",
+    "do it", "build",
+    # EN genres / scene words
+    "lo-fi", "lofi", "techno", "house", "trance", "rock", "pop", "jazz",
+    "hip-hop", "hip hop", "rap", "ambient", "metal", "punk", "country",
+    "blues", "reggae", "ska", "funk", "soul", "r&b", "indie", "synthwave",
+    "shoegaze", "post-rock", "dnb", "drum and bass", "garage", "phonk",
+    "hyperpop", "vaporwave", "dubstep", "drill", "trap", "edm",
+    # RU genres
+    "рок", "поп", "рэп", "техно", "хаус", "джаз", "электроника",
+    "акустика", "классика", "метал", "панк", "блюз", "фанк", "регги",
+    # Module words
+    "инструментал", "instrumental", "песня", "song", "трек", "track",
+    "звуковой эффект", "sound effect", "sfx", "обложка", "cover art",
+    "кавер", "cover",
+    # Lyrics / text intent
+    "слова", "текст", "лирик", "lyrics", "стих", "куплет", "припев",
+    "verse", "chorus",
+    # Length / direction
+    "минут", "minute", "bpm", "темп", "tempo", "вокал", "vocal",
+)
+
+
+def _pick_model(messages: list[ChatMessage]) -> str:
+    """Route between gpt-4o (full quality) and gpt-4o-mini (cheap, fast).
+
+    Heuristic: the full model handles every turn that's actually shaping a
+    music brief (commit markers present, OR conversation deep enough that
+    we're past the get-to-know stage). Pure chit-chat — short replies, no
+    commit markers, no prior brief — gets mini. The decision flips back to
+    the full model the moment the user names a genre / module / verb of
+    intent, so we never accidentally finalize with mini.
+    """
+    if not messages:
+        return "gpt-4o-mini"
+    last_user = next((m for m in reversed(messages) if m.role == "user"), None)
+    if last_user is None:
+        return "gpt-4o-mini"
+    blob = last_user.content.lower()
+    if any(marker in blob for marker in _COMMIT_MARKERS):
+        return "gpt-4o"
+    # If the conversation already has substantive context (>=4 turns of
+    # back-and-forth, or any prior agent message containing structured
+    # brief language), stay on the full model for continuity.
+    if len(messages) >= 4:
+        return "gpt-4o"
+    return "gpt-4o-mini"
+
+
 async def _build_user_stats(session: AsyncSession, user: User) -> str:
     """Fetch a compact natural-language summary of the user's creative profile.
 
@@ -1397,6 +1530,89 @@ def _coerce_intent(
     )
 
 
+# Matches `"reply": "text..."` where the closing quote may not yet exist.
+# Captures the text inside without consuming the closing quote, so we can
+# emit partial reply deltas while the stream is still in flight.
+_REPLY_FIELD_RE = re.compile(r'"reply"\s*:\s*"((?:[^"\\]|\\.)*)')
+
+
+async def _stream_agent_completion(
+    body: AgentChatRequest,
+    client: AsyncOpenAI,
+    chat_messages: list[dict[str, str]],
+    chosen_model: str,
+    reply_lang: str,
+) -> AsyncIterator[bytes]:
+    """SSE generator: streams reply deltas + a final structured event.
+
+    Two events:
+      • `reply` — incremental text chunks of the user-facing reply.
+        Frontend appends each delta to the in-progress agent message,
+        so the user sees the answer typing live instead of waiting for
+        the full 5-10s GPT round-trip.
+      • `complete` — final JSON with everything (done, summary, prompt,
+        music_params, intent, suggestions, prompt_version, model).
+        Sent after the OpenAI stream closes and we re-run the existing
+        post-processing pipeline on the accumulated JSON.
+
+    JSON-output mode stays on: GPT emits one big object, we extract the
+    `reply` field substring incrementally with a regex while the rest
+    of the JSON streams in. When the full JSON arrives we hand it to
+    _postprocess_agent_reply which preserves every safety net (music
+    params patching, genre splice, intent coercion, etc).
+    """
+    accumulated = ""
+    last_reply_pos = 0
+    try:
+        stream_resp = await client.chat.completions.create(  # type: ignore[call-overload]
+            model=chosen_model,
+            messages=chat_messages,
+            temperature=0.55,
+            max_tokens=1800,
+            response_format={"type": "json_object"},
+            stream=True,
+        )
+        async for chunk in stream_resp:
+            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if not delta:
+                continue
+            accumulated += delta
+            # Extract whatever fits inside `"reply": "...` so far.
+            m = _REPLY_FIELD_RE.search(accumulated)
+            if m:
+                raw_reply = m.group(1)
+                try:
+                    # JSON-unescape (handles \n, \", \\, \uXXXX inside the
+                    # captured substring). We close the string with " so the
+                    # parser accepts it.
+                    unescaped = json.loads(f'"{raw_reply}"')
+                except Exception:
+                    unescaped = raw_reply
+                if len(unescaped) > last_reply_pos:
+                    new_part = unescaped[last_reply_pos:]
+                    last_reply_pos = len(unescaped)
+                    yield (
+                        b"event: reply\n"
+                        b"data: " + json.dumps({"delta": new_part}).encode("utf-8")
+                        + b"\n\n"
+                    )
+    except Exception as exc:
+        logger.exception("agent_chat stream: GPT call failed: {}", exc)
+        yield (
+            b"event: error\n"
+            b"data: " + json.dumps({"detail": "agent backend unavailable"}).encode("utf-8")
+            + b"\n\n"
+        )
+        return
+
+    final = _postprocess_agent_reply(accumulated, body, chosen_model, reply_lang)
+    yield (
+        b"event: complete\n"
+        b"data: " + final.model_dump_json().encode("utf-8")
+        + b"\n\n"
+    )
+
+
 @router.post("/chat", response_model=AgentChatResponse)
 async def agent_chat(
     body: AgentChatRequest,
@@ -1417,6 +1633,7 @@ async def agent_chat(
                 "трек, инструментал, обложку или эффект?"
             ),
             done=False,
+            model="canned",
         )
 
     api_key = settings.apiyi_key or settings.openai_api_key
@@ -1460,17 +1677,17 @@ async def agent_chat(
             }
         )
 
+    chosen_model = _pick_model(body.messages)
     try:
-        # gpt-4o is back: gpt-4o-mini was confabulating on niche artists
-        # ("eneer" → wrong band) and not following the new ARTIST REFERENCE
-        # FLOW that requires asking for a link when uncertain. The full model
-        # follows nuanced instructions much better and recognises a wider
-        # catalogue of small/regional artists.
+        # Brief-shaping turns get the full gpt-4o (handles MODULE ROUTER,
+        # MUSIC_PARAMS validation, LYRICS DRAFTING reliably). Pure chitchat
+        # gets gpt-4o-mini (3-5× cheaper, 2× faster, plenty for "hi" or
+        # "что ты умеешь?"). _pick_model handles the routing.
         # `response_format` accepts the {"type": "json_object"} literal at
         # runtime, but the typed-dict variant in openai 1.61 is too narrow
         # for mypy to pick the right overload — silence just this call.
         resp = await client.chat.completions.create(  # type: ignore[call-overload]
-            model="gpt-4o",
+            model=chosen_model,
             messages=chat_messages,
             temperature=0.55,
             max_tokens=1800,
@@ -1484,11 +1701,28 @@ async def agent_chat(
             detail="Agent backend is temporarily unavailable",
         ) from exc
 
+    return _postprocess_agent_reply(raw, body, chosen_model, reply_lang)
+
+
+def _postprocess_agent_reply(
+    raw: str,
+    body: AgentChatRequest,
+    chosen_model: str,
+    reply_lang: str,
+) -> AgentChatResponse:
+    """Parse + validate + safety-net the raw JSON reply from GPT.
+
+    Extracted so the streaming path can reuse identical post-processing once
+    it accumulates the full JSON payload.
+    """
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
         logger.warning("agent_chat: GPT returned non-JSON, falling back to plain reply")
-        return AgentChatResponse(reply=raw[:1500] or "...", done=False)
+        return AgentChatResponse(
+            reply=raw[:1500] or "...", done=False,
+            prompt_version=AGENT_PROMPT_VERSION, model=chosen_model,
+        )
 
     reply = str(parsed.get("reply", "")).strip()
     done = bool(parsed.get("done", False))
@@ -1570,4 +1804,90 @@ async def agent_chat(
         short_prompt=short_prompt,
         music_params=music_params, research_notes=research_notes,
         intent=intent, suggestions=suggestions,
+        prompt_version=AGENT_PROMPT_VERSION,
+        model=chosen_model,
+    )
+
+
+@router.post("/chat/stream")
+async def agent_chat_stream(
+    body: AgentChatRequest,
+    user: User = Depends(current_user),
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(db_session),
+) -> StreamingResponse:
+    """SSE variant of /chat — streams `reply` deltas, then a final
+    `complete` event with the full AgentChatResponse JSON.
+
+    Shares every system-prompt build, model-routing, language-lock and
+    post-processing path with /chat — only the OpenAI call switches to
+    stream=True and we emit chunks as they arrive.
+    """
+    # Canned opener path: no GPT call, no stream — just send the complete
+    # event in one shot so the frontend's stream consumer still works.
+    if not body.messages:
+        canned = AgentChatResponse(
+            reply=(
+                "Привет! Я RIFFA Agent — помогу собрать промпт для нашей "
+                "AI-студии. Расскажи в двух словах, что хочется сделать: "
+                "трек, инструментал, обложку или эффект?"
+            ),
+            done=False,
+            model="canned",
+        )
+
+        async def _canned() -> AsyncIterator[bytes]:
+            yield (
+                b"event: complete\n"
+                b"data: " + canned.model_dump_json().encode("utf-8")
+                + b"\n\n"
+            )
+
+        return StreamingResponse(_canned(), media_type="text/event-stream")
+
+    api_key = settings.apiyi_key or settings.openai_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Agent is not configured",
+        )
+
+    client = AsyncOpenAI(api_key=api_key, base_url=settings.openai_base_url)
+    windowed = body.messages[-40:]
+    reply_lang = _detect_reply_language(windowed)
+    chat_messages: list[dict[str, str]] = [
+        {"role": "system", "content": _SYS_AGENT},
+        {
+            "role": "system",
+            "content": (
+                f"Reply language: {reply_lang}. This is the language for "
+                f"`reply`, `suggestions`, `intent.note`, `summary`, and every "
+                f"other user-facing string in this response. Do not switch "
+                f"languages within this turn."
+            ),
+        },
+        {"role": "system", "content": _build_user_context(body)},
+    ]
+    try:
+        stats_block = await _build_user_stats(session, user)
+        if stats_block:
+            chat_messages.append({"role": "system", "content": stats_block})
+    except Exception as exc:
+        logger.warning("agent_chat_stream: stats lookup failed for user {}: {}", user.id, exc)
+
+    for m in body.messages:
+        chat_messages.append(
+            {
+                "role": "assistant" if m.role == "agent" else "user",
+                "content": m.content,
+            }
+        )
+
+    chosen_model = _pick_model(body.messages)
+    return StreamingResponse(
+        _stream_agent_completion(body, client, chat_messages, chosen_model, reply_lang),
+        media_type="text/event-stream",
+        # Disable nginx buffering — without this the proxy holds chunks
+        # until the connection closes, defeating the whole point of streaming.
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
     )

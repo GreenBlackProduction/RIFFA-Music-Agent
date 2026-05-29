@@ -1517,6 +1517,8 @@ export function StudioPage() {
     const enrichedPrompt = result.prompt;
     const agentMusicParams = result.musicParams || {};
     const agentResearchNotes = result.researchNotes || "";
+    const agentPromptVersion = result.promptVersion || "";
+    const agentModel = result.model || "";
 
     if (intent.module === "cover_art") {
       try {
@@ -1578,6 +1580,8 @@ export function StudioPage() {
           agent_prompt: enrichedPrompt,
           agent_music_params: agentMusicParams,
           agent_research_notes: agentResearchNotes,
+          agent_prompt_version: agentPromptVersion,
+          agent_model: agentModel,
         });
         title =
           (params.description || "").slice(0, 60) ||
@@ -1593,6 +1597,8 @@ export function StudioPage() {
           agent_prompt: enrichedPrompt,
           agent_music_params: agentMusicParams,
           agent_research_notes: agentResearchNotes,
+          agent_prompt_version: agentPromptVersion,
+          agent_model: agentModel,
         });
         title =
           (params.description || "").slice(0, 60) ||
@@ -1605,6 +1611,8 @@ export function StudioPage() {
           agent_prompt: enrichedPrompt,
           agent_music_params: agentMusicParams,
           agent_research_notes: agentResearchNotes,
+          agent_prompt_version: agentPromptVersion,
+          agent_model: agentModel,
         });
         title = sfxPrompt.slice(0, 60) || "SFX · агент";
         trackKind = "sound_effect";
@@ -1618,6 +1626,8 @@ export function StudioPage() {
           agent_prompt: enrichedPrompt,
           agent_music_params: agentMusicParams,
           agent_research_notes: agentResearchNotes,
+          agent_prompt_version: agentPromptVersion,
+          agent_model: agentModel,
         });
         title =
           (params.description || "").slice(0, 60) ||
