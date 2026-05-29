@@ -77,6 +77,7 @@ class GenerationOut(BaseModel):
 def _to_out(gen: Generation) -> GenerationOut:
     result: dict[str, Any] = gen.result or {}
     raw_tracks = result.get("tracks", [])
+    deleted_idx = set(gen.deleted_track_indices or [])
     tracks = [
         TrackOut(
             # Route audio through our backend so crossOrigin="anonymous" works
@@ -88,7 +89,7 @@ def _to_out(gen: Generation) -> GenerationOut:
             title=t.get("title", gen.title),
         )
         for i, t in enumerate(raw_tracks)
-        if t.get("audio_url")
+        if t.get("audio_url") and i not in deleted_idx
     ]
     return GenerationOut(
         id=str(gen.id),
@@ -613,10 +614,19 @@ async def toggle_radio(
 @router.delete("/{gen_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_generation(
     gen_id: str,
+    track_index: int | None = None,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(db_session),
 ) -> Response:
-    """Move a generation to the trash (soft-delete).  Auto-purged after 7 days."""
+    """Soft-delete a generation or just one of its variants.
+
+    Each Suno generation produces V1 and V2; deleting one variant must
+    never take its sibling with it. When ``track_index`` is set we add
+    that index to ``deleted_track_indices`` and unpublish *only that
+    variant* from Radio. When the index is omitted, or after the last
+    surviving variant gets trashed, we set ``deleted_at`` on the whole
+    row so it shows up in the trash list.
+    """
     try:
         gid = uuid.UUID(gen_id)
     except ValueError as exc:
@@ -631,8 +641,38 @@ async def delete_generation(
     if gen is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
 
+    if track_index is not None:
+        raw_tracks = (gen.result or {}).get("tracks") or []
+        if not (0 <= track_index < len(raw_tracks)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="track_index out of range",
+            )
+        deleted = set(gen.deleted_track_indices or [])
+        deleted.add(track_index)
+        gen.deleted_track_indices = sorted(deleted)
+        flag_modified(gen, "deleted_track_indices")
+
+        # Unpublish only the targeted variant from Radio.
+        pub_indices = list(gen.published_track_indices or [])
+        if gen.published_track_index == track_index:
+            gen.published_track_index = None
+        if track_index in pub_indices:
+            pub_indices.remove(track_index)
+            gen.published_track_indices = pub_indices or None
+        # If every surviving variant is gone we fall through and trash the
+        # whole row so it lands in the user's trash drawer.
+        live = [i for i in range(len(raw_tracks)) if i not in deleted]
+        if live:
+            # At least one variant remains — partial delete is complete.
+            if not pub_indices and gen.published_track_index is None:
+                gen.is_public = False
+                gen.published_at = None
+            await session.commit()
+            return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    # Whole-generation soft-delete (no track_index, OR last variant just left).
     gen.deleted_at = datetime.now(UTC)
-    # Un-publish from Radio when trashed.
     if gen.is_public:
         gen.is_public = False
         gen.published_track_index = None
@@ -664,5 +704,8 @@ async def restore_generation(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
 
     gen.deleted_at = None
+    # Restore every variant — the user moved the row out of trash, so it
+    # would be confusing if half the variants stayed hidden.
+    gen.deleted_track_indices = None
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

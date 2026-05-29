@@ -112,6 +112,10 @@ class Generation(Base, TimestampMixin):
     published_track_indices: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     # Soft-delete: set to now() when user moves to trash; hard-deleted after 7 days.
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Per-variant soft-delete: lets the user trash V1 while keeping V2 (or
+    # vice-versa). The library / radio / share queries filter tracks by this
+    # list. When every variant ends up here we also set deleted_at on the row.
+    deleted_track_indices: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     play_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
     like_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
     dislike_count: Mapped[int] = mapped_column(
