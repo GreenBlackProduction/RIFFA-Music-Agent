@@ -1328,6 +1328,22 @@ a {
 .pill.on-emr { background: var(--emr); color: var(--paper); border-color: var(--emr); }
 .pill .num { color: var(--ink-4); margin-left: 6px; }
 .pill.on .num { color: rgba(233,229,218,0.6); }
+.pill__count {
+  margin-left: 8px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--paper-3);
+  color: var(--ink-4);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  vertical-align: middle;
+}
+.pill.on .pill__count {
+  background: rgba(233,229,218,0.18);
+  color: var(--paper);
+}
 
 /* ── Buttons ── */
 .btn {
