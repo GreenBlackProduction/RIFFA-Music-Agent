@@ -201,12 +201,18 @@ export function ProfilePage() {
     }
   };
 
-  const handleBuyPack = async () => {
+  const handleBuyPack = async (pickedId?: string) => {
     // Align frontend pack ids with backend ("pro" on frontend → "advanced" on backend)
     const packMap: Record<string, PackageCode> = {
       starter: "starter", basic: "basic", pro: "advanced", premium: "premium",
     };
-    const backendPack: PackageCode = packMap[selectedPack] ?? "basic";
+    // Read the pack id from the click site directly. The button's onClick
+    // calls setSelectedPack + handleBuyPack on the same tick — but setState
+    // is async, so handleBuyPack would otherwise see the *previous*
+    // selectedPack from its closure and ship the wrong package_code
+    // (visible bug: tap "Premium 999₽" → Robokassa shows 200₽).
+    const effective = pickedId ?? selectedPack;
+    const backendPack: PackageCode = packMap[effective] ?? "basic";
     setPayStatus("loading");
     setPayError(null);
     try {
@@ -592,9 +598,22 @@ export function ProfilePage() {
           const tokensLine = isEN
             ? <>{p.tokens} <Coin size={12} /> to balance</>
             : <><Coin size={12} /> {p.tokens} на баланс</>;
+          const songGens = Math.floor(p.tokens / 2);
+          const sfxGens = p.tokens * 2;
+          const coverGens = p.tokens;
           const perks = isEN
-            ? [tokensLine, `${Math.floor(p.tokens / 2)} songs`, `WAV export`, `priority queue`]
-            : [tokensLine, `${Math.floor(p.tokens / 2)} песен с вокалом`, `экспорт в WAV`, `приоритет очереди`];
+            ? [
+                tokensLine,
+                `${songGens} song / instr. / cover gens (${songGens * 2} tracks)`,
+                `${sfxGens} sound effect gens`,
+                `up to ${coverGens} cover art gens`,
+              ]
+            : [
+                tokensLine,
+                `${songGens} ген. песен / инстр. / каверов (${songGens * 2} треков)`,
+                `${sfxGens} ген. звуковых эффектов`,
+                `до ${coverGens} ген. обложек`,
+              ];
           return (
             <div key={p.id} className={`price-tile${isFeatured ? " is-featured" : ""}${selectedPack === p.id ? " is-selected" : ""}`} onClick={() => setSelectedPack(p.id)}>
               <div className="tier">{p.name}{isFeatured ? ` · ${isEN ? "best value" : "лучшее"}` : ""}</div>
@@ -602,7 +621,7 @@ export function ProfilePage() {
               {p.starsPrice !== undefined && (
                 <div className="price-stars">{isEN ? `or ${p.starsPrice} ★` : `или ${p.starsPrice} ★`}</div>
               )}
-              <div className="tokens-meta">{p.tokens} <Coin size={11} /> · ~{Math.floor(p.tokens / 2)} {isEN ? "tracks" : "треков"}</div>
+              <div className="tokens-meta">{p.tokens} <Coin size={11} /> · ~{Math.floor(p.tokens / 2)} {isEN ? "gens" : "генераций"}</div>
               {p.discount !== undefined && (
                 <div className="discount">{isEN ? `save ${p.discount}%` : `выгода ${p.discount}%`}</div>
               )}
@@ -612,7 +631,7 @@ export function ProfilePage() {
               <button
                 type="button"
                 className="btn btn-emr btn-block"
-                onClick={(e) => { e.stopPropagation(); setSelectedPack(p.id); handleBuyPack(); }}
+                onClick={(e) => { e.stopPropagation(); setSelectedPack(p.id); handleBuyPack(p.id); }}
                 disabled={payStatus === "loading"}
               >
                 {payStatus === "loading" && selectedPack === p.id ? "..." : (isEN ? "buy →" : "купить →")}

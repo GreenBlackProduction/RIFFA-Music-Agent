@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -319,19 +319,87 @@ export function GlobalPlayer() {
   //
   // The React synthetic onEnded is removed from the JSX — it would advance
   // the queue a second time and cause double-track skipping.
+  // Auto-advance + Spotify-style gapless prefetch.
+  //
+  // The 5-10s mobile pause between tracks was caused by us only kicking off
+  // the network request for the next URL at `ended`. On 3G / weak Wi-Fi the
+  // mobile browser then has to walk DNS → TLS → first audio chunk before
+  // playback can resume, all while the audio session is "idle" and easy
+  // for the OS to suspend.
+  //
+  // Fix: warm the HTTP cache for the next track ~15s before the current
+  // one finishes. We do this with a hidden, muted <audio preload="auto">
+  // — it shares the HTTP cache with the visible element, so by the time
+  // `ended` fires the next URL is already (mostly) in memory. el.src=…;
+  // el.play() then resolves instantly without buffering hiccups.
+  const prefetchedUrlRef = useRef<string | null>(null);
+  const prefetchAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const tearDownPrefetch = useCallback(() => {
+    const ghost = prefetchAudioRef.current;
+    if (ghost) {
+      ghost.removeAttribute("src");
+      ghost.load();
+      ghost.remove();
+    }
+    prefetchAudioRef.current = null;
+    prefetchedUrlRef.current = null;
+  }, []);
+
   useEffect(() => {
     const el = audioRef.current;
     if (!el) return;
+
+    function pickNext(): typeof queue[number] | null {
+      const store = usePlayer.getState();
+      const { queue, queueIndex, shuffle } = store;
+      if (queue.length <= 1) return null;
+      const idx = shuffle
+        ? Math.floor(Math.random() * queue.length)
+        : (queueIndex + 1) % queue.length;
+      return queue[idx] ?? null;
+    }
+
+    function maybePrefetch() {
+      if (!el || !el.duration || !isFinite(el.duration)) return;
+      const remaining = el.duration - el.currentTime;
+      // 15s window — enough for DNS+TLS+first chunk even on slow LTE.
+      if (remaining > 15 || remaining <= 0) return;
+      const nxt = pickNext();
+      if (!nxt?.url) return;
+      if (prefetchedUrlRef.current === nxt.url) return;
+      tearDownPrefetch();
+      try {
+        const ghost = document.createElement("audio");
+        ghost.preload = "auto";
+        ghost.muted = true;
+        ghost.crossOrigin = "anonymous";
+        ghost.style.position = "fixed";
+        ghost.style.opacity = "0";
+        ghost.style.pointerEvents = "none";
+        ghost.style.width = "0";
+        ghost.style.height = "0";
+        ghost.src = nxt.url;
+        ghost.load();
+        document.body.appendChild(ghost);
+        prefetchAudioRef.current = ghost;
+        prefetchedUrlRef.current = nxt.url;
+      } catch {
+        // Prefetch is best-effort — playback still works on `ended`, just
+        // with the original buffering delay.
+      }
+    }
+
     function handleEnded() {
       if (!el) return;
       const store = usePlayer.getState();
-      const { queue, queueIndex, shuffle } = store;
-      if (queue.length <= 1) { store.setPlaying(false); return; }
-      const nextIdx = shuffle
-        ? Math.floor(Math.random() * queue.length)
-        : (queueIndex + 1) % queue.length;
-      const nxt = queue[nextIdx];
-      if (!nxt?.url) { store.setPlaying(false); return; }
+      const { queue } = store;
+      const nxt = pickNext();
+      if (queue.length <= 1 || !nxt?.url) {
+        store.setPlaying(false);
+        tearDownPrefetch();
+        return;
+      }
       // Suppress load()-induced pause before setting new src.
       suppressNextPauseRef.current = true;
       currentSrcRef.current = nxt.url;
@@ -341,15 +409,14 @@ export function GlobalPlayer() {
       // — it silently rejects, the canplay fallback never gets a gesture
       // either, and the track quietly fails to start. Assigning .src alone
       // keeps the audio session alive and play() continues to be allowed
-      // because we are still inside the `ended` event callback.
+      // because we are still inside the `ended` event callback. Combined
+      // with the prefetch warming HTTP cache, this gives Spotify-style
+      // instant track-to-track transitions.
       el.src = nxt.url;
       const playAttempt = el.play();
       if (playAttempt && typeof playAttempt.catch === "function") {
         playAttempt.catch(() => {
           if (!el) return;
-          // Last-ditch: wait for canplay and retry once. Won't help if the
-          // browser already rejected because of autoplay policy, but covers
-          // the case where the new src just hadn't buffered yet.
           const onCanPlay = () => {
             el.removeEventListener("canplay", onCanPlay);
             el.play().catch(() => undefined);
@@ -357,13 +424,18 @@ export function GlobalPlayer() {
           el.addEventListener("canplay", onCanPlay, { once: true });
         });
       }
-      // Sync UI state; since currentSrcRef is already updated, the
-      // main useEffect's URL-change branch won't fire again.
+      tearDownPrefetch();
       store.next();
     }
+
     el.addEventListener("ended", handleEnded);
-    return () => el.removeEventListener("ended", handleEnded);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    el.addEventListener("timeupdate", maybePrefetch);
+    return () => {
+      el.removeEventListener("ended", handleEnded);
+      el.removeEventListener("timeupdate", maybePrefetch);
+      tearDownPrefetch();
+    };
+  }, [tearDownPrefetch]);
 
   // Media Session API — lock screen / notification centre controls.
   // Lets the OS know audio is playing so it doesn't kill the tab on screen lock.

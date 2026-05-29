@@ -12,6 +12,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import current_user, current_user_optional, db_session
+from app.services.mood_canonical import canonical_mood
 from app.db.models import (
     Generation,
     GenerationRating,
@@ -237,7 +238,13 @@ async def list_radio(
     )
 
     if mood:
+        # Mood-coded playlists are instrumental-only: a song with vocals lands
+        # in the "vocal" chip, never under a mood. Without this extra clause
+        # mood chips bleed song+instrumental together and the user sees the
+        # same songs both under "vocal" and under e.g. "calm".
         stmt = stmt.where(Generation.mood == mood)
+        if vocal is None:
+            stmt = stmt.where(Generation.type == GenerationType.instrumental)
     if genre:
         stmt = stmt.where(Generation.genre == genre)
     if vocal == "instrumental":
@@ -343,33 +350,41 @@ class MoodCounts(BaseModel):
 async def mood_counts(
     session: AsyncSession = Depends(db_session),
 ) -> MoodCounts:
-    """Per-mood counts for the Mood grid on the Radio page."""
+    """Per-mood counts for the Mood grid on the Radio page.
+
+    Mood chips on /radio cover instrumentals only (a vocal song belongs to
+    the "vocal" chip instead), so the per-mood counts must mirror that —
+    otherwise the chip says 20 and reveals fewer rows when tapped. The
+    `vocal` field stays a separate total of every song-style track.
+    """
     rows = (
         await session.execute(
             select(Generation.mood, func.count(Generation.id)).where(
                 Generation.is_public.is_(True),
                 Generation.status == GenerationStatus.completed,
-                Generation.type.in_(RADIO_TYPES),
-                Generation.mood.is_not(None),  # Exclude tracks without mood
+                Generation.type == GenerationType.instrumental,
+                Generation.mood.is_not(None),
             ).group_by(Generation.mood)
         )
     ).all()
     counts: dict[str, int] = {str(m): int(c) for m, c in rows if m}
-    total = sum(counts.values())
+    instrumental = sum(counts.values())
 
-    instrumental = (
-        await session.execute(
-            select(func.count(Generation.id)).where(
-                Generation.is_public.is_(True),
-                Generation.status == GenerationStatus.completed,
-                Generation.type == GenerationType.instrumental,
-                Generation.mood.is_not(None),  # Exclude instrumentals without mood
+    vocal = int(
+        (
+            await session.execute(
+                select(func.count(Generation.id)).where(
+                    Generation.is_public.is_(True),
+                    Generation.status == GenerationStatus.completed,
+                    Generation.type != GenerationType.instrumental,
+                    Generation.type.in_(RADIO_TYPES),
+                )
             )
-        )
-    ).scalar_one()
-    vocal = total - int(instrumental)
+        ).scalar_one()
+    )
+    total = instrumental + vocal
 
-    return MoodCounts(counts=counts, total=total, vocal=vocal, instrumental=int(instrumental))
+    return MoodCounts(counts=counts, total=total, vocal=vocal, instrumental=instrumental)
 
 
 @router.get("/stats", response_model=RadioStats)
@@ -647,3 +662,84 @@ async def record_play(
     _bump_track_stat(gen, track_index, "plays", +1)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ── Admin: manual classify ─────────────────────────────────────────────
+
+
+class ClassifyRequest(BaseModel):
+    mood: str | None = None
+    has_vocals: bool | None = None
+
+
+class ClassifyResponse(BaseModel):
+    id: str
+    mood: str | None
+    vocal: str | None
+    type: str
+
+
+@router.patch("/{gen_id}/admin/classify", response_model=ClassifyResponse)
+async def admin_classify(
+    gen_id: str,
+    body: ClassifyRequest,
+    me: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+) -> ClassifyResponse:
+    """Admin-only manual sort. Lets an admin force the mood/vocal classification
+    on a Radio track when the agent guessed wrong.
+
+    `has_vocals=True` flips the row to a vocal song (`type=song`,
+    `vocal=male` as a sensible default if it was empty). `has_vocals=False`
+    flips it to instrumental (`type=instrumental`, `vocal=no_vocal`).
+    `mood` is canonicalised through the same dictionary used at write-time
+    so chip filters can find it.
+
+    The mood/vocal mismatch was the root of the user-visible bug:
+    instrumentals were leaking into the "vocal" chip and vocal songs were
+    leaking into mood playlists. Admin-side reclassify is the manual
+    escape hatch when our automatic detection mis-fires.
+    """
+    if not me.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="admin only"
+        )
+    try:
+        gid = uuid.UUID(gen_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="not found"
+        ) from exc
+
+    gen = (
+        await session.execute(select(Generation).where(Generation.id == gid))
+    ).scalar_one_or_none()
+    if gen is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="not found"
+        )
+
+    if body.mood is not None:
+        normalised = canonical_mood(body.mood) or body.mood.strip()
+        gen.mood = normalised[:32] or None
+
+    if body.has_vocals is True:
+        # Flip to vocal song. If it was instrumental, change type; vocal
+        # field gets a default so downstream Suno logic has something to
+        # work with — admin can refine later via direct DB edit if needed.
+        if gen.type == GenerationType.instrumental:
+            gen.type = GenerationType.song
+        if not gen.vocal or gen.vocal == "no_vocal":
+            gen.vocal = "male"
+    elif body.has_vocals is False:
+        if gen.type != GenerationType.instrumental:
+            gen.type = GenerationType.instrumental
+        gen.vocal = "no_vocal"
+
+    await session.commit()
+    return ClassifyResponse(
+        id=str(gen.id),
+        mood=gen.mood,
+        vocal=gen.vocal,
+        type=gen.type.value if hasattr(gen.type, "value") else str(gen.type),
+    )

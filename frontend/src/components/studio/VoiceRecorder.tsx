@@ -80,7 +80,10 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
 
       analyser.getByteFrequencyData(dataArray);
 
-      ctx.fillStyle = "rgba(10, 10, 18, 0.3)";
+      // Paper-3 base layer — keeps the editorial palette consistent with
+      // the modal chrome. Old neon gradient bars are replaced by solid
+      // ink bars with a single hi-coloured accent tip.
+      ctx.fillStyle = "rgba(242, 239, 229, 0.85)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       const barWidth = (canvas.width / bufferLength) * 2.5;
@@ -88,15 +91,14 @@ export function VoiceRecorder({ isRecording, recordingTime, onStop, onCancel }: 
 
       for (let i = 0; i < bufferLength; i++) {
         const barHeight = (dataArray[i] / 255) * canvas.height * 0.8;
-
-        const gradient = ctx.createLinearGradient(0, canvas.height - barHeight, 0, canvas.height);
-        gradient.addColorStop(0, "rgba(124, 255, 31, 0.8)");
-        gradient.addColorStop(0.5, "rgba(255, 90, 0, 0.6)");
-        gradient.addColorStop(1, "rgba(15, 93, 71, 0.4)");
-
-        ctx.fillStyle = gradient;
+        // Body of the bar in ink; topmost few pixels in hi accent so loud
+        // peaks read as orange on the otherwise monochrome chart.
+        ctx.fillStyle = "rgba(22, 20, 19, 0.92)";
         ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
-
+        if (barHeight > 6) {
+          ctx.fillStyle = "rgba(255, 59, 31, 0.95)";
+          ctx.fillRect(x, canvas.height - barHeight, barWidth, 3);
+        }
         x += barWidth + 1;
       }
     };
