@@ -58,6 +58,7 @@ export const en: TranslationKeys = {
       { title: "AI agent assistant", descr: "Tell the agent your idea in chat — it builds the prompt, genre, tempo and mood for you." },
       { title: "Radio & charts", descr: "Publish your tracks, vote on others, climb day / week / month / all-time charts." },
       { title: "Personal library", descr: "Full history, search, rename, trash with restore, and per-type filters." },
+      { title: "AI models used", descr: "Suno AI v5.5 • ChatGPT-4o • Nano Banana" },
     ],
     telegram: {
       section: "Sign in with Telegram",
@@ -103,7 +104,7 @@ export const en: TranslationKeys = {
       title: "FAQ",
       items: [
         { q: "What are tokens?", a: "The service's internal currency. Spent on generations. No subscriptions, no auto-charges." },
-        { q: "How many tokens does one generation cost?", a: "Song, instrumental, cover, occasion — 2 tokens each. Sound effect, WAV convert, cover art on the base model — 1 token. Pro cover models show the exact price in the UI before you launch." },
+        { q: "How many tokens does one generation cost?", a: "Song, instrumental, cover, occasion — 2 tokens each (one generation produces two track versions). Sound effect — 0.5 tokens. Cover art — from 1 token depending on the model. WAV conversion — 1 token." },
         { q: "How do I top up?", a: "Four packs to choose from: 10, 25, 60 or 150 tokens — from $1 to $9 equivalent. Pay with a Russian card via Robokassa, or with Telegram Stars (works worldwide)." },
         { q: "Are there any free tokens?", a: "Yes — 3 tokens are credited automatically on signup, enough to try any module for free. Plus a referral program: 10 tokens for you per friend invited and 4 for them." },
         { q: "Who owns the generated tracks?", a: "You do. RIFFA does not claim any rights to your result. You can publish, use in your own projects, or monetize." },
@@ -366,11 +367,11 @@ export const en: TranslationKeys = {
     },
     cover: {
       howWorksTitle: "⚠️ How cover generation works",
-      howWorksLead: "Suno uses the uploaded audio only as a melodic foundation. The ORIGINAL VOICE IS NOT PRESERVED — Suno always generates a new vocal. What you can do: 1) pick «Instrumental» format — output has no vocals; 2) pick «With vocals» + add lyrics in «New lyrics» field — Suno sings your words; 3) pick «With vocals» without lyrics — Suno writes lyrics in the chosen style.",
+      howWorksLead: "Suno uses the uploaded audio as a melodic foundation and creates a BRAND NEW full track with full arrangement — it does not process or enhance your recording. For example, a guitar riff becomes the basis for a new track in your chosen genre, but other instruments and production will be added. The original voice and instrument timbre are NOT preserved. What you can do: 1) pick «Instrumental» format — full arrangement without vocals; 2) pick «With vocals» + add lyrics — Suno sings your words; 3) pick «With vocals» without lyrics — Suno writes its own lyrics in the chosen style.",
       fitsTitle: "✅ What works:",
       fitsItems: [
         "Your own voice recording (singing, humming, melody)",
-        "Instrument recording — guitar, piano, any riff",
+        "Instrument recording — guitar, piano, any riff (becomes the basis of a new track)",
         "Your own demos and sketches",
         "Audio without recognisable commercial works",
       ],
@@ -584,6 +585,7 @@ export const en: TranslationKeys = {
     enhancePro: "Enhance quality (Pro)",
     extendTrack: "Extend track",
     convertToWav: "Convert to WAV",
+    wavCost: "1 token",
     noAudioId: "No audio_id to convert",
     shareTrack: "Share track",
   },
