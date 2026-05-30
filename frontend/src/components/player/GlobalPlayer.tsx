@@ -334,6 +334,12 @@ export function GlobalPlayer() {
   // el.play() then resolves instantly without buffering hiccups.
   const prefetchedUrlRef = useRef<string | null>(null);
   const prefetchAudioRef = useRef<HTMLAudioElement | null>(null);
+  // The next track we've committed to (index + url). Shared between the
+  // prefetch warmer and the `ended` handler so the track we PLAY is exactly
+  // the one we PREFETCHED — critical for shuffle, where rolling Math.random()
+  // independently in two places warmed one track but played another, forcing
+  // an el.load() that kills the background audio session mid-transition.
+  const plannedNextRef = useRef<{ index: number; url: string } | null>(null);
 
   const tearDownPrefetch = useCallback(() => {
     const ghost = prefetchAudioRef.current;
@@ -350,24 +356,41 @@ export function GlobalPlayer() {
     const el = audioRef.current;
     if (!el) return;
 
-    function pickNext(): typeof queue[number] | null {
-      const store = usePlayer.getState();
-      const { queue, queueIndex, shuffle } = store;
+    // Returns the next track AND its queue index, so the caller can advance the
+    // store to *exactly* the track it just loaded. Returning only the track
+    // (as before) let `handleEnded` and the store's own `next()` each roll
+    // Math.random() independently in shuffle mode — playing one track while the
+    // store pointed at another, which then forced an el.load() that kills the
+    // background audio session mid-transition.
+    function pickNext(): { index: number; track: typeof queue[number] } | null {
+      const { queue, queueIndex, shuffle } = usePlayer.getState();
       if (queue.length <= 1) return null;
-      const idx = shuffle
+      const index = shuffle
         ? Math.floor(Math.random() * queue.length)
         : (queueIndex + 1) % queue.length;
-      return queue[idx] ?? null;
+      const track = queue[index];
+      return track ? { index, track } : null;
     }
 
     function maybePrefetch() {
+      // Don't prefetch during a seek — currentTime is unreliable mid-seek.
+      if (seekingRef.current || draggingRef.current) return;
       if (!el || !el.duration || !isFinite(el.duration)) return;
       const remaining = el.duration - el.currentTime;
       // 15s window — enough for DNS+TLS+first chunk even on slow LTE.
       if (remaining > 15 || remaining <= 0) return;
-      const nxt = pickNext();
-      if (!nxt?.url) return;
-      if (prefetchedUrlRef.current === nxt.url) return;
+      // Commit to ONE next track for the whole window. Without a stable plan,
+      // shuffle re-picks a random track on every timeupdate (~4 Hz) and never
+      // finishes warming any single one — so `ended` always hits a cold track.
+      const { queue } = usePlayer.getState();
+      let plan = plannedNextRef.current;
+      if (!plan || queue[plan.index]?.url !== plan.url) {
+        const picked = pickNext();
+        if (!picked?.track?.url) return;
+        plan = { index: picked.index, url: picked.track.url };
+        plannedNextRef.current = plan;
+      }
+      if (prefetchedUrlRef.current === plan.url) return;
       tearDownPrefetch();
       try {
         const ghost = document.createElement("audio");
@@ -379,11 +402,11 @@ export function GlobalPlayer() {
         ghost.style.pointerEvents = "none";
         ghost.style.width = "0";
         ghost.style.height = "0";
-        ghost.src = nxt.url;
+        ghost.src = plan.url;
         ghost.load();
         document.body.appendChild(ghost);
         prefetchAudioRef.current = ghost;
-        prefetchedUrlRef.current = nxt.url;
+        prefetchedUrlRef.current = plan.url;
       } catch {
         // Prefetch is best-effort — playback still works on `ended`, just
         // with the original buffering delay.
@@ -392,17 +415,24 @@ export function GlobalPlayer() {
 
     function handleEnded() {
       if (!el) return;
-      const store = usePlayer.getState();
-      const { queue } = store;
-      const nxt = pickNext();
-      if (queue.length <= 1 || !nxt?.url) {
-        store.setPlaying(false);
+      const { queue } = usePlayer.getState();
+      // Prefer the track we already warmed via prefetch so the cache is hot and
+      // the played track == the store's next track. Fall back to a fresh pick
+      // only if the plan went stale (queue changed under us).
+      const plan = plannedNextRef.current;
+      const nxt =
+        plan && queue[plan.index]?.url === plan.url
+          ? { index: plan.index, track: queue[plan.index] }
+          : pickNext();
+      if (queue.length <= 1 || !nxt?.track?.url) {
+        usePlayer.getState().setPlaying(false);
+        plannedNextRef.current = null;
         tearDownPrefetch();
         return;
       }
       // Suppress load()-induced pause before setting new src.
       suppressNextPauseRef.current = true;
-      currentSrcRef.current = nxt.url;
+      currentSrcRef.current = nxt.track.url;
       // CRITICAL on mobile: DO NOT call el.load() here. Calling load() tears
       // down the existing audio session, and mobile Safari / Chrome treat
       // the next el.play() as a fresh autoplay attempt with no user gesture
@@ -412,7 +442,7 @@ export function GlobalPlayer() {
       // because we are still inside the `ended` event callback. Combined
       // with the prefetch warming HTTP cache, this gives Spotify-style
       // instant track-to-track transitions.
-      el.src = nxt.url;
+      el.src = nxt.track.url;
       const playAttempt = el.play();
       if (playAttempt && typeof playAttempt.catch === "function") {
         playAttempt.catch(() => {
@@ -425,7 +455,12 @@ export function GlobalPlayer() {
         });
       }
       tearDownPrefetch();
-      store.next();
+      plannedNextRef.current = null;
+      // Advance the store to the SAME index we just loaded — not store.next(),
+      // which would re-roll shuffle and desync `current` from the audio element
+      // (which then triggers the URL-change branch + el.load() that breaks
+      // background playback).
+      usePlayer.getState().playIndex(nxt.index);
     }
 
     el.addEventListener("ended", handleEnded);
@@ -437,6 +472,12 @@ export function GlobalPlayer() {
     };
   }, [tearDownPrefetch]);
 
+  // Current track changed (auto-advance or a manual pick) — drop any stale
+  // "next" plan so the prefetcher recomputes relative to the new current track.
+  useEffect(() => {
+    plannedNextRef.current = null;
+  }, [currentUrl]);
+
   // Media Session API — lock screen / notification centre controls.
   // Lets the OS know audio is playing so it doesn't kill the tab on screen lock.
   // ВАЖНО для iOS: правильно настроенный MediaSession (с metadata,
@@ -446,18 +487,18 @@ export function GlobalPlayer() {
   useEffect(() => {
     if (!("mediaSession" in navigator) || !currentUrl) return;
     const cover = currentCover;
+    // Always keep our own same-origin icons in the artwork list. The track
+    // cover is a cross-origin Suno CDN URL; if iOS can't fetch it the Now
+    // Playing session is left with empty artwork, which is part of why iOS can
+    // mis-route the lock-screen tap to another app. The same-origin fallback
+    // keeps the session reliably bound to *this* PWA.
+    const ownIcons = [
+      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ];
     const artwork = cover
-      ? [
-          { src: cover, sizes: "96x96", type: "image/webp" },
-          { src: cover, sizes: "192x192", type: "image/webp" },
-          { src: cover, sizes: "256x256", type: "image/webp" },
-          { src: cover, sizes: "384x384", type: "image/webp" },
-          { src: cover, sizes: "512x512", type: "image/webp" },
-        ]
-      : [
-          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
-        ];
+      ? [{ src: cover, sizes: "512x512" }, ...ownIcons]
+      : ownIcons;
     navigator.mediaSession.metadata = new MediaMetadata({
       title: currentTitle || "RIFFA",
       artist: currentAuthor || "RIFFA Music",
@@ -664,18 +705,16 @@ export function GlobalPlayer() {
     return x * duration;
   }
 
-  /** Apply currentTime, preferring fastSeek when available — iOS Safari often
-   *  ignores a plain `currentTime =` assignment if the target is outside the
-   *  loaded buffer, which on a quick click looks like the track jumping back
-   *  to where it was playing (and on a fresh track, that's 0). */
+  /** Apply currentTime.
+   *
+   *  fastSeek() was previously tried here because iOS Safari sometimes
+   *  ignores `currentTime =` outside the loaded buffer.  However fastSeek
+   *  is spec'd to snap to the nearest keyframe, and for progressive MP3
+   *  streams the nearest keyframe is often 0 — which made every progress-bar
+   *  click look like a restart.  Plain `currentTime =` is precise and works
+   *  correctly for our /tracks/.../stream responses (standard HTTP range
+   *  requests, not HLS/DASH). */
   function applySeek(el: HTMLAudioElement, t: number) {
-    try {
-      const fast = (el as HTMLAudioElement & { fastSeek?: (n: number) => void }).fastSeek;
-      if (typeof fast === "function") {
-        fast.call(el, t);
-        return;
-      }
-    } catch { /* fall through */ }
     try { el.currentTime = t; } catch { /* ignore */ }
   }
 
