@@ -334,7 +334,7 @@ export function RadioPage() {
           <span className="live-pill">{isEN ? "on air" : "в эфире"}</span>
           <h2>{isEN ? "Community broadcast" : "Эфир сообщества"}</h2>
           <p>{isEN ? "Best tracks from RIFFA Studio users. Listen, vote, get into charts." : "Лучшие треки от пользователей RIFFA Studio. Слушай, голосуй, попадай в чарты."}</p>
-          <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+          <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
             <button
               type="button"
               className="btn btn-primary"

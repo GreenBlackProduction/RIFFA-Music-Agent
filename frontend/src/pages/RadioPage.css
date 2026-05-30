@@ -246,3 +246,9 @@
 @media (max-width: 600px) {
   .chart-row .duration-mini { display: none; }
 }
+
+@media (max-width: 420px) {
+  /* Узкие экраны: «в эфире сейчас: N треков» цеплялась за правый край. */
+  .radio .top-meta { font-size: 9px; letter-spacing: 0.06em; gap: 10px; }
+  .radio .top-meta .breadcrumb { gap: 8px; }
+}
