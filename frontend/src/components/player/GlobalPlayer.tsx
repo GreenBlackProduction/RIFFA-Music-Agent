@@ -8,6 +8,7 @@ import {
   generateSimilar,
   renameGeneration,
   rateGeneration,
+  shareGeneration,
   toggleHistoryRadio,
   voteRadioTrack,
 } from "@/lib/api/client";
@@ -154,6 +155,8 @@ export function GlobalPlayer() {
   const setRadioState = usePlayer((s) => s.setRadioState);
   const [radioPending, setRadioPending] = useState(false);
   const [wavPending, setWavPending] = useState(false);
+  const [sharePending, setSharePending] = useState(false);
+  const [shareToast, setShareToast] = useState<string | null>(null);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [renamePending, setRenamePending] = useState(false);
@@ -189,6 +192,12 @@ export function GlobalPlayer() {
   const [coverFailed, setCoverFailed] = useState(false);
   useEffect(() => { setCoverFailed(false); }, [currentCover]);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+  // Auto-dismiss the «link copied» toast.
+  useEffect(() => {
+    if (!shareToast) return;
+    const timer = window.setTimeout(() => setShareToast(null), 2500);
+    return () => window.clearTimeout(timer);
+  }, [shareToast]);
 
   // Queue dropdown
   const [queueOpen, setQueueOpen] = useState(false);
@@ -844,6 +853,51 @@ export function GlobalPlayer() {
     downloadBlob(currentUrl, filename);
   }
 
+  /** Share the currently-playing track. Only wired for OWN tracks (the bolt
+   *  menu hides this on radio-foreign rows), so the owner-only
+   *  POST /history/{id}/share endpoint always succeeds. Mirrors
+   *  FileActions.handleShare: radio source → /radio?s=… deep link that
+   *  auto-loads the track, otherwise the /s/… public share page. */
+  async function handleShare() {
+    if (!currentId || sharePending) return;
+    const gId = extractGenId(currentId);
+    if (!gId) return;
+    setSharePending(true);
+    try {
+      const resp = await shareGeneration(gId);
+      const idx = extractTrackIndex(currentId);
+      const variantQuery = idx !== null ? `v=${idx}` : "";
+      const shareUrl = currentSource === "radio"
+        ? `${window.location.origin}/radio?s=${resp.share_id}${variantQuery ? `&${variantQuery}` : ""}`
+        : `${window.location.origin}/s/${resp.share_id}${variantQuery ? `?${variantQuery}` : ""}`;
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareToast(t("fileActions.linkCopied"));
+      } catch {
+        // Clipboard may be blocked in Mini App / non-HTTPS — textarea fallback.
+        const ta = document.createElement("textarea");
+        ta.value = shareUrl;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand("copy");
+          setShareToast(t("fileActions.linkCopied"));
+        } catch {
+          setShareToast(t("fileActions.copyManually") + shareUrl);
+        } finally {
+          document.body.removeChild(ta);
+        }
+      }
+      setBoltOpen(false);
+    } catch {
+      setShareToast(t("fileActions.shareError"));
+    } finally {
+      setSharePending(false);
+    }
+  }
+
   function openRename() {
     setBoltOpen(false);
     setRenameValue(currentTitle ?? "");
@@ -1242,6 +1296,16 @@ export function GlobalPlayer() {
                     ✏️&nbsp; {t("globalPlayer.renameTrack", { defaultValue: "Переименовать трек" })}
                   </button>
                 )}
+                {genId && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void handleShare()}
+                    disabled={sharePending}
+                  >
+                    {sharePending ? "⏳" : "🔗"}&nbsp; {t("fileActions.shareTrack")}
+                  </button>
+                )}
                 <button
                   type="button"
                   role="menuitem"
@@ -1251,6 +1315,14 @@ export function GlobalPlayer() {
                 </button>
               </>
             )}
+          </div>,
+          document.body,
+        )}
+
+      {shareToast &&
+        createPortal(
+          <div className="share-toast" role="status" aria-live="polite">
+            {shareToast}
           </div>,
           document.body,
         )}
