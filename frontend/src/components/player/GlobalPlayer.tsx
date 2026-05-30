@@ -337,27 +337,19 @@ export function GlobalPlayer() {
   // for the OS to suspend.
   //
   // Fix: warm the HTTP cache for the next track ~15s before the current
-  // one finishes. We do this with a hidden, muted <audio preload="auto">
-  // — it shares the HTTP cache with the visible element, so by the time
-  // `ended` fires the next URL is already (mostly) in memory. el.src=…;
-  // el.play() then resolves instantly without buffering hiccups.
+  // one finishes — with a ranged fetch() (NOT a 2nd <audio> element, which
+  // breaks iOS background audio). It shares the browser HTTP cache with the
+  // visible element, so by the time `ended` fires the next URL is already
+  // (mostly) in memory and el.src=… ; el.play() resolves without hiccups.
   const prefetchedUrlRef = useRef<string | null>(null);
-  const prefetchAudioRef = useRef<HTMLAudioElement | null>(null);
   // The next track we've committed to (index + url). Shared between the
   // prefetch warmer and the `ended` handler so the track we PLAY is exactly
-  // the one we PREFETCHED — critical for shuffle, where rolling Math.random()
+  // the one we warmed — critical for shuffle, where rolling Math.random()
   // independently in two places warmed one track but played another, forcing
   // an el.load() that kills the background audio session mid-transition.
   const plannedNextRef = useRef<{ index: number; url: string } | null>(null);
 
   const tearDownPrefetch = useCallback(() => {
-    const ghost = prefetchAudioRef.current;
-    if (ghost) {
-      ghost.removeAttribute("src");
-      ghost.load();
-      ghost.remove();
-    }
-    prefetchAudioRef.current = null;
     prefetchedUrlRef.current = null;
   }, []);
 
@@ -400,25 +392,21 @@ export function GlobalPlayer() {
         plannedNextRef.current = plan;
       }
       if (prefetchedUrlRef.current === plan.url) return;
-      tearDownPrefetch();
+      prefetchedUrlRef.current = plan.url;
+      // Warm the HTTP cache for the next track WITHOUT a second <audio>
+      // element. On iOS a second media element trips the autoplay policy and
+      // disrupts the background audio-session assertion: when the screen locks
+      // the audio dies and the lock-screen "Now Playing" reverts to whatever
+      // app held it before — so tapping it opens THAT app instead of RIFFA.
+      // A plain ranged fetch shares the browser HTTP cache with the <audio>
+      // element, keeping the near-gapless transition without a 2nd element.
       try {
-        const ghost = document.createElement("audio");
-        ghost.preload = "auto";
-        ghost.muted = true;
-        ghost.crossOrigin = "anonymous";
-        ghost.style.position = "fixed";
-        ghost.style.opacity = "0";
-        ghost.style.pointerEvents = "none";
-        ghost.style.width = "0";
-        ghost.style.height = "0";
-        ghost.src = plan.url;
-        ghost.load();
-        document.body.appendChild(ghost);
-        prefetchAudioRef.current = ghost;
-        prefetchedUrlRef.current = plan.url;
+        void fetch(plan.url, {
+          method: "GET",
+          headers: { Range: "bytes=0-1048575" },
+        }).catch(() => undefined);
       } catch {
-        // Prefetch is best-effort — playback still works on `ended`, just
-        // with the original buffering delay.
+        // Prefetch is best-effort — playback still works on `ended`.
       }
     }
 
