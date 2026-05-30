@@ -467,7 +467,14 @@ export function GlobalPlayer() {
       el.removeEventListener("timeupdate", maybePrefetch);
       tearDownPrefetch();
     };
-  }, [tearDownPrefetch]);
+    // currentUrl MUST be in deps. GlobalPlayer is mounted unconditionally
+    // (App.tsx) and renders null while idle, so on first mount audioRef.current
+    // is null and this effect bailed out at `if (!el) return` — the `ended`
+    // listener was NEVER attached, which is why auto-advance never fired (on
+    // any platform). Re-running when currentUrl flips null→url (the <audio>
+    // element has now mounted) attaches the listeners; it also re-binds them
+    // across track changes, which is harmless (cleanup removes the old ones).
+  }, [tearDownPrefetch, currentUrl]);
 
   // Current track changed (auto-advance or a manual pick) — drop any stale
   // "next" plan so the prefetcher recomputes relative to the new current track.
