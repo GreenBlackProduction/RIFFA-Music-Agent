@@ -65,7 +65,7 @@ async def notify_generation_done(
     )
 
     # Deep link to the generation in the mini app
-    mini_app_url = f"https://t.me/{bot_username}/studio?startapp=gen_{gen.id}"
+    mini_app_url = f"https://t.me/{bot_username}?startapp=gen_{gen.id}"
     reply_markup = {
         "inline_keyboard": [
             [{"text": "🎧 Открыть в студии", "url": mini_app_url}],

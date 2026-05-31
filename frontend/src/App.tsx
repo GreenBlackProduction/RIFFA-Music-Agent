@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { RequireAdmin } from "@/components/RequireAdmin";
 import { RequireAuth } from "@/components/RequireAuth";
@@ -23,7 +23,21 @@ const STANDALONE_PATHS = new Set<string>(["/login", "/auth/email-callback", "/tg
 
 export default function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const standalone = STANDALONE_PATHS.has(location.pathname);
+
+  // Telegram Mini App deep link from a notification: startapp=gen_<uuid> opens that
+  // generation in the studio (StudioPage handles ?gen_id). Runs once on mount.
+  useEffect(() => {
+    const tg = (window as unknown as {
+      Telegram?: { WebApp?: { initDataUnsafe?: { start_param?: string } } };
+    }).Telegram?.WebApp;
+    const sp = tg?.initDataUnsafe?.start_param;
+    if (sp && sp.startsWith("gen_")) {
+      const genId = sp.slice(4);
+      if (genId) navigate(`/studio?gen_id=${genId}`, { replace: true });
+    }
+  }, [navigate]);
 
   // Yandex.Metrika: трек переходов между страницами в SPA.
   // Initial page load счётчик ловит сам из index.html, а route changes
