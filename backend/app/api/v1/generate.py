@@ -652,7 +652,12 @@ def _ensure_bucket_cors(s3_client: Any, bucket_name: str) -> None:
     cors_config = {
         "CORSRules": [
             {
-                "AllowedOrigins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+                "AllowedOrigins": [
+                    "http://localhost:5173",
+                    "http://127.0.0.1:5173",
+                    "https://riffastudio.site",
+                    "https://beta.riffastudio.site",
+                ],
                 "AllowedMethods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
                 "AllowedHeaders": ["*"],
                 "ExposeHeaders": ["ETag"],
@@ -714,6 +719,12 @@ async def get_cover_upload_url(
             ExpiresIn=expires_in,
         )
         public_url = f"{settings.s3_public_base_url}/{filename}"
+        # Replace internal Docker hostname with the public nginx proxy path so
+        # browsers can reach MinIO. Nginx forwards Host: minio:9000 so the S3
+        # signature (computed for that host) validates correctly.
+        s3_internal = settings.s3_endpoint.rstrip("/")
+        s3_public_base = settings.s3_public_base_url.rstrip("/").rsplit("/", 1)[0]
+        upload_url = upload_url.replace(s3_internal, s3_public_base)
     except Exception as exc:
         # MinIO/S3 unavailable — fail loudly so the UI can show the real
         # cause instead of attempting a PUT against a non-existent host.
