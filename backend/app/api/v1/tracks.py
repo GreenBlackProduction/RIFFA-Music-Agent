@@ -16,7 +16,7 @@ import uuid
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import Response
 from loguru import logger
 from pydantic import BaseModel, Field
@@ -289,18 +289,62 @@ async def download_track(
     )
 
 
+async def _proxy_audio(audio_url: str, request: Request, cache_control: str) -> Response:
+    """Proxy audio from upstream with Range request pass-through for seekable playback.
+
+    Without range support the browser can't seek — it restarts the download from
+    byte 0 every time currentTime is set past the buffered region.
+    """
+    upstream_headers: dict[str, str] = {}
+    range_header = request.headers.get("range")
+    if range_header:
+        upstream_headers["Range"] = range_header
+
+    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
+        try:
+            resp = await client.get(audio_url, headers=upstream_headers)
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 416:
+                # Range not satisfiable — pass through to browser
+                return Response(status_code=416, headers={"Accept-Ranges": "bytes"})
+            logger.error("stream fetch failed for {}: {}", audio_url, exc)
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream fetch failed") from exc
+        except Exception as exc:
+            logger.error("stream fetch failed for {}: {}", audio_url, exc)
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream fetch failed") from exc
+
+    response_headers: dict[str, str] = {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": cache_control,
+    }
+    # Forward Content-Range when the upstream returned 206
+    if "content-range" in resp.headers:
+        response_headers["Content-Range"] = resp.headers["content-range"]
+    if "content-length" in resp.headers:
+        response_headers["Content-Length"] = resp.headers["content-length"]
+
+    status_code = 206 if resp.status_code == 206 else 200
+    return Response(
+        content=resp.content,
+        status_code=status_code,
+        media_type="audio/mpeg",
+        headers=response_headers,
+    )
+
+
 @router.get("/{generation_id}/{track_index}/stream")
 async def stream_track(
     generation_id: str,
     track_index: int,
+    request: Request,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(db_session),
 ) -> Response:
     """Proxy audio through the backend so the player can use crossOrigin="anonymous".
 
-    Suno CDN doesn't send Access-Control-Allow-Origin headers. The player needs
-    crossOrigin for Web Audio API visualization. Streaming through our own backend
-    (same origin as the page) solves the CORS block transparently.
+    Passes Range headers through to Suno CDN so the browser can seek without
+    restarting from the beginning.
     """
     try:
         gen_uuid = uuid.UUID(generation_id)
@@ -326,31 +370,20 @@ async def stream_track(
     if not audio_url:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "audio missing")
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
-        try:
-            resp = await client.get(audio_url)
-            resp.raise_for_status()
-        except Exception as exc:
-            logger.error("stream fetch failed for {}: {}", audio_url, exc)
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream fetch failed") from exc
-
-    return Response(
-        content=resp.content,
-        media_type="audio/mpeg",
-        headers={"Cache-Control": "private, max-age=3600"},
-    )
+    return await _proxy_audio(audio_url, request, "private, max-age=3600")
 
 
 @router.get("/{generation_id}/{track_index}/public-stream")
 async def stream_public_track(
     generation_id: str,
     track_index: int,
+    request: Request,
     session: AsyncSession = Depends(db_session),
 ) -> Response:
     """Public audio proxy for Radio and shared tracks (no auth required).
 
     Only serves tracks that are published to Radio (is_public=True).
-    Same CORS workaround as stream_track — proxies Suno CDN through backend.
+    Passes Range headers through so the browser can seek without restart.
     """
     try:
         gen_uuid = uuid.UUID(generation_id)
@@ -376,16 +409,4 @@ async def stream_public_track(
     if not audio_url:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "audio missing")
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
-        try:
-            resp = await client.get(audio_url)
-            resp.raise_for_status()
-        except Exception as exc:
-            logger.error("public stream fetch failed for {}: {}", audio_url, exc)
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream fetch failed") from exc
-
-    return Response(
-        content=resp.content,
-        media_type="audio/mpeg",
-        headers={"Cache-Control": "public, max-age=3600"},
-    )
+    return await _proxy_audio(audio_url, request, "public, max-age=3600")
