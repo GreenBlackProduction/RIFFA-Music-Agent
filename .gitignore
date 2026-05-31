@@ -75,3 +75,41 @@ nohup.out
 # ops secrets (только пример разрешён)
 ops/.env
 !ops/.env.example
+
+# ─── Repo root == /root: ignore home-dir & system noise (могут содержать секреты) ───
+.bashrc
+.bash_history
+.profile
+.zshrc
+.gitconfig
+.lesshst
+.wget-hsts
+.cloud-locale-test.skip
+.claude.json
+.claudeignore
+.cache/
+.claude/
+.config/
+.copilot/
+.docker/
+.dotnet/
+.local/
+.npm/
+.playwright-mcp/
+.ssh/
+.vscode-server/
+
+# ─── Отдельные рабочие зоны и живые боты (этому репо не принадлежат) ───
+frontend-beta/
+static_beta/
+RiffaSupportBot/
+New logo/
+backend/static_dist.backup-*/
+
+# ─── Локальные скриншоты / черновики в корне ───
+/radio-360.png
+/radio-360-fixed.png
+/radio-mobile.png
+/radio-mobile-ru.png
+/minio-cors.json
+/cookie-banner-snap.md
