@@ -67,9 +67,10 @@ async def notify_generation_done(
     # Deep link to the generation in the mini app
     mini_app_url = f"https://t.me/{bot_username}/studio?startapp=gen_{gen.id}"
     reply_markup = {
-        "inline_keyboard": [[
-            {"text": "🎧 Открыть в студии", "url": mini_app_url}
-        ]]
+        "inline_keyboard": [
+            [{"text": "🎧 Открыть в студии", "url": mini_app_url}],
+            [{"text": "🔕 Отключить эти уведомления", "callback_data": "disable_gen_notifications"}],
+        ]
     }
 
     await _send(bot_token, user.telegram_user_id, text, reply_markup)
