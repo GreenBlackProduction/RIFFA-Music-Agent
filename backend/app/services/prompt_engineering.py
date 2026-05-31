@@ -24,6 +24,7 @@ from app.services.genre_data import (
     CONTEXT_COMBINATIONS,
     DYNAMIC_ELEMENTS,
     ERA_MODIFIERS,
+    GENRE_ERA_INSTRUMENTS,
     GENRE_STYLES,
     GENRE_TECHNIQUE_BIAS,
     MOOD_PROFILES,
@@ -136,14 +137,18 @@ def build_suno_style(
     if params.suggested_bpm:
         style_parts.append(f"around {params.suggested_bpm}")
 
-    # Step 4.5: era overlay (NEW — production, instruments, vibe from decade)
+    # Step 4.5: era overlay (production, instruments, vibe from decade)
     if params.era:
         era_data = ERA_MODIFIERS.get(params.era)
         if era_data:
             style_parts.append(era_data["production"])
             style_parts.append(era_data["vibe"])
-            # Include era instruments 70% of the time to avoid overwhelming the genre
-            if rng.random() > 0.3:
+            # Genre×era signature gear (e.g. 1990s Techno → TR-909/TB-303) takes
+            # priority over the generic era kit; fall back to it otherwise (70%).
+            ge_instr = GENRE_ERA_INSTRUMENTS.get(genre_key, {}).get(params.era)
+            if ge_instr:
+                style_parts.append(ge_instr)
+            elif rng.random() > 0.3:
                 style_parts.append(era_data["instruments"])
             weight = min(1.0, weight + 0.02)
 

@@ -985,6 +985,66 @@ ERA_MODIFIERS: dict[str, dict[str, str]] = {
 }
 
 
+# Genre × era specific instrumentation. The generic ERA_MODIFIERS["instruments"]
+# is era-only ("1990s gear"); this overlay nails the *genre's* signature kit for
+# that decade (1990s techno = TR-909/TB-303, not a generic 90s rack). Keyed by
+# the exact GENRE_STYLES key + ERA_MODIFIERS decade. Takes priority over the
+# generic era instruments in build_suno_style. Focused on the genres/eras where
+# the gear genuinely changes the sound (and that reference lookups land on).
+GENRE_ERA_INSTRUMENTS: dict[str, dict[str, str]] = {
+    "Techno": {
+        "1990s": "Roland TR-909 kick, TB-303 acid lines, Detroit drum machines, raw analog rave stabs, hardware-sequenced loops",
+        "2000s": "minimal Berlin techno loops, analog hardware jams, dub-techno chords, Roland TR-909",
+        "2010s": "modular synthesis, eurorack sequencing, hypnotic warehouse loops, granular textures, hardware live jams",
+        "2020s": "dense modular sound design, hybrid analog-digital, peak-time festival synths, distorted hardware",
+    },
+    "Acid Techno": {
+        "1990s": "Roland TB-303 squelch, TR-909, resonant acid sweeps, raw rave energy",
+        "2010s": "overdriven TB-303 acid, modular acid lines, hardware distortion",
+    },
+    "House": {
+        "1990s": "Roland TR-909, house piano stabs, Korg M1 organ bass, sampled disco loops, MPC swing",
+        "2010s": "sidechained supersaws, vocal chops, big-room synth stabs, festival drops",
+        "2020s": "lo-fi house textures, organic house percussion, modern analog warmth",
+    },
+    "Trance": {
+        "1990s": "Roland JP-8000 supersaw, classic trance gate, Access Virus leads, uplifting arpeggios",
+        "2000s": "epic supersaw leads, Virus TI, huge breakdowns, sidechain pump, euphoric pads",
+    },
+    "Synthwave": {
+        "1980s": "Roland Juno-106, Yamaha DX7, LinnDrum, gated reverb, analog arpeggios, neon synth leads",
+        "2010s": "modern synthwave production, OB-6, lush retro analog pads, outrun arpeggios",
+    },
+    "Drum & Bass": {
+        "1990s": "chopped Amen break, Reese bass, jungle breakbeats, Akai S1000 sampler grit",
+        "2010s": "neurofunk Reese bass, surgical drum processing, heavy sub-bass design",
+    },
+    "Boom Bap": {
+        "1990s": "SP-1200 and Akai MPC60 swing, dusty vinyl samples, boom-bap drums, jazzy chops, vinyl crackle",
+    },
+    "Trap": {
+        "2010s": "Roland TR-808 booming sub-bass, rapid hi-hat rolls, snappy claps, FL Studio trap kit",
+        "2020s": "distorted 808 slides, pitched vocal chops, dark melodic trap synths",
+    },
+    "Phonk": {
+        "1990s": "Memphis tape hiss, lo-fi cowbell, distorted 808, screwed vinyl samples",
+        "2020s": "drift phonk cowbell, heavily distorted 808s, aggressive sidechain, lo-fi grit",
+    },
+    "Funk": {
+        "1970s": "Clavinet, wah-wah guitar, Fender Rhodes, analog horn section, Moog bass, tight live rhythm section",
+    },
+    "Rock": {
+        "1970s": "tube amp stacks, Hammond organ, Rhodes, live room drums, tape saturation, analog warmth",
+        "1980s": "gated reverb drums, chorus-soaked guitars, DX7 pads, arena production",
+        "1990s": "grunge distortion, raw overdriven guitars, analog fuzz, live unpolished drums",
+    },
+    "Pop": {
+        "1980s": "DX7 keys, LinnDrum, gated snare, synth-pop sheen, analog bass synth",
+        "2010s": "EDM-pop synths, sidechained drops, polished vocal processing, digital production",
+    },
+}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # DYNAMIC ELEMENTS — 8 categories, 150+ techniques for variation and depth
 # ══════════════════════════════════════════════════════════════════════════════
