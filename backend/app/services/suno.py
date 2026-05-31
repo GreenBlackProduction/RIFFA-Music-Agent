@@ -56,6 +56,13 @@ class SunoError(Exception):
     pass
 
 
+class SunoPending(SunoError):
+    """Suno hasn't finished within our poll budget — this is NOT a failure.
+    The task may still complete; the reconcile sweeper recovers it by task_id
+    instead of failing + refunding a generation that Suno actually delivers."""
+    pass
+
+
 @dataclass
 class SunoTrack:
     audio_url: str
@@ -181,7 +188,44 @@ class SunoClient:
                 elif status in {"CANCELLED", "CANCELED", "TIMEOUT"}:
                     raise SunoError("generation cancelled or timed out by Suno")
 
-        raise SunoError("polling timed out — Suno did not finish in the allotted time")
+        # Budget exhausted — Suno may still be working. Signal "pending" (not a
+        # failure) so the worker leaves the generation in `processing` and the
+        # reconcile sweeper finishes it by task_id later.
+        raise SunoPending("polling budget exhausted — Suno still working")
+
+    async def fetch_tracks(self, task_id: str) -> list[SunoTrack]:
+        """One-shot status check (no waiting loop) for reconciliation.
+
+        Returns tracks when ready, ``[]`` when still generating, and raises
+        ``SunoError`` when Suno reports the task failed/cancelled."""
+        async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=15.0)) as client:
+            resp = await client.get(
+                f"{self._base}/generate/record-info",
+                params={"taskId": task_id},
+                headers=self._headers,
+            )
+            if resp.status_code != 200:
+                return []
+            data = resp.json().get("data")
+            if not data:
+                return []
+            status = str(data.get("status", "")).upper()
+            if status in {"SUCCESS", "COMPLETE"}:
+                return self._extract_tracks(data)
+            if "FAILED" in status or "ERROR" in status:
+                response_obj = data.get("response") or {}
+                if not isinstance(response_obj, dict):
+                    response_obj = {}
+                err = (
+                    response_obj.get("errorMessage")
+                    or data.get("errorMessage")
+                    or data.get("msg")
+                    or "generation failed"
+                )
+                raise SunoError(err)
+            if status in {"CANCELLED", "CANCELED", "TIMEOUT"}:
+                raise SunoError("generation cancelled or timed out by Suno")
+            return []  # PENDING / TEXT_SUCCESS / FIRST_SUCCESS — still generating
 
     @staticmethod
     def _extract_tracks(data: dict[str, Any]) -> list[SunoTrack]:

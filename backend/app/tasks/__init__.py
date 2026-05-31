@@ -24,7 +24,7 @@ from app.services.nanobanana import NanoBananaError, make_nanobanana_client
 from app.services.notifications import notify_generation_done
 from app.services.prompt_engineering import SongParams, build_suno_style, vocal_gender
 from app.services.track_naming import resolve_artist, compose_track_title
-from app.services.suno import SunoError, make_suno_client
+from app.services.suno import SunoError, SunoPending, make_suno_client
 from app.services.mirror import mirror_generation_result
 from app.services.wallet import InsufficientBalance, credit_tokens, deduct_tokens
 
@@ -142,6 +142,23 @@ async def shutdown(ctx: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 
+async def _persist_task_id(
+    session_factory: async_sessionmaker[AsyncSession], gen_id: str, task_id: str
+) -> None:
+    """Save the Suno task id the moment it's known (queued step), so a later
+    crash/restart can reconcile the result instead of blindly refunding."""
+    try:
+        async with session_factory() as s:
+            g = (
+                await s.execute(select(Generation).where(Generation.id == uuid.UUID(gen_id)))
+            ).scalar_one_or_none()
+            if g and not g.suno_task_id:
+                g.suno_task_id = task_id
+                await s.commit()
+    except Exception as exc:
+        logger.warning("persist suno_task_id failed for {}: {}", gen_id, exc)
+
+
 async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
     """Dispatch a queued Generation to the appropriate service."""
     session_factory: async_sessionmaker[AsyncSession] = ctx["session_factory"]
@@ -169,7 +186,22 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 gen_id, gen.status,
             )
             if gen.status == GenerationStatus.processing:
-                # Have any tokens already been refunded for this gen?
+                # Reconcile with Suno FIRST — it may have delivered while we were
+                # down. Only refund when we've confirmed it didn't (else we'd pay
+                # Suno + refund the user + lose the track).
+                if gen.suno_task_id:
+                    try:
+                        outcome = await _reconcile_generation(session_factory, settings, gen)
+                    except Exception:
+                        outcome = "skip"
+                    if outcome == "completed":
+                        await _publish(ctx, gen_id, {"status": "completed"})
+                        return
+                    if outcome == "pending":
+                        # Still generating — leave it; the sweeper will finish it.
+                        await _publish(ctx, gen_id, {"status": "processing", "step": "still_generating"})
+                        return
+                # No task_id, or Suno reported failure → refund + fail.
                 existing_refund = (
                     await session.execute(
                         select(WalletTransaction.id)
@@ -237,9 +269,13 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
     import asyncio
 
     def progress_cb(payload: dict[str, Any]) -> None:
-        asyncio.get_event_loop().create_task(
-            _publish(ctx, gen_id, {"status": "processing", **payload})
-        )
+        loop = asyncio.get_event_loop()
+        loop.create_task(_publish(ctx, gen_id, {"status": "processing", **payload}))
+        # Persist the Suno task id as soon as it's known (queued step) so an
+        # interrupted poll can be reconciled rather than refunded.
+        tid = payload.get("task_id")
+        if tid:
+            loop.create_task(_persist_task_id(session_factory, gen_id, str(tid)))
 
     # ---- dispatch ----
     suno = make_suno_client(settings)
@@ -728,6 +764,13 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
         else:
             raise ValueError(f"unsupported generation type: {gen.type}")
 
+    except SunoPending as exc:
+        # Not a failure — Suno is still working but outran our poll budget.
+        # Leave the row in `processing` (tokens stay deducted) and let the
+        # reconcile sweeper finish it by task_id. No refund, no fail.
+        logger.warning("gen {} still pending after poll budget: {} — leaving for reconcile", gen_id, exc)
+        await _publish(ctx, gen_id, {"status": "processing", "step": "still_generating"})
+        return
     except NanoBananaError as exc:
         logger.error("NanoBananaError for gen {}: {}", gen_id, exc)
         error_msg = str(exc)
@@ -806,6 +849,142 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Reconciliation — recover generations Suno delivered but our polling missed
+# (worker restart / poll-budget timeout / transient site error). Without this
+# we'd refund the user while having already paid Suno, and lose the track.
+# ---------------------------------------------------------------------------
+
+RECONCILE_MIN_AGE_SEC = 240          # don't touch rows younger than this (active polls)
+RECONCILE_GIVE_UP_MIN = 25           # past this (and job_timeout) → fail + refund
+
+
+async def _reconcile_generation(
+    session_factory: async_sessionmaker[AsyncSession], settings: Any, gen: Generation
+) -> str:
+    """Poll Suno once by the persisted task_id and finish a stuck `processing`
+    generation. Returns 'completed' | 'pending' | 'failed' | 'skip'."""
+    task_id = gen.suno_task_id
+    if not task_id:
+        return "skip"
+    suno = make_suno_client(settings)
+    try:
+        tracks = await suno.fetch_tracks(task_id)
+    except SunoError:
+        return "failed"  # Suno reports the task itself failed
+    if not tracks:
+        return "pending"  # still generating
+
+    params = gen.params or {}
+    result: dict[str, Any] = {
+        "tracks": [
+            {
+                "audio_url": t.audio_url,
+                "audio_id": t.audio_id,
+                "image_url": t.image_url,
+                "duration": t.duration,
+                "title": t.title or (gen.title or ""),
+            }
+            for t in tracks
+        ],
+        "suno_task_id": task_id,
+    }
+    if isinstance(params.get("lyrics"), str) and params["lyrics"]:
+        result["lyrics"] = params["lyrics"]
+    try:
+        result = await mirror_generation_result(result, str(gen.id), settings)
+    except Exception as exc:
+        logger.warning("reconcile mirror failed for {}: {}", gen.id, exc)
+
+    async with session_factory() as s:
+        g = (
+            await s.execute(select(Generation).where(Generation.id == gen.id))
+        ).scalar_one_or_none()
+        if g is None or g.status != GenerationStatus.processing:
+            return "completed"  # someone else (the worker) already finished it
+        g.status = GenerationStatus.completed
+        g.result = result
+        g.suno_task_id = task_id
+        g.completed_at = datetime.now(UTC)
+        if not g.title and result["tracks"]:
+            g.title = result["tracks"][0].get("title", "")
+        await s.commit()
+    logger.info("reconciled gen {} → completed ({} tracks)", gen.id, len(tracks))
+    return "completed"
+
+
+async def _fail_and_refund(
+    session_factory: async_sessionmaker[AsyncSession], gen_id: str, msg: str
+) -> None:
+    """Mark a stuck generation failed and refund tokens — idempotently (skips
+    the refund if one was already recorded for this generation)."""
+    async with session_factory() as s:
+        g = (
+            await s.execute(select(Generation).where(Generation.id == uuid.UUID(gen_id)))
+        ).scalar_one_or_none()
+        if g is None or g.status != GenerationStatus.processing:
+            return
+        existing_refund = (
+            await s.execute(
+                select(WalletTransaction.id)
+                .where(WalletTransaction.reference_id == str(g.id))
+                .where(WalletTransaction.amount_tokens > 0)
+            )
+        ).scalar_one_or_none()
+        if existing_refund is None and g.cost_tokens > 0:
+            try:
+                await credit_tokens(
+                    s, g.user_id, g.cost_tokens,
+                    reason="refund:reconcile_failed", reference_id=str(g.id),
+                )
+            except Exception as exc:
+                logger.error("reconcile refund failed for {}: {}", gen_id, exc)
+        g.status = GenerationStatus.failed
+        g.error_message = msg[:512]
+        await s.commit()
+
+
+async def reconcile_stuck(ctx: dict[str, Any]) -> None:
+    """Sweeper: every couple of minutes, finish (or, only when truly dead,
+    fail+refund) `processing` generations whose worker died or outran its poll
+    budget — by polling Suno via the task_id we persisted at the queued step."""
+    session_factory: async_sessionmaker[AsyncSession] = ctx["session_factory"]
+    settings = ctx["settings"]
+    now = datetime.now(UTC)
+    async with session_factory() as s:
+        rows = (
+            await s.execute(
+                select(Generation)
+                .where(Generation.status == GenerationStatus.processing)
+                .where(Generation.suno_task_id.is_not(None))
+                .order_by(Generation.created_at)
+                .limit(50)
+            )
+        ).scalars().all()
+
+    for gen in rows:
+        age = (now - gen.created_at).total_seconds()
+        if age < RECONCILE_MIN_AGE_SEC:
+            continue  # likely still being polled by a live worker
+        try:
+            outcome = await _reconcile_generation(session_factory, settings, gen)
+        except Exception as exc:
+            logger.warning("reconcile sweep error for {}: {}", gen.id, exc)
+            continue
+        if outcome == "completed":
+            await _publish(ctx, str(gen.id), {"status": "completed"})
+        elif outcome == "failed" or (outcome == "pending" and age > RECONCILE_GIVE_UP_MIN * 60):
+            # Suno failed, or it's been far too long (well past job_timeout) — now
+            # it's safe to fail + refund: we've confirmed Suno didn't deliver.
+            await _fail_and_refund(
+                session_factory, str(gen.id),
+                "Suno: генерация не удалась" if outcome == "failed"
+                else "Suno не вернул результат вовремя — токены возвращены, запусти ещё раз",
+            )
+            await _publish(ctx, str(gen.id), {"status": "failed"})
+        # pending & not too old → leave for the next sweep
+
+
+# ---------------------------------------------------------------------------
 # WorkerSettings (used by arq CLI: arq app.tasks.WorkerSettings)
 # ---------------------------------------------------------------------------
 
@@ -817,6 +996,9 @@ class WorkerSettings:
         # Daily 03:17 UTC sweep of the soft-delete trash. Off-peak time so the
         # query never collides with user-driven generation traffic.
         cron(purge_trash, hour=3, minute=17, run_at_startup=False),
+        # Every 2 minutes: reconcile generations Suno delivered but our polling
+        # missed (worker restart / timeout), so we don't refund + lose paid tracks.
+        cron(reconcile_stuck, minute=set(range(0, 60, 2)), run_at_startup=True),
     ]
     on_startup = startup
     on_shutdown = shutdown
