@@ -14,6 +14,7 @@ from app.api.v1 import (
     models,
     payments,
     radio,
+    reviews,
     share,
     tracks,
     upload,
@@ -36,6 +37,7 @@ api_router.include_router(agent.router)
 api_router.include_router(history.router)
 api_router.include_router(payments.router)
 api_router.include_router(radio.router)
+api_router.include_router(reviews.router)
 api_router.include_router(share.router)
 api_router.include_router(tracks.router)
 api_router.include_router(legal.router)
