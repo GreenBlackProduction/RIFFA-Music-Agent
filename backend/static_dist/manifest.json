@@ -2,6 +2,8 @@
   "name": "RIFFA Studio",
   "short_name": "RIFFA",
   "description": "Генератор песен и музыки нейросетью",
+  "id": "/",
+  "scope": "/",
   "start_url": "/studio",
   "display": "standalone",
   "background_color": "#E9E5DA",
