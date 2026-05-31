@@ -1,0 +1,64 @@
+# Шаблон production-конфига Nginx для домена riffa.example.
+# Положи в /etc/nginx/sites-available/riffa и замени домен и пути к сертификатам.
+
+upstream riffa_backend {
+    server 127.0.0.1:8000;
+}
+
+server {
+    listen 80;
+    server_name riffa.example;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name riffa.example;
+
+    ssl_certificate     /etc/letsencrypt/live/riffa.example/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/riffa.example/privkey.pem;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    client_max_body_size 50M;
+
+    # Frontend (билд из frontend/dist, копируется в /var/www/riffa)
+    root /var/www/riffa;
+    index index.html;
+
+    # Статика медиа (если выбран вариант "локальная папка вместо S3")
+    location /media/ {
+        alias /var/lib/riffa/media/;
+        expires 30d;
+        access_log off;
+    }
+
+    # API + WebSocket
+    location /api/ {
+        proxy_pass http://riffa_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 600s;
+    }
+
+    location /ws/ {
+        proxy_pass http://riffa_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 3600s;
+    }
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

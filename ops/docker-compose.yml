@@ -65,6 +65,7 @@ services:
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: ${MINIO_ROOT_USER}
       S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_PUBLIC_BASE_URL: https://riffastudio.site/media-s3/riffa-media
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,6 +76,10 @@ services:
     volumes:
       - backend_media:/app/media
       - ../RiffaBot/test_bot.db:/app/sync/bot.db:ro
+      # Frontend build is served from here. Bind-mounted (not only baked into
+      # the image) so deploying the frontend = `npm run build` + copy into
+      # ../backend/static_dist — no backend rebuild, no docker cp, picked up live.
+      - ../backend/static_dist:/app/static_dist
     deploy:
       resources:
         limits:
