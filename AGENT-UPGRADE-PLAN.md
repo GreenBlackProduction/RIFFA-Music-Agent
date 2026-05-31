@@ -1,6 +1,13 @@
 # Agent + Prompt Engineering — Upgrade Plan
 
-Living doc. **Phase 1 = shipped.** Phase 2 + 3 to-do.
+Living doc. **Phase 1 + гибридный трек A–D + #2 + #1 = в проде.**
+
+**Shipped 2026-05-31 (эта сессия):**
+- Гибридный классификатор **A–D** (скрипт-визард, канонический жанр, детерм. финализация, GPT-fallback).
+- **#2 Редактор брифа** — правка genre/mood/tempo/вокал/тема перед запуском.
+- **#1 Референсы треков — через Deezer** (Spotify после ноя-2024 не даёт BPM новым app). «сделай как X» / ссылка Deezer·Spotify·YouTube → реальный BPM/жанр/эра в `build_suno_style`. `services/track_reference.py`.
+- **Отложено пользователем:** Phase E (телеметрия), #6 (профиль вкуса), #9 (дашборд).
+- **Следующее:** Phase 4 — **era-инструменты по жанрам** (genre×era specific).
 
 См. также: [REDESIGN-PLAN.md](REDESIGN-PLAN.md), [GUIDE.md](GUIDE.md), `/root/.claude/projects/-root/memory/`.
 
