@@ -8,8 +8,10 @@ import {
   agentChat,
   type AgentChatResponse,
   streamAgentChat,
+  classifyAgent,
   type AgentChatMessage,
   type AgentIntent,
+  type AgentIntentParams,
   type AgentModuleKind,
 } from "@/lib/api/client";
 import "./AgentChat.css";
@@ -31,6 +33,8 @@ interface SavedAgentSession {
   history: AgentChatMessage[];
   wizardPhase: string;
   wizardParamsCurrent: WizardParams;
+  effectiveModule?: AgentModuleKind;
+  scripted?: boolean;
   lyricsGenerated: boolean;
   done: boolean;
   result: AgentResult | null;
@@ -63,20 +67,29 @@ function clearAgentSession(module: string) {
 }
 
 // ─── Wizard chips ──────────────────────────────────────────────────────────
-// Genre chips are always in English / universal — music genres are an
-// international vocabulary. Only mood/tempo/vocal labels are localised
-// because they describe emotional concepts.
-
-const GENRE_CHIPS_EN = [
-  "Pop / R&B", "Hip-Hop / Trap", "Classical / Orchestra", "Not sure — pick for me",
-  "Rock / Metal", "Electronic / Synth", "Jazz / Blues", "Acoustic / Folk", "Lofi / Chillout",
+// Genre chip VALUES must be exact `GENRE_STYLES` keys (genre_data.py): the
+// server-side prompt builder (`build_suno_style`) only lands on a rich preset
+// on an exact key match — a grouped label like "Hip-Hop / Trap" silently falls
+// back to a generic prompt. Labels == keys here (genres are an international
+// vocabulary). "Pick for me" carries an empty value (mood/tempo still guide).
+const GENRE_CHIPS: { label: string; value: string }[] = [
+  { label: "Pop", value: "Pop" },
+  { label: "Hip-Hop", value: "Hip-Hop" },
+  { label: "Lofi", value: "Lofi" },
+  { label: "Phonk", value: "Phonk" },
+  { label: "Rock", value: "Rock" },
+  { label: "Electronic", value: "Electronic" },
+  { label: "House", value: "House" },
+  { label: "Trap", value: "Trap" },
+  { label: "R&B", value: "R&B" },
+  { label: "Synthwave", value: "Synthwave" },
+  { label: "Jazz", value: "Jazz" },
+  { label: "Drum & Bass", value: "Drum & Bass" },
+  { label: "Classical", value: "Classical" },
+  { label: "Ambient", value: "Ambient" },
 ];
-const GENRE_CHIPS_RU = [
-  "Pop / R&B", "Hip-Hop / Trap", "Классика / Оркестр", "Не знаю — подбери сам",
-  "Rock / Metal", "Electronic / Synth", "Jazz / Blues", "Acoustic / Folk", "Lofi / Chillout",
-];
 
-// Mood labels → backend values (both languages)
+// Mood labels → backend values (both languages). Values are canonical mood keys.
 const MOOD_CHIPS_RU = ["Энергичное", "Меланхоличное", "Агрессивное", "Спокойное", "Вдохновляющее", "Романтичное"];
 const MOOD_CHIPS_EN = ["Energetic", "Melancholic", "Aggressive", "Calm", "Inspiring", "Romantic"];
 const MOOD_VALUES =   ["energetic",  "sad",          "aggressive",  "calm",  "inspiring",  "romantic"];
@@ -92,7 +105,8 @@ const VOCAL_VALUES =   ["male",    "female"];
 function useWizardChips(lang: string) {
   const isEn = lang.startsWith("en");
   return {
-    genreChips:  isEn ? GENRE_CHIPS_EN : GENRE_CHIPS_RU,
+    genreChips:  GENRE_CHIPS,
+    genrePickLabel: isEn ? "Not sure — pick for me" : "Не знаю — подбери сам",
     moodChips:   isEn ? MOOD_CHIPS_EN  : MOOD_CHIPS_RU,
     tempoChips:  isEn ? TEMPO_CHIPS_EN : TEMPO_CHIPS_RU,
     vocalChips:  isEn ? VOCAL_CHIPS_EN : VOCAL_CHIPS_RU,
@@ -105,7 +119,20 @@ function useWizardChips(lang: string) {
     vocalValue:  (label: string) => VOCAL_VALUES[
       (isEn ? VOCAL_CHIPS_EN : VOCAL_CHIPS_RU).indexOf(label)
     ] ?? label.toLowerCase(),
-    genreUnknown: isEn ? "Not sure — pick for me" : "Не знаю — подбери сам",
+    // value → localised label (for brief/ack display)
+    moodLabel:   (value: string) => {
+      const i = MOOD_VALUES.indexOf(value);
+      return i >= 0 ? (isEn ? MOOD_CHIPS_EN : MOOD_CHIPS_RU)[i] : value;
+    },
+    tempoLabel:  (value: string) => {
+      const i = TEMPO_VALUES.indexOf(value);
+      return i >= 0 ? (isEn ? TEMPO_CHIPS_EN : TEMPO_CHIPS_RU)[i] : value;
+    },
+    vocalLabel:  (value: string) => {
+      const i = VOCAL_VALUES.indexOf(value);
+      return i >= 0 ? (isEn ? VOCAL_CHIPS_EN : VOCAL_CHIPS_RU)[i]
+        : value === "no_vocal" ? (isEn ? "none" : "нет") : value;
+    },
   };
 }
 
@@ -115,11 +142,17 @@ type WizardPhase = "free" | "lyrics_review" | "genre" | "mood" | "tempo" | "voca
 
 interface WizardParams {
   lyrics: string;
-  genre: string;
+  topic: string;       // what the track is about (songs) / SFX description
+  genre: string;       // canonical GENRE_STYLES key
+  customGenre: string; // free-typed genre that isn't a canonical key
   mood: string;
   tempo: string;
   vocal: string;
 }
+
+const EMPTY_WIZARD: WizardParams = {
+  lyrics: "", topic: "", genre: "", customGenre: "", mood: "", tempo: "", vocal: "",
+};
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -258,8 +291,18 @@ export function AgentChat({
 
   // Wizard state
   const [wizardPhase, setWizardPhase] = useState<WizardPhase>("free");
-  const wizardParams = useRef<WizardParams>({ lyrics: "", genre: "", mood: "", tempo: "", vocal: "" });
+  const wizardParams = useRef<WizardParams>({ ...EMPTY_WIZARD });
   const lyricsGeneratedRef = useRef(false); // true once agent has drafted lyrics
+
+  // Module the conversation is actually about — starts as the page's module,
+  // then the classifier may re-route it (e.g. SFX request on the Song page).
+  const [effectiveModule, setEffectiveModule] = useState<AgentModuleKind>(module);
+  const effectiveModuleRef = useRef<AgentModuleKind>(module);
+  useEffect(() => { effectiveModuleRef.current = effectiveModule; }, [effectiveModule]);
+  // true once we've entered the scripted (no-GPT) wizard for this conversation
+  const scriptedRef = useRef(false);
+  // first user message — fallback description for SFX (prompt min_length=1)
+  const firstUserMsgRef = useRef("");
 
   const [result, setResult] = useState<AgentResult | null>(null);
 
@@ -332,7 +375,12 @@ export function AgentChat({
       setHistory(hist);
       historyRef.current = hist;
       setWizardPhase((saved.wizardPhase as WizardPhase) ?? "free");
-      wizardParams.current = saved.wizardParamsCurrent ?? { lyrics: "", genre: "", mood: "", tempo: "", vocal: "" };
+      wizardParams.current = { ...EMPTY_WIZARD, ...(saved.wizardParamsCurrent ?? {}) };
+      if (saved.effectiveModule) {
+        setEffectiveModule(saved.effectiveModule);
+        effectiveModuleRef.current = saved.effectiveModule;
+      }
+      scriptedRef.current = saved.scripted ?? false;
       lyricsGeneratedRef.current = saved.lyricsGenerated ?? false;
       if (saved.done && saved.result) {
         setDone(true);
@@ -351,12 +399,14 @@ export function AgentChat({
       history,
       wizardPhase,
       wizardParamsCurrent: wizardParams.current,
+      effectiveModule,
+      scripted: scriptedRef.current,
       lyricsGenerated: lyricsGeneratedRef.current,
       done,
       result,
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, history, wizardPhase, done, result]);
+  }, [messages, history, wizardPhase, done, result, effectiveModule]);
 
   // ── bootstrap ──
   useEffect(() => {
@@ -389,7 +439,8 @@ export function AgentChat({
         }
       })();
     } else if (seed) {
-      void sendInternal(seed, []);
+      appendUserMessage(seed);
+      void classifyAndRoute(seed);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentInitiates]);
@@ -419,65 +470,330 @@ export function AgentChat({
     });
   }
 
-  // Called when user clicks "Accept lyrics"
+  function appendUserMessage(text: string) {
+    const id = `u-${Date.now()}`;
+    setMessages((prev) => [...prev, { id, role: "user", text }]);
+    setHistory((prev) => {
+      const next = [...prev, { role: "user" as const, content: text }];
+      historyRef.current = next;
+      return next;
+    });
+  }
+
+  function pushAgentMessage(text: string) {
+    const id = `a-${Date.now()}`;
+    setMessages((prev) => [...prev, { id, role: "agent", text }]);
+    setHistory((prev) => {
+      const next = [...prev, { role: "agent" as const, content: text }];
+      historyRef.current = next;
+      return next;
+    });
+  }
+
+  // ── Classify-first routing ──
+  // The first user message hits the cheap gpt-4o-mini classifier; clear,
+  // parametric requests enter the scripted (no-GPT) wizard, everything
+  // nuanced (vague / artist refs / custom lyrics / niche genre / image /
+  // occasion / cover) falls through to the full streaming GPT flow. If the
+  // classify endpoint is unavailable we degrade gracefully to the GPT flow.
+  async function classifyAndRoute(text: string) {
+    firstUserMsgRef.current = text;
+    setThinking(true);
+    setError(null);
+    startThinking(false, true);
+
+    let cls: Awaited<ReturnType<typeof classifyAgent>> | null = null;
+    try {
+      cls = await classifyAgent({ message: text, module_hint: module });
+    } catch (err) {
+      const { is401 } = extractError(err);
+      if (is401) {
+        setNeedsAuth(true);
+        setError(isEn ? "Sign in to use the agent" : "Войдите в аккаунт чтобы использовать агента");
+        setThinking(false);
+        stopThinking();
+        return;
+      }
+      cls = null; // endpoint missing / errored → GPT fallback below
+    }
+    setThinking(false);
+    stopThinking();
+
+    if (!cls) {
+      await sendInternal(text, historyRef.current, { alreadyAppended: true });
+      return;
+    }
+
+    // Pre-fill any slots the classifier already extracted.
+    const s = cls.slots;
+    wizardParams.current.genre = s.genre || "";
+    wizardParams.current.mood = s.mood || "";
+    wizardParams.current.tempo = s.tempo || "";
+    wizardParams.current.vocal = s.vocal || "";
+    wizardParams.current.topic = s.topic || "";
+    setEffectiveModule(cls.module);
+    effectiveModuleRef.current = cls.module;
+
+    const scriptable =
+      cls.module === "song" || cls.module === "instrumental" || cls.module === "sound_effect";
+    const needsGpt =
+      cls.too_vague || cls.artist_ref || cls.obscure_genre || cls.needs_lyrics;
+
+    if (scriptable && !needsGpt) {
+      enterScriptedWizard();
+    } else {
+      await sendInternal(text, historyRef.current, { alreadyAppended: true });
+    }
+  }
+
+  // Module → ordered list of scripted slots to collect via chips.
+  function moduleSequence(m: AgentModuleKind): WizardPhase[] {
+    if (m === "instrumental") return ["genre", "mood", "tempo"];
+    if (m === "song" || m === "occasion") return ["genre", "mood", "tempo", "vocal"];
+    return []; // sound_effect / cover_* — nothing to ask
+  }
+
+  // First unfilled slot after `current` (null = start), skipping slots the
+  // classifier already filled. "finalize" when nothing is left to ask.
+  function nextScriptedPhase(current: WizardPhase | null): WizardPhase | "finalize" {
+    const seq = moduleSequence(effectiveModuleRef.current);
+    const p = wizardParams.current;
+    const filled = (slot: WizardPhase) =>
+      slot === "genre" ? !!(p.genre || p.customGenre)
+        : slot === "mood" ? !!p.mood
+        : slot === "tempo" ? !!p.tempo
+        : slot === "vocal" ? !!p.vocal
+        : false;
+    const start = current === null ? 0 : seq.indexOf(current) + 1;
+    for (let i = start; i < seq.length; i++) {
+      if (!filled(seq[i])) return seq[i];
+    }
+    return "finalize";
+  }
+
+  function questionFor(phase: WizardPhase): string {
+    switch (phase) {
+      case "genre": return isEn ? "Which genre?" : "Какой жанр?";
+      case "mood":  return isEn ? "What mood?" : "Какое настроение?";
+      case "tempo": return isEn ? "Tempo?" : "Какой темп?";
+      case "vocal": return isEn ? "Vocals?" : "Какой вокал?";
+      default: return "";
+    }
+  }
+
+  function recognizedSummary(): string {
+    const p = wizardParams.current;
+    const got: string[] = [];
+    if (p.genre || p.customGenre) got.push(p.customGenre || p.genre);
+    if (p.mood) got.push(chips.moodLabel(p.mood));
+    if (p.tempo) got.push(chips.tempoLabel(p.tempo));
+    if (got.length) return (isEn ? "Got it: " : "Принято: ") + got.join(", ") + ".";
+    return isEn ? "Got it!" : "Принято!";
+  }
+
+  // Enter the scripted wizard: ask the first unfilled slot, or finalize
+  // immediately when the classifier already supplied everything.
+  function enterScriptedWizard() {
+    scriptedRef.current = true;
+    const first = nextScriptedPhase(null);
+    if (first === "finalize") {
+      pushAgentMessage(isEn ? "Got it — building the prompt…" : "Принято — собираю промт…");
+      finalizeDeterministic();
+      return;
+    }
+    pushAgentMessage(`${recognizedSummary()} ${questionFor(first)}`);
+    setWizardPhase(first);
+  }
+
+  // Advance the scripted wizard after a slot was answered (chip or free text).
+  function advanceAfterSlot(answerLabel: string, currentPhase: WizardPhase) {
+    const next = nextScriptedPhase(currentPhase);
+    if (next === "finalize") {
+      if (scriptedRef.current) {
+        addLocalPair(answerLabel, isEn ? "Building the prompt…" : "Собираю промт…");
+        finalizeDeterministic();
+      } else {
+        void gptFinalize(answerLabel);
+      }
+      return;
+    }
+    addLocalPair(answerLabel, questionFor(next));
+    setWizardPhase(next);
+  }
+
+  // Build music_params + intent fully on the client — no GPT. The worker still
+  // runs build_suno_style + enrich_music_prompt server-side from the canonical
+  // genre/mood/tempo, so prompt quality is preserved.
+  function finalizeDeterministic() {
+    const p = wizardParams.current;
+    const m = effectiveModuleRef.current;
+
+    const musicParams: Record<string, unknown> = {};
+    if (p.genre) musicParams.genre = p.genre;
+    if (p.customGenre) musicParams.custom_genre = p.customGenre;
+    if (p.mood) musicParams.mood = p.mood;
+    if (p.tempo) musicParams.tempo = p.tempo;
+    if (m === "instrumental") musicParams.vocal = "no_vocal";
+    else if (p.vocal) musicParams.vocal = p.vocal;
+
+    const topic = p.topic.trim();
+    const params: AgentIntentParams = {};
+    if (m === "sound_effect") {
+      params.description = topic || firstUserMsgRef.current || "ambient";
+    } else {
+      params.description = topic;
+      if (p.genre) params.genre = p.genre;
+      if (p.customGenre) params.custom_genre = p.customGenre;
+      if (p.mood) params.mood = p.mood;
+      if (p.tempo) params.tempo = p.tempo;
+      if (m === "song") {
+        params.vocal = p.vocal;
+        params.text_mode = "ai"; // Suno writes the lyrics from the brief
+      }
+    }
+
+    const intent: AgentIntent = {
+      module: m,
+      confidence: "high",
+      params,
+      note: buildNote(),
+    };
+    const summary = buildSummary();
+    setResult({
+      summary,
+      prompt: topic,
+      shortPrompt: summary,
+      intent,
+      musicParams,
+      researchNotes: "",
+      promptVersion: "v3.1-scripted",
+      model: "scripted",
+    });
+    setDone(true);
+    setWizardPhase("free");
+  }
+
+  function buildSummary(): string {
+    const p = wizardParams.current;
+    const m = effectiveModuleRef.current;
+    const lines = [`${isEn ? "Module" : "Модуль"}: ${moduleLabel(m)}`];
+    if (m === "sound_effect") {
+      lines.push(`${isEn ? "Description" : "Описание"}: ${p.topic || firstUserMsgRef.current || "—"}`);
+      return lines.join("\n");
+    }
+    if (p.topic) lines.push(`${isEn ? "Topic" : "Тема"}: ${p.topic}`);
+    const g = p.customGenre || p.genre;
+    lines.push(`${isEn ? "Genre" : "Жанр"}: ${g || (isEn ? "agent's pick" : "на выбор агента")}`);
+    if (p.mood) lines.push(`${isEn ? "Mood" : "Настроение"}: ${chips.moodLabel(p.mood)}`);
+    if (p.tempo) lines.push(`${isEn ? "Tempo" : "Темп"}: ${chips.tempoLabel(p.tempo)}`);
+    if (m === "instrumental") lines.push(`${isEn ? "Vocals" : "Вокал"}: ${isEn ? "none" : "нет"}`);
+    else if (m === "song") {
+      lines.push(`${isEn ? "Vocals" : "Вокал"}: ${p.vocal ? chips.vocalLabel(p.vocal) : (isEn ? "AI decides" : "на выбор")}`);
+      lines.push(`${isEn ? "Lyrics" : "Текст"}: ${isEn ? "AI-written" : "пишет ИИ"}`);
+    }
+    return lines.join("\n");
+  }
+
+  function buildNote(): string {
+    const p = wizardParams.current;
+    const m = effectiveModuleRef.current;
+    const g = p.customGenre || p.genre || (isEn ? "a fitting genre" : "подходящий жанр");
+    const moodPart = p.mood ? `, ${chips.moodLabel(p.mood)}` : "";
+    return isEn
+      ? `I'll launch ${moduleLabel(m)} — ${g}${moodPart}. Tweak below if anything's off.`
+      : `Запущу: ${moduleLabel(m).toLowerCase()} — ${g}${moodPart}. Поправь ниже, если что-то не так.`;
+  }
+
+  // Legacy GPT finalize — used only on the GPT path (scripted=false), e.g.
+  // after the user accepted custom lyrics drafted by the model.
+  async function gptFinalize(lastAnswerLabel: string) {
+    const buildingMsg = isEn ? "Building the final prompt…" : "Собираю финальный промт…";
+    const now = Date.now();
+    const uMsg: UiMessage = { id: `u-${now}`, role: "user", text: lastAnswerLabel };
+    const thinkMsg: UiMessage = { id: `a-${now + 1}`, role: "agent", text: buildingMsg };
+    setMessages((prev) => [...prev, uMsg, thinkMsg]);
+    const nextHistory: AgentChatMessage[] = [
+      ...historyRef.current,
+      { role: "user", content: lastAnswerLabel },
+      { role: "agent", content: buildingMsg },
+    ];
+    setHistory(nextHistory);
+    historyRef.current = nextHistory;
+
+    const p = wizardParams.current;
+    const finalizeMsg =
+      `Финализируй. Все параметры собраны: ` +
+      (p.customGenre || p.genre ? `жанр=${p.customGenre || p.genre}, ` : "") +
+      `настроение=${p.mood || "energetic"}, темп=${p.tempo || "medium"}, вокал=${p.vocal || "male"}. ` +
+      `Текст утверждён (custom). Запускай с done=true.`;
+
+    await sendInternal(finalizeMsg, nextHistory, { isFinalize: true });
+  }
+
+  // Called when user clicks "Accept lyrics" (GPT path only).
   function handleAcceptLyrics() {
+    const first = nextScriptedPhase(null);
+    if (first === "finalize") {
+      addLocalPair(
+        isEn ? "Accept lyrics" : "Принимаю текст",
+        isEn ? "Building the final prompt…" : "Собираю финальный промт…",
+      );
+      void gptFinalize(isEn ? "Accept lyrics" : "Принимаю текст");
+      return;
+    }
     addLocalPair(
       isEn ? "Accept lyrics" : "Принимаю текст",
-      isEn ? "Great, lyrics accepted! Now pick a music genre:" : "Отлично, текст принят! Теперь выбери жанр музыки:",
-      chips.genreChips,
+      `${isEn ? "Lyrics accepted!" : "Текст принят!"} ${questionFor(first)}`,
     );
-    setWizardPhase("genre");
+    setWizardPhase(first);
   }
 
   function handleEditLyrics() {
     setWizardPhase("free");
   }
 
-  function handleGenreSelect(genre: string) {
-    wizardParams.current.genre = genre === chips.genreUnknown ? "" : genre;
-    const agentMsg = genre === chips.genreUnknown
-      ? (isEn ? "Agent will pick a genre! What mood do you want?" : "Агент подберёт жанр! Какое настроение хочешь?")
-      : (isEn ? `${genre} — nice pick! What mood for the track?` : `${genre} — хороший выбор! Настроение трека?`);
-    addLocalPair(genre, agentMsg, chips.moodChips);
-    setWizardPhase("mood");
+  function handleGenreSelect(value: string, label: string) {
+    wizardParams.current.genre = value;
+    wizardParams.current.customGenre = "";
+    advanceAfterSlot(label, "genre");
   }
 
   function handleMoodSelect(mood: string) {
     wizardParams.current.mood = chips.moodValue(mood);
-    addLocalPair(mood, isEn ? "Tempo?" : "Темп?", chips.tempoChips);
-    setWizardPhase("tempo");
+    advanceAfterSlot(mood, "mood");
   }
 
   function handleTempoSelect(tempo: string) {
     wizardParams.current.tempo = chips.tempoValue(tempo);
-    addLocalPair(tempo, isEn ? "Vocals?" : "Вокал?", chips.vocalChips);
-    setWizardPhase("vocal");
+    advanceAfterSlot(tempo, "tempo");
   }
 
-  async function handleVocalSelect(vocal: string) {
+  function handleVocalSelect(vocal: string) {
     wizardParams.current.vocal = chips.vocalValue(vocal);
-    const buildingMsg = isEn ? "Building the final prompt…" : "Собираю финальный промт…";
-    const now = Date.now();
-    const uMsg: UiMessage = { id: `u-${now}`, role: "user", text: vocal };
-    const thinkMsg: UiMessage = { id: `a-${now + 1}`, role: "agent", text: buildingMsg };
-    setMessages((prev) => [...prev, uMsg, thinkMsg]);
-    const nextHistory: AgentChatMessage[] = [
-      ...historyRef.current,
-      { role: "user", content: vocal },
-      { role: "agent", content: buildingMsg },
-    ];
-    setHistory(nextHistory);
-    historyRef.current = nextHistory;
+    advanceAfterSlot(vocal, "vocal");
+  }
 
-    // Build finalization message with all collected params
-    const p = wizardParams.current;
-    const finalizeMsg =
-      `Финализируй. Все параметры собраны: ` +
-      (p.genre ? `жанр=${p.genre}, ` : "") +
-      `настроение=${p.mood || "energetic"}, темп=${p.tempo || "medium"}, вокал=${p.vocal || "male"}. ` +
-      `Текст утверждён (custom). Запускай с done=true.`;
-
-    await sendInternal(finalizeMsg, nextHistory, true /* isFinalizeCall */);
+  // Free-typed answer while a scripted slot is being asked.
+  function handleTypedSlotAnswer(text: string) {
+    switch (wizardPhase) {
+      case "genre":
+        wizardParams.current.genre = "";
+        wizardParams.current.customGenre = text;
+        advanceAfterSlot(text, "genre");
+        break;
+      case "mood":
+        wizardParams.current.mood = text.toLowerCase();
+        advanceAfterSlot(text, "mood");
+        break;
+      case "tempo":
+        wizardParams.current.tempo = text.toLowerCase();
+        advanceAfterSlot(text, "tempo");
+        break;
+      case "vocal":
+        wizardParams.current.vocal = text.toLowerCase();
+        advanceAfterSlot(text, "vocal");
+        break;
+    }
   }
 
   // ── Main GPT send ──
@@ -485,20 +801,26 @@ export function AgentChat({
   async function sendInternal(
     text: string,
     baseHistory: AgentChatMessage[],
-    isFinalizeCall = false,
+    opts: { isFinalize?: boolean; alreadyAppended?: boolean } = {},
   ) {
-    if (!isFinalizeCall) {
+    const { isFinalize = false, alreadyAppended = false } = opts;
+
+    // `alreadyAppended` — the caller already pushed the user turn into the UI +
+    // history (classify-first path). `isFinalize` — synthetic prompt, no UI echo.
+    if (!isFinalize && !alreadyAppended) {
       const userMsg: UiMessage = { id: `u-${Date.now()}`, role: "user", text };
       setMessages((prev) => [...prev, userMsg]);
     }
 
-    const nextHistory: AgentChatMessage[] = isFinalizeCall
-      ? [...baseHistory, { role: "user", content: text }]
-      : [...baseHistory, { role: "user", content: text }];
-
-    if (!isFinalizeCall) {
-      setHistory(nextHistory);
-      historyRef.current = nextHistory;
+    let nextHistory: AgentChatMessage[];
+    if (alreadyAppended) {
+      nextHistory = baseHistory;
+    } else {
+      nextHistory = [...baseHistory, { role: "user", content: text }];
+      if (!isFinalize) {
+        setHistory(nextHistory);
+        historyRef.current = nextHistory;
+      }
     }
 
     setThinking(true);
@@ -516,12 +838,14 @@ export function AgentChat({
     const p = wizardParams.current;
     try {
       const chatReq = {
-        module,
+        module: effectiveModuleRef.current,
         messages: nextHistory,
-        selected_genre: isFinalizeCall ? (p.genre || selectedGenre) : selectedGenre,
-        selected_mood: isFinalizeCall ? (p.mood || selectedMood) : selectedMood,
-        selected_tempo: isFinalizeCall ? (p.tempo || selectedTempo) : selectedTempo,
-        selected_vocal: isFinalizeCall ? (p.vocal || selectedVocal) : selectedVocal,
+        // Always feed the classifier-extracted canonical slots so the GPT path
+        // builds on the same parameters the scripted path would.
+        selected_genre: p.customGenre || p.genre || selectedGenre,
+        selected_mood: p.mood || selectedMood,
+        selected_tempo: p.tempo || selectedTempo,
+        selected_vocal: p.vocal || selectedVocal,
       };
 
       // Streaming-first: open SSE, append reply deltas to a placeholder
@@ -578,7 +902,7 @@ export function AgentChat({
         lyricsGeneratedRef.current = true;
         wizardParams.current.lyrics = extractLyrics(resp.reply);
         setWizardPhase("lyrics_review");
-      } else if (wizardPhase === "lyrics_review" || isFinalizeCall) {
+      } else if (wizardPhase === "lyrics_review" || isFinalize) {
         // After lyrics phase or finalize — keep wizard phase state, don't reset
       } else {
         // Still in free mode — suggestions come from GPT normally
@@ -652,8 +976,29 @@ export function AgentChat({
     const text = draft.trim();
     if (!text || thinking || done) return;
     setDraft("");
+
+    // Free-typed answer while a scripted slot is being asked → consume it.
+    if (wizardPhase === "genre" || wizardPhase === "mood" || wizardPhase === "tempo" || wizardPhase === "vocal") {
+      handleTypedSlotAnswer(text);
+      return;
+    }
+
     // If user types freely while in lyrics_review, treat as edit request → reset to free
     if (wizardPhase === "lyrics_review") setWizardPhase("free");
+
+    await routeUserText(text);
+  }
+
+  // The very first user message routes through the classifier (cheap, one
+  // call), which decides scripted-wizard vs full GPT flow; later turns go
+  // straight to the GPT conversation.
+  async function routeUserText(text: string) {
+    const isFirstUserTurn = !historyRef.current.some((m) => m.role === "user");
+    if (isFirstUserTurn) {
+      appendUserMessage(text);
+      await classifyAndRoute(text);
+      return;
+    }
     await sendInternal(text, historyRef.current);
   }
 
@@ -685,8 +1030,9 @@ export function AgentChat({
       return (
         <div className="agent-suggestions">
           {chips.genreChips.map((g) => (
-            <button key={g} type="button" className="agent-suggestion-chip" onClick={() => handleGenreSelect(g)}>{g}</button>
+            <button key={g.value} type="button" className="agent-suggestion-chip" onClick={() => handleGenreSelect(g.value, g.label)}>{g.label}</button>
           ))}
+          <button key="__pick" type="button" className="agent-suggestion-chip" onClick={() => handleGenreSelect("", chips.genrePickLabel)}>{chips.genrePickLabel}</button>
         </div>
       );
     }
@@ -759,8 +1105,12 @@ export function AgentChat({
                 setHistory([]);
                 historyRef.current = [];
                 setWizardPhase("free");
-                wizardParams.current = { lyrics: "", genre: "", mood: "", tempo: "", vocal: "" };
+                wizardParams.current = { ...EMPTY_WIZARD };
                 lyricsGeneratedRef.current = false;
+                scriptedRef.current = false;
+                firstUserMsgRef.current = "";
+                setEffectiveModule(module);
+                effectiveModuleRef.current = module;
                 setDone(false);
                 setResult(null);
                 setError(null);
@@ -829,7 +1179,7 @@ export function AgentChat({
                           key={s}
                           type="button"
                           className="agent-suggestion-chip"
-                          onClick={() => { setDraft(""); void sendInternal(s, historyRef.current); }}
+                          onClick={() => { setDraft(""); void routeUserText(s); }}
                         >
                           {s}
                         </button>

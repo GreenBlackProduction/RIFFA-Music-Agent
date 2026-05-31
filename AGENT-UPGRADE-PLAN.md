@@ -26,6 +26,35 @@ Commit: `<branch main>` — поиск по «feat(agent): streaming + model rou
 
 ---
 
+## Hybrid classifier track (Phase A–E) — снижение GPT-вызовов
+
+Отдельный трек: «минимизировать обработку ответов через ChatGPT». Типичные
+параметрические запросы идут по заскриптованным чипам без GPT; нетипичные
+(vague / артист / ниша / кастомный текст / occasion / image / cover) — в полный
+GPT-поток. Приоритет пользователя: **качественные промты в Suno** — рычаг
+качества это канонический `genre` (точный ключ `GENRE_STYLES`).
+
+| Фаза | Статус | Что |
+|---|---|---|
+| **A** Классификатор | ✅ **задеплоен** (restart `ops-backend-1`, 2026-05-31) | `services/genre_canonical.py` (RU/EN→каноника), `POST /agent/classify` (gpt-4o-mini, temp 0.1, json) → `module` + слоты + флаги (`needs_lyrics/artist_ref/obscure_genre/too_vague`). Safe-fallback `too_vague=true`. Файлы `agent.py`+`genre_canonical.py` лежат в writable-слое контейнера (поверх образа 29.05) → переживают restart/reboot, теряются только при `--force-recreate`/`build` (тогда фронт деградирует). |
+| **B** Скрипт-визард | ✅ код + **задеплоен на прод** (2026-05-31), `/classify` = 401 (live) | `client.ts: classifyAgent()` + типы. `AgentChat.tsx`: первый ход → classify; genre-чипы с **каноническими** значениями (`GENRE_STYLES` keys); пропуск уже извлечённых слотов; роутинг scriptable={song,instrumental,sfx} vs GPT-fallback. **Скрипт-путь активен.** Graceful degrade сохраняется на случай потери writable-слоя. |
+| **C** Детерм. финализация | ✅ код | `finalizeDeterministic()` — `intent`+`music_params` строятся на клиенте, **0 GPT**. Качество держит серверный `enrich_music_prompt`(GPT-4o)+`build_suno_style` на запуске. song→`text_mode=ai` (Suno пишет текст). `promptVersion="v3.1-scripted"`. |
+| **D** GPT-fallback | ✅ переиспользует существующий поток | needs_lyrics/artist_ref/obscure_genre/too_vague/occasion/cover → `sendInternal` (streaming). Слоты классификатора прокидываются в `selected_*`. |
+| **E** Телеметрия | ⏳ TODO | счётчик GPT-вызовов до/после; `model="scripted"` уже различает путь. |
+
+**Deploy-статус (исправлено 2026-05-31):** `/classify` оживлён рестартом
+`ops-backend-1` — код агента уже лежал в writable-слое контейнера. ВАЖНО: все
+«uncommitted» backend-файлы на диске **байт-в-байт совпадают** с работающим
+контейнером (admin/tracks/payments/generate/router/notifications/reviews/legal
+давно в проде, `/api/v1/reviews`=200). «uncommitted в git» здесь = «не сделан
+`git commit`», а НЕ «не задеплоено». → Будущая пересборка backend-образа
+**низкорисковая** (диск == прод), сделает agent-файлы durable. Гигиена: стоит
+`git commit` backend-работы, чтобы репо отражал реальность.
+
+**Файлы:** `backend/app/services/genre_canonical.py` (new), `backend/app/api/v1/agent.py` (+`/classify`), `frontend/src/lib/api/client.ts` (+`classifyAgent`), `frontend/src/components/studio/AgentChat.tsx` (визард).
+
+---
+
 ## Phase 2 — Mid effort (TODO, ~1 день)
 
 ### #2 Структурированный редактор брифа

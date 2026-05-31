@@ -787,6 +787,40 @@ export async function* streamAgentChat(
 }
 
 // ---------------------------------------------------------------------------
+// Agent classify — one cheap gpt-4o-mini call that routes the module and
+// pre-fills any parameters the user already stated. The scripted wizard
+// collects the rest with quick-reply chips (no further GPT). Falls back
+// to the streaming /chat flow when this endpoint is unavailable.
+// ---------------------------------------------------------------------------
+
+export interface AgentClassifySlots {
+  genre: string;
+  mood: string;
+  tempo: string;
+  vocal: string;
+  topic: string;
+}
+
+export interface AgentClassifyResponse {
+  module: AgentModuleKind;
+  slots: AgentClassifySlots;
+  needs_lyrics: boolean;
+  artist_ref: boolean;
+  obscure_genre: boolean;
+  too_vague: boolean;
+  model: string;
+}
+
+export function classifyAgent(
+  req: { message: string; module_hint: AgentModuleKind },
+): Promise<AgentClassifyResponse> {
+  return apiFetch("/api/v1/agent/classify", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // History API
 // ---------------------------------------------------------------------------
 
@@ -1185,4 +1219,24 @@ export function pollGenerationStatus(
   }
   setTimeout(tick, intervalMs);
   return { stop: () => { active = false; } };
+}
+
+// ── Reviews ─────────────────────────────────────────────────────
+export interface ReviewItem {
+  id: number;
+  rating: number;
+  text: string;
+  author: string;
+  created_at: string;
+}
+
+export function fetchReviews(limit = 20): Promise<{ items: ReviewItem[] }> {
+  return apiFetch(`/api/v1/reviews?limit=${limit}`);
+}
+
+export function postReview(rating: number, text: string): Promise<ReviewItem> {
+  return apiFetch("/api/v1/reviews", {
+    method: "POST",
+    body: JSON.stringify({ rating, text }),
+  });
 }

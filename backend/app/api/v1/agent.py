@@ -35,6 +35,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.deps import current_user, db_session
 from app.db.models import Generation, GenerationStatus, GenerationType, User
+from app.services.genre_canonical import canonical_genre
+from app.services.mood_canonical import canonical_mood
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -1890,4 +1892,141 @@ async def agent_chat_stream(
         # Disable nginx buffering — without this the proxy holds chunks
         # until the connection closes, defeating the whole point of streaming.
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fast intent classifier — Phase 2.5 hybrid (scripted wizard + LLM fallback)
+# ---------------------------------------------------------------------------
+#
+# ONE cheap gpt-4o-mini call reads a single free-text request and returns the
+# module + any parameters the user already stated + routing flags. The frontend
+# wizard then collects the REMAINING slots with quick-reply chips (0 GPT calls)
+# and finalizes deterministically. GPT is only re-entered for free-text answers,
+# lyrics drafting, and artist / obscure-genre research.
+
+_VALID_TEMPO = {"very_slow", "slow", "medium", "fast", "very_fast"}
+_VALID_VOCAL = {"male", "female", "no_vocal"}
+_VALID_MODULES = {
+    "song", "instrumental", "cover_song", "sound_effect", "occasion", "cover_art",
+}
+
+_SYS_CLASSIFY = """\
+You classify ONE music-creation request for RIFFA and extract any parameters the
+user already stated. Output ONLY raw JSON (no markdown, no extra keys), exactly:
+{
+  "module": "song|instrumental|cover_song|sound_effect|occasion|cover_art",
+  "genre": "<English genre name if clearly stated/implied, else ''>",
+  "mood": "<happy|calm|sad|energetic|confident|dreamy|aggressive|inspiring|anxious|dramatic|romantic|nostalgic|mysterious|playful|epic, else ''>",
+  "tempo": "<very_slow|slow|medium|fast|very_fast, else ''>",
+  "vocal": "<male|female|no_vocal, else ''>",
+  "topic": "<short subject/idea in the user's language if any, else ''>",
+  "needs_lyrics": <true only if module=song AND the user wants sung words>,
+  "artist_ref": <true if the user named a specific artist/band/song/producer>,
+  "obscure_genre": <true if the genre is niche and needs research>,
+  "too_vague": <true if the request is too vague to route (e.g. "что-то прикольное", "сделай красиво")>
+}
+
+MODULE ROUTING (pick exactly one):
+- sound_effect: short non-musical sound ("звук дождя", "взрыв", "sfx", "whoosh"). No lyrics, no melody.
+- cover_song: user wants to restyle/re-sing an UPLOADED audio file ("сделай кавер", "перепеть").
+- cover_art: image / обложка / album cover / artwork.
+- occasion: celebratory song for a NAMED recipient/event (birthday / wedding / anniversary).
+- instrumental: music with an EXPLICIT no-vocals signal ("без вокала", "инструментал", "no vocals").
+- song: default for music with (or unspecified) vocals.
+module_hint is the page the user opened — override it only when the words clearly point elsewhere.
+
+EXTRACTION RULES:
+- Fill genre/mood/tempo/vocal ONLY when clearly stated or strongly implied. Otherwise "". Do NOT invent — the app asks.
+- genre is a normal English genre word/phrase ("lo-fi", "phonk", "deep house"); the server canonicalizes it.
+- "topic" = what the track is ABOUT (songs) — keep the user's language.
+"""
+
+
+class AgentClassifyRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    module_hint: ModuleKind = "song"
+
+
+class AgentClassifySlots(BaseModel):
+    genre: str = ""        # canonical GENRE_STYLES key (or "")
+    mood: str = ""         # canonical mood (or "")
+    tempo: str = ""        # one of _VALID_TEMPO (or "")
+    vocal: str = ""        # one of _VALID_VOCAL (or "")
+    topic: str = ""
+
+
+class AgentClassifyResponse(BaseModel):
+    module: ModuleKind = "song"
+    slots: AgentClassifySlots = Field(default_factory=AgentClassifySlots)
+    needs_lyrics: bool = False
+    artist_ref: bool = False
+    obscure_genre: bool = False
+    too_vague: bool = False
+    model: str = "gpt-4o-mini"
+
+
+@router.post("/classify", response_model=AgentClassifyResponse)
+async def agent_classify(
+    body: AgentClassifyRequest,
+    user: User = Depends(current_user),
+    settings: Settings = Depends(get_settings),
+) -> AgentClassifyResponse:
+    """One cheap gpt-4o-mini call: route the module + pre-fill stated slots.
+
+    The frontend wizard collects the remaining slots with quick-reply chips
+    (no further GPT) and finalizes deterministically. Falls back to a safe
+    default (module_hint, empty slots, too_vague=true) on any error so the
+    scripted flow can still proceed.
+    """
+    api_key = settings.apiyi_key or settings.openai_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Agent is not configured",
+        )
+
+    client = AsyncOpenAI(api_key=api_key, base_url=settings.openai_base_url)
+    try:
+        resp = await client.chat.completions.create(  # type: ignore[call-overload]
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": _SYS_CLASSIFY},
+                {"role": "system", "content": f"module_hint: {body.module_hint}"},
+                {"role": "user", "content": body.message},
+            ],
+            temperature=0.1,
+            max_tokens=300,
+            response_format={"type": "json_object"},
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        parsed = json.loads(raw)
+    except Exception as exc:
+        logger.warning("agent_classify failed for user {}: {}", user.id, exc)
+        # Safe fallback: keep the page's module, let the scripted wizard ask all.
+        return AgentClassifyResponse(module=body.module_hint, too_vague=True)
+
+    module = str(parsed.get("module", "")).strip()
+    if module not in _VALID_MODULES:
+        module = body.module_hint
+
+    tempo = str(parsed.get("tempo", "")).strip().lower()
+    tempo = tempo if tempo in _VALID_TEMPO else ""
+    vocal = str(parsed.get("vocal", "")).strip().lower()
+    vocal = vocal if vocal in _VALID_VOCAL else ""
+
+    slots = AgentClassifySlots(
+        genre=canonical_genre(str(parsed.get("genre", "")).strip()),
+        mood=canonical_mood(str(parsed.get("mood", "")).strip().lower()),
+        tempo=tempo,
+        vocal=vocal,
+        topic=str(parsed.get("topic", "")).strip()[:500],
+    )
+    return AgentClassifyResponse(
+        module=module,  # type: ignore[arg-type]
+        slots=slots,
+        needs_lyrics=bool(parsed.get("needs_lyrics", False)),
+        artist_ref=bool(parsed.get("artist_ref", False)),
+        obscure_genre=bool(parsed.get("obscure_genre", False)),
+        too_vague=bool(parsed.get("too_vague", False)),
     )
