@@ -148,11 +148,26 @@ interface WizardParams {
   mood: string;
   tempo: string;
   vocal: string;
+  era: string;         // from a reference track (e.g. "2010s")
+  suggestedBpm: string; // from a reference track
 }
 
 const EMPTY_WIZARD: WizardParams = {
   lyrics: "", topic: "", genre: "", customGenre: "", mood: "", tempo: "", vocal: "",
+  era: "", suggestedBpm: "",
 };
+
+// Editable copy of the finalized brief — lets the user tweak the core params
+// before launch without another GPT round. Merged back into intent.params +
+// musicParams on launch (the worker re-enriches server-side).
+interface EditableBrief {
+  description: string;
+  genre: string;        // canonical key (from a chip)
+  customGenre: string;  // free-typed genre
+  mood: string;
+  tempo: string;
+  vocal: string;
+}
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -305,6 +320,32 @@ export function AgentChat({
   const firstUserMsgRef = useRef("");
 
   const [result, setResult] = useState<AgentResult | null>(null);
+
+  // Brief editor (#2) — user can tweak the finalized params before launch.
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editedBrief, setEditedBrief] = useState<EditableBrief | null>(null);
+
+  // Seed the brief editor from the finalized result (and reset when the chat
+  // re-opens for refinement). User edits live in `editedBrief`, not `result`.
+  useEffect(() => {
+    if (done && result?.intent) {
+      const ip = result.intent.params ?? {};
+      const mp = (result.musicParams ?? {}) as Record<string, unknown>;
+      const str = (k: string) => (typeof mp[k] === "string" ? (mp[k] as string) : "");
+      setEditedBrief({
+        description: ip.description || result.prompt || "",
+        genre: str("genre") || ip.genre || "",
+        customGenre: str("custom_genre") || ip.custom_genre || "",
+        mood: str("mood") || ip.mood || "",
+        tempo: str("tempo") || ip.tempo || "",
+        vocal: str("vocal") || ip.vocal || "",
+      });
+      setEditorOpen(false);
+    } else if (!done) {
+      setEditedBrief(null);
+      setEditorOpen(false);
+    }
+  }, [done, result]);
 
   const thinkingTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const thinkingTick = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -531,13 +572,32 @@ export function AgentChat({
     wizardParams.current.tempo = s.tempo || "";
     wizardParams.current.vocal = s.vocal || "";
     wizardParams.current.topic = s.topic || "";
+    wizardParams.current.era = cls.era || "";
+    wizardParams.current.suggestedBpm = cls.suggested_bpm || "";
     setEffectiveModule(cls.module);
     effectiveModuleRef.current = cls.module;
+
+    // A resolved reference track (Deezer) gives real BPM/genre/era — show it and
+    // treat the request as scriptable even if the user named an artist.
+    const hasReference = !!cls.reference && !!(cls.reference.artist || cls.reference.title);
+    if (hasReference && cls.reference) {
+      const r = cls.reference;
+      const bits = [
+        r.bpm > 0 ? `~${Math.round(r.bpm)} BPM` : "",
+        r.genre || "",
+        r.year > 0 ? String(r.year) : "",
+      ].filter(Boolean).join(" · ");
+      pushAgentMessage(
+        `${isEn ? "🎯 Reference" : "🎯 Референс"}: ${[r.artist, r.title].filter(Boolean).join(" — ")}` +
+        (bits ? ` · ${bits}` : "") +
+        `. ${isEn ? "Tuned the parameters to it." : "Подобрал параметры под него."}`,
+      );
+    }
 
     const scriptable =
       cls.module === "song" || cls.module === "instrumental" || cls.module === "sound_effect";
     const needsGpt =
-      cls.too_vague || cls.artist_ref || cls.obscure_genre || cls.needs_lyrics;
+      cls.too_vague || cls.obscure_genre || cls.needs_lyrics || (cls.artist_ref && !hasReference);
 
     if (scriptable && !needsGpt) {
       enterScriptedWizard();
@@ -635,6 +695,9 @@ export function AgentChat({
     if (p.tempo) musicParams.tempo = p.tempo;
     if (m === "instrumental") musicParams.vocal = "no_vocal";
     else if (p.vocal) musicParams.vocal = p.vocal;
+    // Reference-track enrichment (Deezer) — feeds SongParams.era / suggested_bpm.
+    if (p.era) musicParams.era = p.era;
+    if (p.suggestedBpm) musicParams.suggested_bpm = p.suggestedBpm;
 
     const topic = p.topic.trim();
     const params: AgentIntentParams = {};
@@ -1002,9 +1065,60 @@ export function AgentChat({
     await sendInternal(text, historyRef.current);
   }
 
+  function isMusicModule(m?: AgentModuleKind) {
+    return m === "song" || m === "instrumental" || m === "occasion";
+  }
+
+  // Merge the user's brief edits back into both intent.params and musicParams
+  // (the worker prefers musicParams.genre, so they must stay in sync).
+  function applyBriefEdits(r: AgentResult): AgentResult {
+    const e = editedBrief;
+    if (!e || !r.intent) return r;
+    const params: AgentIntentParams = { ...r.intent.params, description: e.description };
+    const mp: Record<string, unknown> = { ...(r.musicParams ?? {}) };
+    if (isMusicModule(r.intent.module)) {
+      const isInstr = r.intent.module === "instrumental";
+      params.genre = e.genre;
+      params.custom_genre = e.customGenre;
+      params.mood = e.mood;
+      params.tempo = e.tempo;
+      params.vocal = isInstr ? "" : e.vocal;
+      mp.genre = e.genre;
+      mp.custom_genre = e.customGenre;
+      mp.mood = e.mood;
+      mp.tempo = e.tempo;
+      mp.vocal = isInstr ? "no_vocal" : e.vocal;
+    }
+    return { ...r, intent: { ...r.intent, params }, musicParams: mp, prompt: e.description || r.prompt };
+  }
+
+  // Brief lines for display — derived from the (possibly edited) brief so the
+  // card always reflects what will actually launch.
+  function briefLines(): string[] {
+    const e = editedBrief;
+    const m = result?.intent?.module;
+    if (!e || !m) return [];
+    if (!isMusicModule(m)) {
+      return [`${isEn ? "Description" : "Описание"}: ${e.description || "—"}`];
+    }
+    const lines: string[] = [];
+    if (e.description) lines.push(`${isEn ? "Topic" : "Тема"}: ${e.description}`);
+    const g = e.customGenre || e.genre;
+    lines.push(`${isEn ? "Genre" : "Жанр"}: ${g || (isEn ? "agent's pick" : "на выбор агента")}`);
+    if (e.mood) lines.push(`${isEn ? "Mood" : "Настроение"}: ${chips.moodLabel(e.mood)}`);
+    if (e.tempo) lines.push(`${isEn ? "Tempo" : "Темп"}: ${chips.tempoLabel(e.tempo)}`);
+    if (m === "instrumental") lines.push(`${isEn ? "Vocals" : "Вокал"}: ${isEn ? "none" : "нет"}`);
+    else lines.push(`${isEn ? "Vocals" : "Вокал"}: ${e.vocal ? chips.vocalLabel(e.vocal) : (isEn ? "AI decides" : "на выбор")}`);
+    // era / BPM come from a reference track (not edited) — read from musicParams.
+    const mp = (result?.musicParams ?? {}) as Record<string, unknown>;
+    if (typeof mp.era === "string" && mp.era) lines.push(`${isEn ? "Era" : "Эпоха"}: ${mp.era}`);
+    if (typeof mp.suggested_bpm === "string" && mp.suggested_bpm) lines.push(`BPM: ~${mp.suggested_bpm}`);
+    return lines;
+  }
+
   function handleAccept() {
     if (!result || !onComplete) return;
-    onComplete({ ...result, transcript: history });
+    onComplete(applyBriefEdits({ ...result, transcript: history }));
   }
 
   async function handleLaunch() {
@@ -1012,7 +1126,7 @@ export function AgentChat({
     setLaunching(true);
     setError(null);
     try {
-      await onLaunch({ ...result, transcript: history });
+      await onLaunch(applyBriefEdits({ ...result, transcript: history }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось запустить генерацию");
     } finally {
@@ -1064,6 +1178,99 @@ export function AgentChat({
       );
     }
     return null;
+  }
+
+  function renderBriefEditor() {
+    const e = editedBrief;
+    const m = result?.intent?.module;
+    if (!e || !m) return null;
+    const music = isMusicModule(m);
+    const setF = (patch: Partial<EditableBrief>) =>
+      setEditedBrief((b) => (b ? { ...b, ...patch } : b));
+    return (
+      <div className="agent-edit">
+        <div className="agent-edit__field">
+          <label>{music ? (isEn ? "Topic" : "Тема") : (isEn ? "Description" : "Описание")}</label>
+          <input
+            type="text"
+            value={e.description}
+            onChange={(ev) => setF({ description: ev.target.value })}
+            placeholder={music ? (isEn ? "what the track is about" : "о чём трек") : (isEn ? "describe the sound" : "опиши звук")}
+          />
+        </div>
+
+        {music && (
+          <>
+            <div className="agent-edit__field">
+              <label>{isEn ? "Genre" : "Жанр"}</label>
+              <input
+                type="text"
+                value={e.customGenre || e.genre}
+                onChange={(ev) => setF({ customGenre: ev.target.value, genre: "" })}
+                placeholder={isEn ? "e.g. Phonk" : "напр. Phonk"}
+              />
+              <div className="agent-edit__chips">
+                {chips.genreChips.map((g) => (
+                  <button
+                    key={g.value}
+                    type="button"
+                    className={`agent-edit__chip${e.genre === g.value && !e.customGenre ? " is-active" : ""}`}
+                    onClick={() => setF({ genre: g.value, customGenre: "" })}
+                  >{g.label}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="agent-edit__field">
+              <label>{isEn ? "Mood" : "Настроение"}</label>
+              <div className="agent-edit__chips">
+                {chips.moodChips.map((label) => {
+                  const val = chips.moodValue(label);
+                  return (
+                    <button key={val} type="button"
+                      className={`agent-edit__chip${e.mood === val ? " is-active" : ""}`}
+                      onClick={() => setF({ mood: val })}>{label}</button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="agent-edit__field">
+              <label>{isEn ? "Tempo" : "Темп"}</label>
+              <div className="agent-edit__chips">
+                {chips.tempoChips.map((label) => {
+                  const val = chips.tempoValue(label);
+                  return (
+                    <button key={val} type="button"
+                      className={`agent-edit__chip${e.tempo === val ? " is-active" : ""}`}
+                      onClick={() => setF({ tempo: val })}>{label}</button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {m !== "instrumental" && (
+              <div className="agent-edit__field">
+                <label>{isEn ? "Vocals" : "Вокал"}</label>
+                <div className="agent-edit__chips">
+                  {chips.vocalChips.map((label) => {
+                    const val = chips.vocalValue(label);
+                    return (
+                      <button key={val} type="button"
+                        className={`agent-edit__chip${e.vocal === val ? " is-active" : ""}`}
+                        onClick={() => setF({ vocal: val })}>{label}</button>
+                    );
+                  })}
+                  <button type="button"
+                    className={`agent-edit__chip${!e.vocal ? " is-active" : ""}`}
+                    onClick={() => setF({ vocal: "" })}>{isEn ? "Any" : "Любой"}</button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
   }
 
   // ── JSX ──
@@ -1226,9 +1433,24 @@ export function AgentChat({
                 <span>{result.intent.note}</span>
               </p>
             )}
-            <h4>Бриф</h4>
-            <pre className="agent-result__summary">{result.summary || "—"}</pre>
-            {result.shortPrompt && (
+            <div className="agent-result__brief-head">
+              <h4>{isEn ? "Brief" : "Бриф"}</h4>
+              {result.intent && (
+                <button
+                  type="button"
+                  className="agent-result__edit-toggle"
+                  onClick={() => setEditorOpen((v) => !v)}
+                >
+                  <IconPencil /> {editorOpen ? (isEn ? "Done" : "Готово") : (isEn ? "Edit" : "Изменить")}
+                </button>
+              )}
+            </div>
+            {editorOpen && result.intent ? (
+              renderBriefEditor()
+            ) : (
+              <pre className="agent-result__summary">{briefLines().join("\n") || result.summary || "—"}</pre>
+            )}
+            {result.shortPrompt && result.model !== "scripted" && (
               <div className="agent-result__suno">
                 <span className="agent-result__suno-label">
                   {isEn ? "Suno prompt" : "Suno-промт"}

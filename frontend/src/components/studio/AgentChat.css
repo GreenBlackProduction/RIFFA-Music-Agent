@@ -453,6 +453,79 @@
   word-break: break-word;
 }
 
+/* ── Brief editor (#2) ─────────────────────────── */
+
+.agent-result__brief-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.agent-result__edit-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.agent-result__edit-toggle:hover { border-color: var(--ink); color: var(--ink); }
+
+.agent-edit {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--paper);
+}
+.agent-edit__field { display: grid; gap: 6px; }
+.agent-edit__field > label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+.agent-edit__field > input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 13px;
+}
+.agent-edit__field > input:focus { border-color: var(--ink); outline: none; }
+.agent-edit__field > input::placeholder { color: var(--ink-3); }
+
+.agent-edit__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.agent-edit__chip {
+  padding: 5px 11px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.agent-edit__chip:hover { border-color: var(--ink); color: var(--ink); }
+.agent-edit__chip:active { transform: scale(0.97); }
+.agent-edit__chip.is-active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
 /* ── Error ─────────────────────────────────────── */
 
 .agent-chat__error {
