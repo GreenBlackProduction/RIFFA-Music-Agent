@@ -65,6 +65,9 @@ _ALIAS_RAW: dict[str, str] = {
     "регги": "Reggae", "рэгги": "Reggae", "реггетон": "Reggaeton",
     # Folk / country (RU)
     "фолк": "Folk", "народная": "Folk", "кантри": "Country",
+    # Deezer top-level genre labels (reference lookup)
+    "electro": "Electronic", "dance": "EDM", "rap/hip hop": "Hip-Hop",
+    "soul & funk": "Funk", "latin music": "Latin", "films/games": "Cinematic",
 }
 
 _ALIAS: dict[str, str] = {_norm(a): k for a, k in _ALIAS_RAW.items()}

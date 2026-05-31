@@ -17,6 +17,7 @@ song-prompt-building session.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from collections import Counter
@@ -37,6 +38,7 @@ from app.core.deps import current_user, db_session
 from app.db.models import Generation, GenerationStatus, GenerationType, User
 from app.services.genre_canonical import canonical_genre
 from app.services.mood_canonical import canonical_mood
+from app.services.track_reference import detect_reference_url, resolve_reference
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -1923,6 +1925,7 @@ user already stated. Output ONLY raw JSON (no markdown, no extra keys), exactly:
   "topic": "<short subject/idea in the user's language if any, else ''>",
   "needs_lyrics": <true only if module=song AND the user wants sung words>,
   "artist_ref": <true if the user named a specific artist/band/song/producer>,
+  "reference_query": "<if artist_ref: the 'Artist - Song' or artist name to look up, else ''>",
   "obscure_genre": <true if the genre is niche and needs research>,
   "too_vague": <true if the request is too vague to route (e.g. "что-то прикольное", "сделай красиво")>
 }
@@ -1956,6 +1959,15 @@ class AgentClassifySlots(BaseModel):
     topic: str = ""
 
 
+class AgentReference(BaseModel):
+    artist: str = ""
+    title: str = ""
+    bpm: float = 0
+    year: int = 0
+    genre: str = ""
+    tempo: str = ""
+
+
 class AgentClassifyResponse(BaseModel):
     module: ModuleKind = "song"
     slots: AgentClassifySlots = Field(default_factory=AgentClassifySlots)
@@ -1963,6 +1975,11 @@ class AgentClassifyResponse(BaseModel):
     artist_ref: bool = False
     obscure_genre: bool = False
     too_vague: bool = False
+    # Reference-track enrichment (Deezer) — real BPM/genre/era when the user
+    # points at an existing track ("сделай как X" / a Deezer/Spotify/YT link).
+    era: str = ""
+    suggested_bpm: str = ""
+    reference: AgentReference | None = None
     model: str = "gpt-4o-mini"
 
 
@@ -2022,6 +2039,35 @@ async def agent_classify(
         vocal=vocal,
         topic=str(parsed.get("topic", "")).strip()[:500],
     )
+
+    # Reference-track enrichment (best-effort, capped at 8s so a slow/down
+    # Deezer never stalls /classify). Real BPM/genre/era beat the model's guess.
+    era = ""
+    suggested_bpm = ""
+    reference: AgentReference | None = None
+    ref_raw = detect_reference_url(body.message) or str(parsed.get("reference_query", "")).strip()
+    if ref_raw:
+        try:
+            ref = await asyncio.wait_for(resolve_reference(ref_raw), timeout=8.0)
+        except Exception:
+            ref = None
+        if ref and (ref.get("artist") or ref.get("title")):
+            if ref.get("genre"):
+                slots.genre = ref["genre"]
+            if ref.get("tempo"):
+                slots.tempo = ref["tempo"]
+            era = ref.get("era", "") or ""
+            if (ref.get("bpm") or 0) > 0:
+                suggested_bpm = str(int(ref["bpm"]))
+            reference = AgentReference(
+                artist=ref.get("artist", ""),
+                title=ref.get("title", ""),
+                bpm=ref.get("bpm", 0) or 0,
+                year=ref.get("year", 0) or 0,
+                genre=ref.get("genre", ""),
+                tempo=ref.get("tempo", ""),
+            )
+
     return AgentClassifyResponse(
         module=module,  # type: ignore[arg-type]
         slots=slots,
@@ -2029,4 +2075,7 @@ async def agent_classify(
         artist_ref=bool(parsed.get("artist_ref", False)),
         obscure_genre=bool(parsed.get("obscure_genre", False)),
         too_vague=bool(parsed.get("too_vague", False)),
+        era=era,
+        suggested_bpm=suggested_bpm,
+        reference=reference,
     )

@@ -801,6 +801,15 @@ export interface AgentClassifySlots {
   topic: string;
 }
 
+export interface AgentReference {
+  artist: string;
+  title: string;
+  bpm: number;
+  year: number;
+  genre: string;
+  tempo: string;
+}
+
 export interface AgentClassifyResponse {
   module: AgentModuleKind;
   slots: AgentClassifySlots;
@@ -808,6 +817,11 @@ export interface AgentClassifyResponse {
   artist_ref: boolean;
   obscure_genre: boolean;
   too_vague: boolean;
+  /** Reference-track enrichment (Deezer): real BPM/genre/era when the user
+   *  points at an existing track. `reference` is null when nothing matched. */
+  era: string;
+  suggested_bpm: string;
+  reference: AgentReference | null;
   model: string;
 }
 
