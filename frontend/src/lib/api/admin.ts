@@ -80,6 +80,7 @@ export interface AdminUserDetail {
   generations_by_status: GenTypeCount[];
   referred_by_user_id: number | null;
   referred_by_code: string | null;
+  referred_by_name: string | null;
   referrals_made: number;
   promocodes_used: PromoUsageRow[];
 }
@@ -180,4 +181,18 @@ export function adminUpdatePromocode(
     method: "PATCH",
     body: JSON.stringify(body),
   });
+}
+
+export interface AdminGenRow {
+  id: string;
+  type: string;
+  status: string;
+  title: string;
+  cost_tokens: number;
+  error_message: string | null;
+  created_at: string;
+}
+
+export function adminFetchUserGenerations(userId: number, limit = 30): Promise<AdminGenRow[]> {
+  return apiFetch<AdminGenRow[]>(`/api/v1/admin/users/${userId}/generations?limit=${limit}`);
 }

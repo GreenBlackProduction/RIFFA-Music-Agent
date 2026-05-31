@@ -7,7 +7,7 @@ is admin; backend enforcement is still the source of truth.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -91,6 +91,8 @@ class AdminUserRow(BaseModel):
     is_banned: bool
     notice_kind: str | None
     created_at: datetime
+    last_seen_at: datetime | None
+    morning_messages_enabled: bool
     generations_count: int
 
 
@@ -104,6 +106,7 @@ async def list_users(
     _: User = Depends(admin_user),
     session: AsyncSession = Depends(db_session),
     q: str | None = Query(default=None, description="Поиск по имени / email / telegram"),
+    status: str | None = Query(default=None),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
 ) -> AdminUserList:
@@ -116,6 +119,26 @@ async def list_users(
                 func.lower(User.email).like(like),
                 func.lower(User.telegram_username).like(like),
             )
+        )
+    if status == "banned":
+        base = base.where(User.is_banned.is_(True))
+    elif status == "admins":
+        base = base.where(User.is_admin.is_(True))
+    elif status == "morning_on":
+        base = base.where(User.morning_messages_enabled.is_(True))
+    elif status == "morning_off":
+        base = base.where(User.morning_messages_enabled.is_(False))
+    elif status == "email_only":
+        base = base.where(User.email.isnot(None), User.telegram_user_id.is_(None))
+    elif status == "telegram_only":
+        base = base.where(User.telegram_user_id.isnot(None), User.email.is_(None))
+    elif status == "active_30d":
+        cutoff = datetime.now(UTC) - timedelta(days=30)
+        base = base.where(User.last_seen_at >= cutoff)
+    elif status == "inactive_30d":
+        cutoff = datetime.now(UTC) - timedelta(days=30)
+        base = base.where(
+            or_(User.last_seen_at < cutoff, User.last_seen_at.is_(None))
         )
 
     total = (
@@ -156,6 +179,8 @@ async def list_users(
                 is_banned=u.is_banned,
                 notice_kind=u.notice_kind,
                 created_at=u.created_at,
+                last_seen_at=u.last_seen_at,
+                morning_messages_enabled=u.morning_messages_enabled,
                 generations_count=int(gen_counts.get(u.id, 0)),
             )
             for u in rows
@@ -201,6 +226,7 @@ class AdminUserDetail(BaseModel):
 
     referred_by_user_id: int | None
     referred_by_code: str | None
+    referred_by_name: str | None
     referrals_made: int
 
     promocodes_used: list[PromoUsageRow]
@@ -250,12 +276,17 @@ async def get_user_detail(
     ).scalar_one_or_none()
     referred_by_user_id = referral.referrer_id if referral else None
     referred_by_code: str | None = None
+    referred_by_name: str | None = None
     if referred_by_user_id:
-        referred_by_code = (
+        referrer_row = (
             await session.execute(
-                select(User.referral_code).where(User.id == referred_by_user_id)
+                select(User.referral_code, User.telegram_username, User.display_name)
+                .where(User.id == referred_by_user_id)
             )
-        ).scalar_one_or_none()
+        ).one_or_none()
+        if referrer_row:
+            referred_by_code = referrer_row.referral_code
+            referred_by_name = referrer_row.telegram_username or referrer_row.display_name
 
     referrals_made = int(
         (
@@ -297,6 +328,7 @@ async def get_user_detail(
         generations_by_status=[GenTypeCount(type=str(s.value if hasattr(s, "value") else s), count=int(c)) for s, c in status_rows],
         referred_by_user_id=referred_by_user_id,
         referred_by_code=referred_by_code,
+        referred_by_name=referred_by_name,
         referrals_made=referrals_made,
         promocodes_used=[
             PromoUsageRow(code=code, tokens_granted=int(t), redeemed_at=ts)
@@ -375,6 +407,50 @@ async def update_user_balance(
 
 # unused fix-up — keep deduct_tokens used so ruff doesn't strip the import
 _ = deduct_tokens
+
+
+# ───────────────────────────── user generations log ─────────────────────────
+
+
+class AdminGenRow(BaseModel):
+    id: str
+    type: str
+    status: str
+    title: str
+    cost_tokens: int
+    error_message: str | None
+    created_at: datetime
+
+
+@router.get("/users/{user_id}/generations", response_model=list[AdminGenRow])
+async def list_user_generations(
+    user_id: int,
+    limit: int = Query(default=30, le=100),
+    offset: int = Query(default=0, ge=0),
+    _: User = Depends(admin_user),
+    session: AsyncSession = Depends(db_session),
+) -> list[AdminGenRow]:
+    rows = (
+        await session.execute(
+            select(Generation)
+            .where(Generation.user_id == user_id)
+            .order_by(Generation.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+    ).scalars().all()
+    return [
+        AdminGenRow(
+            id=str(g.id),
+            type=g.type.value,
+            status=g.status.value,
+            title=g.title or "",
+            cost_tokens=g.cost_tokens,
+            error_message=g.error_message,
+            created_at=g.created_at,
+        )
+        for g in rows
+    ]
 
 
 # ───────────────────────────── notice / ban ──────────────────────────────────
