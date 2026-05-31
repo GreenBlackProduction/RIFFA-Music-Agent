@@ -138,7 +138,7 @@ function useWizardChips(lang: string) {
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type WizardPhase = "free" | "lyrics_review" | "genre" | "mood" | "tempo" | "vocal";
+type WizardPhase = "free" | "lyrics_review" | "genre" | "mood" | "tempo" | "vocal" | "confirm";
 
 interface WizardParams {
   lyrics: string;
@@ -657,8 +657,18 @@ export function AgentChat({
     scriptedRef.current = true;
     const first = nextScriptedPhase(null);
     if (first === "finalize") {
-      pushAgentMessage(isEn ? "Got it — building the prompt…" : "Принято — собираю промт…");
-      finalizeDeterministic();
+      // SFX has nothing to ask — build straight away. For music where the
+      // classifier/reference already filled everything, confirm before building
+      // instead of silently finalizing (so the user can adjust first).
+      if (effectiveModuleRef.current === "sound_effect") {
+        pushAgentMessage(isEn ? "Got it — building the prompt…" : "Принято — собираю промт…");
+        finalizeDeterministic();
+      } else {
+        pushAgentMessage(
+          `${recognizedSummary()} ${isEn ? "Build the brief, or adjust something?" : "Собрать бриф — или что-то поправить?"}`,
+        );
+        setWizardPhase("confirm");
+      }
       return;
     }
     pushAgentMessage(`${recognizedSummary()} ${questionFor(first)}`);
@@ -836,26 +846,83 @@ export function AgentChat({
     advanceAfterSlot(vocal, "vocal");
   }
 
-  // Free-typed answer while a scripted slot is being asked.
-  function handleTypedSlotAnswer(text: string) {
-    switch (wizardPhase) {
-      case "genre":
-        wizardParams.current.genre = "";
-        wizardParams.current.customGenre = text;
-        advanceAfterSlot(text, "genre");
-        break;
-      case "mood":
-        wizardParams.current.mood = text.toLowerCase();
-        advanceAfterSlot(text, "mood");
-        break;
-      case "tempo":
-        wizardParams.current.tempo = text.toLowerCase();
-        advanceAfterSlot(text, "tempo");
-        break;
-      case "vocal":
-        wizardParams.current.vocal = text.toLowerCase();
-        advanceAfterSlot(text, "vocal");
-        break;
+  // Free-typed text mid-wizard is NOT a blind slot answer — re-interpret it.
+  // Re-classify (cheap, also resolves Deezer references): a new reference or
+  // new params get merged and we re-ask what's missing; anything the classifier
+  // can't turn into params is a real message → hand to GPT. Never auto-finalizes.
+  async function refineFromText(text: string) {
+    setThinking(true);
+    setError(null);
+    startThinking(false, true);
+    let cls: Awaited<ReturnType<typeof classifyAgent>> | null = null;
+    try {
+      cls = await classifyAgent({ message: text, module_hint: effectiveModuleRef.current });
+    } catch (err) {
+      const { is401 } = extractError(err);
+      if (is401) {
+        setNeedsAuth(true);
+        setError(isEn ? "Sign in to use the agent" : "Войдите в аккаунт чтобы использовать агента");
+        setThinking(false);
+        stopThinking();
+        return;
+      }
+      cls = null;
+    }
+    setThinking(false);
+    stopThinking();
+
+    if (!cls) {
+      await sendInternal(text, historyRef.current, { alreadyAppended: true });
+      return;
+    }
+
+    const p = wizardParams.current;
+    const ref = cls.reference && (cls.reference.artist || cls.reference.title) ? cls.reference : null;
+    let changed = false;
+
+    if (ref) {
+      if (cls.slots.genre) { p.genre = cls.slots.genre; p.customGenre = ""; }
+      if (cls.slots.tempo) p.tempo = cls.slots.tempo;
+      if (cls.era) p.era = cls.era;
+      if (cls.suggested_bpm) p.suggestedBpm = cls.suggested_bpm;
+      const bits = [
+        ref.bpm > 0 ? `~${Math.round(ref.bpm)} BPM` : "",
+        ref.genre || "",
+        ref.year > 0 ? String(ref.year) : "",
+      ].filter(Boolean).join(" · ");
+      pushAgentMessage(
+        `${isEn ? "🎯 Reference" : "🎯 Референс"}: ${[ref.artist, ref.title].filter(Boolean).join(" — ")}` +
+        (bits ? ` · ${bits}` : "") + `. ${isEn ? "Using it as the basis." : "Беру за основу."}`,
+      );
+      changed = true;
+    } else {
+      if (cls.slots.genre) { p.genre = cls.slots.genre; p.customGenre = ""; changed = true; }
+      if (cls.slots.mood) { p.mood = cls.slots.mood; changed = true; }
+      if (cls.slots.tempo) { p.tempo = cls.slots.tempo; changed = true; }
+      if (cls.slots.vocal) { p.vocal = cls.slots.vocal; changed = true; }
+      if (cls.slots.topic) { p.topic = cls.slots.topic; changed = true; }
+      const m = cls.module;
+      if ((m === "song" || m === "instrumental" || m === "sound_effect") && m !== effectiveModuleRef.current) {
+        setEffectiveModule(m);
+        effectiveModuleRef.current = m;
+        changed = true;
+      }
+    }
+
+    // Nothing parametric in the message → it's a real question/instruction → GPT.
+    if (!changed) {
+      await sendInternal(text, historyRef.current, { alreadyAppended: true });
+      return;
+    }
+
+    // Re-ask what's still missing, or offer to build — but never auto-finalize.
+    const next = nextScriptedPhase(null);
+    if (next === "finalize") {
+      pushAgentMessage(isEn ? "Anything else, or shall I build the brief?" : "Что-то ещё уточнить — или собрать бриф?");
+      setWizardPhase("confirm");
+    } else {
+      pushAgentMessage(`${recognizedSummary()} ${questionFor(next)}`);
+      setWizardPhase(next);
     }
   }
 
@@ -1040,9 +1107,16 @@ export function AgentChat({
     if (!text || thinking || done) return;
     setDraft("");
 
-    // Free-typed answer while a scripted slot is being asked → consume it.
-    if (wizardPhase === "genre" || wizardPhase === "mood" || wizardPhase === "tempo" || wizardPhase === "vocal") {
-      handleTypedSlotAnswer(text);
+    // Typed text mid-wizard is a message, not a blind slot answer. In the
+    // scripted path re-interpret it (refineFromText); in the GPT path just
+    // converse. Chips remain the instant scripted route.
+    if (
+      wizardPhase === "genre" || wizardPhase === "mood" || wizardPhase === "tempo" ||
+      wizardPhase === "vocal" || wizardPhase === "confirm"
+    ) {
+      appendUserMessage(text);
+      if (scriptedRef.current) await refineFromText(text);
+      else await sendInternal(text, historyRef.current, { alreadyAppended: true });
       return;
     }
 
@@ -1139,6 +1213,19 @@ export function AgentChat({
   function renderChipsForPhase(isLastAgentMsg: boolean) {
     if (!isLastAgentMsg || thinking || done) return null;
 
+    // "Build the brief" escape hatch — lets the user finalize whenever they
+    // want instead of answering every question (scripted path only).
+    const buildChip = scriptedRef.current ? (
+      <button
+        key="__build"
+        type="button"
+        className="agent-suggestion-chip agent-suggestion-chip--build"
+        onClick={() => finalizeDeterministic()}
+      >
+        {isEn ? "✅ Build brief" : "✅ Собрать бриф"}
+      </button>
+    ) : null;
+
     // Wizard phase chips (local — no GPT call)
     if (wizardPhase === "genre") {
       return (
@@ -1147,6 +1234,7 @@ export function AgentChat({
             <button key={g.value} type="button" className="agent-suggestion-chip" onClick={() => handleGenreSelect(g.value, g.label)}>{g.label}</button>
           ))}
           <button key="__pick" type="button" className="agent-suggestion-chip" onClick={() => handleGenreSelect("", chips.genrePickLabel)}>{chips.genrePickLabel}</button>
+          {buildChip}
         </div>
       );
     }
@@ -1156,6 +1244,7 @@ export function AgentChat({
           {chips.moodChips.map((m) => (
             <button key={m} type="button" className="agent-suggestion-chip" onClick={() => handleMoodSelect(m)}>{m}</button>
           ))}
+          {buildChip}
         </div>
       );
     }
@@ -1165,6 +1254,7 @@ export function AgentChat({
           {chips.tempoChips.map((tp) => (
             <button key={tp} type="button" className="agent-suggestion-chip" onClick={() => handleTempoSelect(tp)}>{tp}</button>
           ))}
+          {buildChip}
         </div>
       );
     }
@@ -1174,8 +1264,12 @@ export function AgentChat({
           {chips.vocalChips.map((v) => (
             <button key={v} type="button" className="agent-suggestion-chip" onClick={() => void handleVocalSelect(v)}>{v}</button>
           ))}
+          {buildChip}
         </div>
       );
+    }
+    if (wizardPhase === "confirm") {
+      return <div className="agent-suggestions">{buildChip}</div>;
     }
     return null;
   }

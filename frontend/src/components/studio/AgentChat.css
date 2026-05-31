@@ -290,6 +290,18 @@
   background: rgba(15, 93, 71, 0.18);
 }
 .agent-suggestion-chip:active { transform: scale(0.97); }
+/* "Build brief" escape-hatch chip — filled accent so it reads as the primary
+   action among the parameter chips. */
+.agent-suggestion-chip--build {
+  background: var(--emr);
+  border-color: var(--emr);
+  color: var(--paper);
+  font-weight: 600;
+}
+.agent-suggestion-chip--build:hover {
+  background: var(--emr);
+  filter: brightness(1.08);
+}
 
 /* ── Кнопки «принять / редактировать» текст ────── */
 
