@@ -96,9 +96,83 @@ async def _search_track_id(client: httpx.AsyncClient, query: str) -> int | None:
     return int(tid) if tid else None
 
 
-async def resolve_reference(raw: str) -> dict | None:
+_LASTFM_API = "https://ws.audioscrobbler.com/2.0/"
+
+# Last.fm community top-tags carry plenty of non-musical noise — drop these.
+_TAG_BLOCKLIST = {
+    "seen live", "favorites", "favourites", "favorite", "favourite",
+    "favorite songs", "favourite songs", "my favorite", "albums i own",
+    "love", "beautiful", "masterpiece", "epic", "awesome", "amazing",
+    "cool", "best", "good", "great", "favs", "fav", "music", "spotify",
+}
+_TAG_JUNK_RE = re.compile(r"^(?:\d{2,4}s?|under \d|favou?rite|seen live)", re.I)
+
+
+def _clean_lastfm_tags(tags: list[dict], artist: str, limit: int) -> list[str]:
+    """Keep the top musical descriptors by weight; drop the artist's own name
+    and Last.fm's meta/junk tags. Tags arrive sorted by descending count."""
+    artist_n = re.sub(r"[^a-z0-9]", "", artist.lower())
+    scored: list[tuple[int, str]] = []
+    for t in tags:
+        name = str(t.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            count = int(t.get("count") or 0)
+        except (TypeError, ValueError):
+            count = 0
+        low = name.lower()
+        norm = re.sub(r"[^a-z0-9]", "", low)
+        if not norm or norm == artist_n:
+            continue
+        if low in _TAG_BLOCKLIST or _TAG_JUNK_RE.match(low):
+            continue
+        scored.append((count, name))
+    if not scored:
+        return []
+    max_count = max(c for c, _ in scored) or 1
+    floor = max(3, int(max_count * 0.05))
+    return [name for count, name in scored if count >= floor][:limit]
+
+
+async def fetch_lastfm_tags(
+    client: httpx.AsyncClient, artist: str, title: str, api_key: str, *, limit: int = 6
+) -> list[str]:
+    """Detailed style tags for a resolved track via the Last.fm public API.
+
+    Tries track-level tags first, falls back to artist-level. Best-effort: any
+    failure (no key, network, parse) returns ``[]`` — never raises into the agent."""
+    if not api_key or not artist:
+        return []
+
+    async def _get(method: str, extra: dict) -> list[dict]:
+        try:
+            resp = await client.get(
+                _LASTFM_API,
+                params={"method": method, "api_key": api_key, "format": "json", **extra},
+            )
+            resp.raise_for_status()
+            tags = ((resp.json() or {}).get("toptags") or {}).get("tag") or []
+            return tags if isinstance(tags, list) else []
+        except Exception as exc:
+            logger.debug("lastfm {} failed: {}", method, exc)
+            return []
+
+    cleaned: list[str] = []
+    if title:
+        cleaned = _clean_lastfm_tags(
+            await _get("track.getTopTags", {"artist": artist, "track": title}), artist, limit
+        )
+    if not cleaned:
+        cleaned = _clean_lastfm_tags(
+            await _get("artist.getTopTags", {"artist": artist}), artist, limit
+        )
+    return cleaned
+
+
+async def resolve_reference(raw: str, *, lastfm_api_key: str = "") -> dict | None:
     """Resolve a link or "artist - song" string to ``{artist,title,bpm,year,era,
-    genre,tempo,source}`` via Deezer, or ``None`` when nothing usable is found."""
+    genre,tempo,tags,source}`` via Deezer (+ Last.fm tags), or ``None``."""
     raw = (raw or "").strip()
     if not raw:
         return None
@@ -151,6 +225,8 @@ async def resolve_reference(raw: str) -> dict | None:
         if len(release) >= 4 and release[:4].isdigit():
             year = int(release[:4])
 
+        tags = await fetch_lastfm_tags(client, artist, title, lastfm_api_key)
+
     return {
         "artist": artist,
         "title": title,
@@ -160,6 +236,7 @@ async def resolve_reference(raw: str) -> dict | None:
         "genre_raw": genre_raw,
         "genre": canonical_genre(genre_raw),
         "tempo": bpm_to_tempo(bpm),
+        "tags": tags,
         "source": "deezer",
     }
 

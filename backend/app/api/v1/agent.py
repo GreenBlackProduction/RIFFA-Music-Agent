@@ -1966,6 +1966,7 @@ class AgentReference(BaseModel):
     year: int = 0
     genre: str = ""
     tempo: str = ""
+    tags: list[str] = []          # Last.fm scene tags (post-rock, krautrock, …)
 
 
 class AgentClassifyResponse(BaseModel):
@@ -2048,7 +2049,9 @@ async def agent_classify(
     ref_raw = detect_reference_url(body.message) or str(parsed.get("reference_query", "")).strip()
     if ref_raw:
         try:
-            ref = await asyncio.wait_for(resolve_reference(ref_raw), timeout=8.0)
+            ref = await asyncio.wait_for(
+                resolve_reference(ref_raw, lastfm_api_key=settings.lastfm_api_key), timeout=8.0
+            )
         except Exception:
             ref = None
         if ref and (ref.get("artist") or ref.get("title")):
@@ -2066,6 +2069,7 @@ async def agent_classify(
                 year=ref.get("year", 0) or 0,
                 genre=ref.get("genre", ""),
                 tempo=ref.get("tempo", ""),
+                tags=ref.get("tags", []) or [],
             )
 
     return AgentClassifyResponse(

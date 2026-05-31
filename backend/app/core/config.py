@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     nanobanana_api_key: str = ""
     nanobanana_base_url: str = ""
     elevenlabs_api_key: str = ""
+    lastfm_api_key: str = ""
 
     # Payments — Robokassa
     robokassa_merchant_login: str = ""

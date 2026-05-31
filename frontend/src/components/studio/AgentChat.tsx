@@ -150,11 +150,12 @@ interface WizardParams {
   vocal: string;
   era: string;         // from a reference track (e.g. "2010s")
   suggestedBpm: string; // from a reference track
+  refTags: string[];   // Last.fm scene tags from a reference track
 }
 
 const EMPTY_WIZARD: WizardParams = {
   lyrics: "", topic: "", genre: "", customGenre: "", mood: "", tempo: "", vocal: "",
-  era: "", suggestedBpm: "",
+  era: "", suggestedBpm: "", refTags: [],
 };
 
 // Editable copy of the finalized brief — lets the user tweak the core params
@@ -574,6 +575,7 @@ export function AgentChat({
     wizardParams.current.topic = s.topic || "";
     wizardParams.current.era = cls.era || "";
     wizardParams.current.suggestedBpm = cls.suggested_bpm || "";
+    wizardParams.current.refTags = cls.reference?.tags || [];
     setEffectiveModule(cls.module);
     effectiveModuleRef.current = cls.module;
 
@@ -587,10 +589,12 @@ export function AgentChat({
         r.genre || "",
         r.year > 0 ? String(r.year) : "",
       ].filter(Boolean).join(" · ");
+      const tagLine = r.tags?.length ? `\n${isEn ? "Tags" : "Теги"}: ${r.tags.join(", ")}` : "";
       pushAgentMessage(
         `${isEn ? "🎯 Reference" : "🎯 Референс"}: ${[r.artist, r.title].filter(Boolean).join(" — ")}` +
         (bits ? ` · ${bits}` : "") +
-        `. ${isEn ? "Tuned the parameters to it." : "Подобрал параметры под него."}`,
+        `. ${isEn ? "Tuned the parameters to it." : "Подобрал параметры под него."}` +
+        tagLine,
       );
     }
 
@@ -732,13 +736,16 @@ export function AgentChat({
       note: buildNote(),
     };
     const summary = buildSummary();
+    const researchNotes = p.refTags.length
+      ? `Reference style tags (Last.fm): ${p.refTags.join(", ")}. Reflect these subgenres in the instrumentation, rhythm and production.`
+      : "";
     setResult({
       summary,
       prompt: topic,
       shortPrompt: summary,
       intent,
       musicParams,
-      researchNotes: "",
+      researchNotes,
       promptVersion: "v3.1-scripted",
       model: "scripted",
     });
@@ -885,6 +892,7 @@ export function AgentChat({
       if (cls.slots.tempo) p.tempo = cls.slots.tempo;
       if (cls.era) p.era = cls.era;
       if (cls.suggested_bpm) p.suggestedBpm = cls.suggested_bpm;
+      p.refTags = ref.tags || [];
       const bits = [
         ref.bpm > 0 ? `~${Math.round(ref.bpm)} BPM` : "",
         ref.genre || "",

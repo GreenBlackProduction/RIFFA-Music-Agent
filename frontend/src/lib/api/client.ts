@@ -808,6 +808,7 @@ export interface AgentReference {
   year: number;
   genre: string;
   tempo: string;
+  tags: string[];
 }
 
 export interface AgentClassifyResponse {
