@@ -119,6 +119,16 @@ async def create_robokassa_link(
     inv_id = (user.id * 100 + list(PACKAGES.keys()).index(body.package_code)) % 2_147_483_647
     description = f"RIFFA Studio: {pkg['name']} ({pkg['tokens']} токенов)"
 
+    # Diagnostic log — investigating the "tap 999₽ → Robokassa shows 100₽"
+    # report. Lets us see exactly what package_code arrives and what
+    # OutSum we are about to sign.
+    import logging
+    logging.getLogger("riffa.payments").warning(
+        "[ROBOKASSA] user=%s package_code=%s rub=%s inv_id=%s test=%s",
+        user.id, body.package_code, pkg["rub"], inv_id,
+        settings.robokassa_test_mode,
+    )
+
     url = _robokassa_url(
         settings.robokassa_merchant_login,
         settings.robokassa_password_1,
