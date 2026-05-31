@@ -54,6 +54,13 @@ _ALIAS_RAW: dict[str, str] = {
     # Rock / metal / pop families (RU)
     "рок": "Rock", "метал": "Metal", "метл": "Metal", "поп": "Pop",
     "панк": "Punk", "гранж": "Grunge", "инди": "Indie",
+    # Rock subgenres the agent/GPT emits as free text → nearest canonical preset
+    "progressive rock": "Rock", "prog rock": "Rock", "prog-rock": "Rock",
+    "post rock": "Rock", "post-rock": "Rock", "alternative rock": "Rock",
+    "alt rock": "Rock", "hard rock": "Rock", "classic rock": "Rock",
+    "indie rock": "Rock", "art rock": "Rock", "psychedelic rock": "Rock",
+    "прогрессивный рок": "Rock", "прог-рок": "Rock", "прогрессив-рок": "Rock",
+    "пост-рок": "Rock", "альтернативный рок": "Rock",
     # Jazz / blues / soul / funk (RU)
     "джаз": "Jazz", "блюз": "Blues", "соул": "Soul", "фанк": "Funk", "госпел": "Gospel",
     # Classical / ambient (RU)

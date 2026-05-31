@@ -85,7 +85,13 @@ def build_suno_style(
     """
     rng = rng or random.Random()
 
-    genre_key = params.custom_genre or params.genre
+    # Canonicalise the genre so near-misses / agent free-text ("Progressive Rock",
+    # "lo-fi", RU spellings) still land on a rich preset instead of the bare-word
+    # fallback. Mirrors the mood canonicalisation in Step 3. No confident match → ""
+    # → keep the raw word (build still works, just without the preset's richness).
+    from app.services.genre_canonical import canonical_genre as _canonical_genre
+    raw_genre_key = params.custom_genre or params.genre
+    genre_key = _canonical_genre(raw_genre_key) or raw_genre_key
     preset = GENRE_STYLES.get(genre_key, {})
 
     if preset.get("style"):
