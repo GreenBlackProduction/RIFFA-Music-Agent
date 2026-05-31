@@ -851,6 +851,16 @@ a {
 .file-bolt-menu button:hover { background: var(--paper-2); }
 .file-bolt-menu button + button { border-top: 1px solid var(--rule-soft); }
 
+.file-bolt-cost {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--ink-dim);
+  background: var(--paper-2);
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: auto;
+}
+
 /* ── Rename modal ── */
 .rename-modal-backdrop {
   position: fixed;

@@ -386,7 +386,7 @@ export function FileActions({
                   disabled={!canWav}
                   title={canWav ? undefined : t("fileActions.noAudioId")}
                 >
-                  💿&nbsp; {t("fileActions.convertToWav")}
+                  💿&nbsp; {t("fileActions.convertToWav")}&nbsp;<span className="file-bolt-cost">{t("fileActions.wavCost")}</span>
                 </button>
                 {onRename && (
                   <button

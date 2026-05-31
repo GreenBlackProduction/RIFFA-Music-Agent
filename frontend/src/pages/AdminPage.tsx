@@ -20,12 +20,14 @@ import {
   adminCreatePromocode,
   adminFetchStats,
   adminFetchUserDetail,
+  adminFetchUserGenerations,
   adminFetchUsers,
   adminListPromocodes,
   adminSetNotice,
   adminClearNotice,
   adminUpdateBalance,
   adminUpdatePromocode,
+  type AdminGenRow,
   type AdminUserDetail,
   type AdminUserRow,
   type AdminUserStatus,
@@ -162,18 +164,17 @@ function UsersPanel({
               <tr>
                 <th>#</th>
                 <th>{t("admin.colUser")}</th>
-                <th>{t("admin.colRegistered")}</th>
+                <th className="admin-table__col--hide-mobile">{t("admin.colRegistered")}</th>
                 <th>{t("admin.colBalance")}</th>
-                <th>{t("admin.colGenerations")}</th>
+                <th className="admin-table__col--hide-mobile">{t("admin.colGenerations")}</th>
                 <th>{t("admin.colStatus")}</th>
-                <th>{t("admin.colCreated")}</th>
-                <th>{t("admin.colLastSeen")}</th>
-                <th />
+                <th className="admin-table__col--hide-mobile">{t("admin.colCreated")}</th>
+                <th className="admin-table__col--hide-mobile">{t("admin.colLastSeen")}</th>
               </tr>
             </thead>
             <tbody>
               {data.users.map((u) => (
-                <tr key={u.id}>
+                <tr key={u.id} className="admin-table__row--clickable" onClick={() => onSelectUser(u)}>
                   <td className="admin-table__id">{u.id}</td>
                   <td className="admin-table__name">
                     <strong>{u.display_name}</strong>
@@ -183,7 +184,7 @@ function UsersPanel({
                       {u.telegram_username ? `@${u.telegram_username}` : null}
                     </small>
                   </td>
-                  <td>
+                  <td className="admin-table__col--hide-mobile">
                     {u.telegram_user_id != null
                       ? "Telegram"
                       : u.email
@@ -191,7 +192,7 @@ function UsersPanel({
                         : "—"}
                   </td>
                   <td className="admin-table__num">{u.balance_tokens}</td>
-                  <td className="admin-table__num">{u.generations_count}</td>
+                  <td className="admin-table__num admin-table__col--hide-mobile">{u.generations_count}</td>
                   <td>
                     {u.is_banned ? (
                       <span className="admin-pill admin-pill--ban">{t("admin.statusBan")}</span>
@@ -203,17 +204,8 @@ function UsersPanel({
                       <span className="admin-pill admin-pill--ok">OK</span>
                     )}
                   </td>
-                  <td className="admin-table__date">{fmtDate(u.created_at)}</td>
-                  <td className="admin-table__date">{fmtDate(u.last_seen_at)}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="admin-btn admin-btn--small"
-                      onClick={() => onSelectUser(u)}
-                    >
-                      {t("admin.openUser")}
-                    </button>
-                  </td>
+                  <td className="admin-table__date admin-table__col--hide-mobile">{fmtDate(u.created_at)}</td>
+                  <td className="admin-table__date admin-table__col--hide-mobile">{fmtDate(u.last_seen_at)}</td>
                 </tr>
               ))}
             </tbody>
@@ -230,6 +222,73 @@ function UsersPanel({
 }
 
 // ─── User detail drawer ────────────────────────────────────────────────────
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: "⏳ ожидает",
+  processing: "🔄 генерация",
+  completed: "✅ готово",
+  failed: "❌ ошибка",
+};
+const TYPE_LABEL: Record<string, string> = {
+  song: "Песня",
+  instrumental: "Инструментал",
+  cover_song: "Кавер",
+  sfx: "SFX",
+  cover_art: "Обложка",
+  wav_convert: "WAV",
+  extend: "Продление",
+};
+
+function UserGenerations({
+  userId,
+  onCredit,
+}: {
+  userId: number;
+  onCredit: (amount: number) => void;
+}) {
+  const { data: gens, isLoading } = useQuery({
+    queryKey: ["admin", "user", userId, "generations"],
+    queryFn: () => adminFetchUserGenerations(userId, 30),
+  });
+
+  return (
+    <section className="admin-card">
+      <h4>Последние генерации</h4>
+      {isLoading && <div className="admin-empty">Загружаем…</div>}
+      {gens && gens.length === 0 && <div className="admin-empty">Генераций нет</div>}
+      {gens && gens.length > 0 && (
+        <div className="admin-gen-list">
+          {gens.map((g: AdminGenRow) => (
+            <div
+              key={g.id}
+              className={`admin-gen-row${g.status === "failed" ? " admin-gen-row--failed" : ""}`}
+            >
+              <div className="admin-gen-row__meta">
+                <span className="admin-gen-row__type">{TYPE_LABEL[g.type] ?? g.type}</span>
+                <span className="admin-gen-row__status">{STATUS_LABEL[g.status] ?? g.status}</span>
+                <span className="admin-gen-row__cost">−{g.cost_tokens} ⓡ</span>
+                <span className="admin-gen-row__date">{fmtDate(g.created_at)}</span>
+              </div>
+              {g.title && <div className="admin-gen-row__title">{g.title}</div>}
+              {g.error_message && (
+                <div className="admin-gen-row__error">{g.error_message}</div>
+              )}
+              {g.status === "failed" && g.cost_tokens > 0 && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn--xs admin-btn--primary"
+                  onClick={() => onCredit(g.cost_tokens)}
+                >
+                  Вернуть {g.cost_tokens} ⓡ
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
 
 function UserDetail({
   userId,
@@ -355,6 +414,13 @@ function UserDetail({
               )}
             </section>
 
+            {/* ─── Логи генераций ───────────────────────────── */}
+            <UserGenerations userId={userId} onCredit={(amount) => {
+              setBalanceMode("add");
+              setBalanceAmount(String(amount));
+              setBalanceReason("Компенсация за ошибку генерации");
+            }} />
+
             {/* ─── Предупреждение / бан ─────────────────────── */}
             <section className="admin-card">
               <h4>Предупреждение или бан</h4>
@@ -444,9 +510,20 @@ function UserDetailContent({ detail }: { detail: AdminUserDetail }) {
         <dd>{detail.referral_code ?? "—"}</dd>
         <dt>Пришёл по рефералке</dt>
         <dd>
-          {detail.referred_by_user_id != null
-            ? `от #${detail.referred_by_user_id}${detail.referred_by_code ? ` (${detail.referred_by_code})` : ""}`
-            : "—"}
+          {detail.referred_by_user_id != null ? (
+            <>
+              {detail.referred_by_name
+                ? <strong>{detail.referred_by_name.startsWith("tg_") ? `#${detail.referred_by_user_id}` : detail.referred_by_name}</strong>
+                : <strong>#{detail.referred_by_user_id}</strong>
+              }
+              {detail.referred_by_name && !detail.referred_by_name.startsWith("tg_") && (
+                <span style={{ color: "var(--muted)", fontSize: 12 }}> · #{detail.referred_by_user_id}</span>
+              )}
+              {detail.referred_by_code && (
+                <span style={{ color: "var(--muted)", fontSize: 12 }}> · {detail.referred_by_code}</span>
+              )}
+            </>
+          ) : "—"}
         </dd>
         <dt>Привёл</dt>
         <dd>{detail.referrals_made} чел.</dd>

@@ -139,6 +139,13 @@
   background: var(--paper-3);
 }
 
+.admin-table__row--clickable {
+  cursor: pointer;
+}
+.admin-table__row--clickable:hover {
+  background: var(--paper-2);
+}
+
 .admin-table__id { color: var(--muted); font-variant-numeric: tabular-nums; width: 40px; }
 .admin-table__num { font-variant-numeric: tabular-nums; }
 .admin-table__date { color: var(--muted); white-space: nowrap; }
@@ -406,6 +413,62 @@
   font-size: 12.5px;
 }
 
+/* ─── Generation log ─────────────────────────────────────────────────── */
+
+.admin-gen-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.admin-gen-row {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--paper-2, #f0ece0);
+  font-size: 13px;
+}
+
+.admin-gen-row--failed {
+  background: #fff0ee;
+  border-left: 3px solid var(--hi, #ff3b1f);
+}
+
+.admin-gen-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-gen-row__type   { font-weight: 600; }
+.admin-gen-row__status { color: #555; }
+.admin-gen-row__cost   { font-family: var(--font-mono, monospace); color: #c44; }
+.admin-gen-row__date   { color: #888; margin-left: auto; font-size: 12px; }
+
+.admin-gen-row__title {
+  margin-top: 3px;
+  color: #444;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-gen-row__error {
+  margin-top: 4px;
+  color: #c44;
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+  word-break: break-all;
+}
+
+.admin-btn--xs {
+  margin-top: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
 /* ─── Responsive ──────────────────────────────────────────────────────── */
 
 @media (max-width: 720px) {
@@ -417,5 +480,8 @@
   }
   .admin-drawer {
     width: 100%;
+  }
+  .admin-table__col--hide-mobile {
+    display: none;
   }
 }

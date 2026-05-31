@@ -5,6 +5,9 @@ import {
   changePassword,
   createRobokassaLink,
   createStarsInvoice,
+  fetchReviews,
+  postReview,
+  type ReviewItem,
   fetchTrash,
   purgeTrash,
   redeemPromo,
@@ -166,6 +169,37 @@ export function ProfilePage() {
         : t("profile.pwError.failed");
       setPwError(msg);
       setPwStatus("error");
+    }
+  };
+
+  // ── Reviews (at the very bottom of the profile) ──
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [reviewText, setReviewText] = useState<string>("");
+  const [reviewPending, setReviewPending] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewSent, setReviewSent] = useState(false);
+  useEffect(() => {
+    fetchReviews(20).then(({ items }) => setReviews(items)).catch(() => undefined);
+  }, []);
+  const submitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = reviewText.trim();
+    if (!text || reviewPending) return;
+    setReviewPending(true);
+    setReviewError(null);
+    try {
+      const fresh = await postReview(reviewRating, text);
+      setReviews((prev) => [fresh, ...prev]);
+      setReviewText("");
+      setReviewRating(5);
+      setReviewSent(true);
+      setTimeout(() => setReviewSent(false), 2500);
+    } catch (err) {
+      const msg = (err as { detail?: string })?.detail ?? t("common.error");
+      setReviewError(msg);
+    } finally {
+      setReviewPending(false);
     }
   };
 
@@ -738,6 +772,100 @@ export function ProfilePage() {
               </a>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* ── 05 · Отзывы ── */}
+      <div className="h-section">
+        <div className="tag"><span className="num">05</span> · {isEN ? "feedback" : "отзывы"}</div>
+        <h2>{isEN ? "leave a review" : "оставить отзыв"}</h2>
+        <div className="right">{reviews.length} {isEN ? "reviews" : "отзывов"}</div>
+      </div>
+      <div className="reviews-block">
+        {user && (
+          <form className="reviews-form" onSubmit={submitReview}>
+            <div className="reviews-form__stars" role="radiogroup" aria-label={isEN ? "Rating" : "Оценка"}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  type="button"
+                  key={n}
+                  role="radio"
+                  aria-checked={n === reviewRating}
+                  className={`reviews-star${n <= reviewRating ? " reviews-star--on" : ""}`}
+                  onClick={() => setReviewRating(n)}
+                  disabled={reviewPending}
+                  aria-label={`${n}`}
+                >
+                  ★
+                </button>
+              ))}
+              <span className="reviews-form__rating-label">
+                {reviewRating}/5
+              </span>
+            </div>
+            <textarea
+              className="reviews-form__text"
+              value={reviewText}
+              onChange={(e) => setReviewText(e.target.value)}
+              maxLength={2000}
+              rows={3}
+              placeholder={isEN
+                ? "Share your impression — what worked, what didn't"
+                : "Поделись впечатлением — что понравилось, что можно улучшить"}
+              disabled={reviewPending}
+            />
+            <div className="reviews-form__actions">
+              <button
+                type="submit"
+                className="btn btn-ink btn-sm"
+                disabled={reviewPending || !reviewText.trim()}
+              >
+                {reviewPending
+                  ? (isEN ? "Sending…" : "Отправляю…")
+                  : (isEN ? "Post review" : "Оставить отзыв")}
+              </button>
+              {reviewSent && (
+                <span className="reviews-form__ok">
+                  {isEN ? "Thanks — your review is published." : "Спасибо — отзыв опубликован."}
+                </span>
+              )}
+              {reviewError && (
+                <span className="reviews-form__err">{reviewError}</span>
+              )}
+            </div>
+          </form>
+        )}
+        {!user && (
+          <p className="muted reviews-block__login">
+            {isEN
+              ? "Sign in to leave a review."
+              : "Войдите в аккаунт чтобы оставить отзыв."}
+          </p>
+        )}
+        <div className="reviews-list">
+          {reviews.length === 0 && (
+            <p className="muted reviews-list__empty">
+              {isEN ? "No reviews yet — be the first." : "Пока нет отзывов — стань первым."}
+            </p>
+          )}
+          {reviews.map((r) => {
+            const date = new Date(r.created_at);
+            const dateLabel = isFinite(date.getTime())
+              ? date.toLocaleDateString(isEN ? "en-US" : "ru-RU", { day: "numeric", month: "long", year: "numeric" })
+              : "";
+            return (
+              <article key={r.id} className="reviews-item">
+                <header className="reviews-item__head">
+                  <strong className="reviews-item__author">{r.author}</strong>
+                  <span className="reviews-item__rating" aria-label={`${r.rating}/5`}>
+                    {"★".repeat(r.rating)}<span className="reviews-item__rating-dim">{"★".repeat(5 - r.rating)}</span>
+                  </span>
+                  <span className="reviews-item__date">{dateLabel}</span>
+                </header>
+                <p className="reviews-item__text">{r.text}</p>
+              </article>
+            );
+          })}
         </div>
       </div>
 
