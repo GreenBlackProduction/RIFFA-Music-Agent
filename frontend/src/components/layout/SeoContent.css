@@ -1,0 +1,46 @@
+/* Homepage SEO block — unobtrusive, below the studio app. */
+.seo-content {
+  max-width: 820px;
+  margin: 40px auto 24px;
+  padding: 24px 20px 8px;
+  border-top: 1px solid var(--rule);
+}
+.seo-content__h {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0 0 12px;
+}
+.seo-content__lead {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  margin: 0 0 20px;
+}
+.seo-content__faq { display: grid; gap: 8px; }
+.seo-content__item {
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--paper-2);
+  padding: 0 14px;
+}
+.seo-content__item > summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.seo-content__item > summary::-webkit-details-marker { display: none; }
+.seo-content__item > summary::after { content: "+"; color: var(--ink-3); flex: none; }
+.seo-content__item[open] > summary::after { content: "–"; }
+.seo-content__item > p {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}

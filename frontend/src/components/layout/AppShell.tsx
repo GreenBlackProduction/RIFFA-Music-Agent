@@ -1,9 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
 import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import { useGenerationStore } from "@/store/generation";
 
 import { Sidebar } from "./Sidebar";
+import { SeoContent } from "./SeoContent";
 import { MobileTopbar } from "./MobileTopbar";
 import { NoticeBanner } from "./NoticeBanner";
 import { TermsAcceptanceModal } from "./TermsAcceptanceModal";
@@ -16,6 +18,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { pathname } = useLocation();
   const reconnectAll = useGenerationStore((s) => s.reconnectAll);
   const syncFromServer = useGenerationStore((s) => s.syncFromServer);
 
@@ -36,6 +39,7 @@ export function AppShell({ children }: AppShellProps) {
         <MobileTopbar onMenuClick={() => setDrawerOpen(true)} />
         <NoticeBanner />
         {children}
+        {(pathname === "/" || pathname === "/studio") && <SeoContent />}
       </main>
 
       <CollapsedGenerationProgress />

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { RequireAdmin } from "@/components/RequireAdmin";
 import { RequireAuth } from "@/components/RequireAuth";
@@ -21,23 +21,45 @@ const StudioPage        = lazy(() => import("@/pages/StudioPage").then((m) => ({
 
 const STANDALONE_PATHS = new Set<string>(["/login", "/auth/email-callback", "/tg-auth"]);
 
+// Per-route <title> + meta so each page ranks for its own query (the SPA shipped
+// one static title for everything). Googlebot/Yandex render JS and pick these up.
+const ROUTE_SEO: Record<string, { title: string; description: string }> = {
+  "/studio": {
+    title: "RIFFA Studio — генерация музыки онлайн на основе Suno AI",
+    description:
+      "Генерация музыки и песен онлайн на русском: вокал, инструменталы, каверы, обложки. ИИ на движке Suno, ИИ-радио, оплата картой РФ и Telegram Stars.",
+  },
+  "/radio": {
+    title: "ИИ-радио — слушать треки нейросети онлайн | RIFFA Studio",
+    description:
+      "ИИ-радио RIFFA: слушай лучшие треки, созданные нейросетью пользователями. Голосуй, попадай в чарты, открывай новую ИИ-музыку на русском.",
+  },
+  "/agent": {
+    title: "ИИ-агент для создания музыки — соберёт бриф и стиль | RIFFA Studio",
+    description:
+      "Умный ИИ-агент RIFFA: опиши идею словами или дай референс — агент подберёт жанр, настроение и стиль и сгенерирует трек на Suno AI.",
+  },
+  "/guide": {
+    title: "Как создать песню нейросетью — гайд | RIFFA Studio",
+    description:
+      "Пошаговый гайд RIFFA Studio: как сгенерировать песню с вокалом, инструментал, кавер и обложку с помощью ИИ. Suno на русском, простыми словами.",
+  },
+};
+
+function upsertMeta(attr: "name" | "property", key: string, content: string) {
+  let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${key}"]`);
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute(attr, key);
+    document.head.appendChild(el);
+  }
+  el.setAttribute("content", content);
+}
+
 export default function App() {
   const location = useLocation();
-  const navigate = useNavigate();
   const standalone = STANDALONE_PATHS.has(location.pathname);
 
-  // Telegram Mini App deep link from a notification: startapp=gen_<uuid> opens that
-  // generation in the studio (StudioPage handles ?gen_id). Runs once on mount.
-  useEffect(() => {
-    const tg = (window as unknown as {
-      Telegram?: { WebApp?: { initDataUnsafe?: { start_param?: string } } };
-    }).Telegram?.WebApp;
-    const sp = tg?.initDataUnsafe?.start_param;
-    if (sp && sp.startsWith("gen_")) {
-      const genId = sp.slice(4);
-      if (genId) navigate(`/studio?gen_id=${genId}`, { replace: true });
-    }
-  }, [navigate]);
 
   // Yandex.Metrika: трек переходов между страницами в SPA.
   // Initial page load счётчик ловит сам из index.html, а route changes
@@ -50,6 +72,20 @@ export default function App() {
       });
     }
   }, [location.pathname, location.search]);
+
+  // Per-route SEO meta (title/description/OG/Twitter). "/" redirects to /studio,
+  // so it resolves to the studio entry. Unlisted routes keep the index.html defaults.
+  useEffect(() => {
+    const seo = ROUTE_SEO[location.pathname];
+    if (!seo) return;
+    document.title = seo.title;
+    upsertMeta("name", "description", seo.description);
+    upsertMeta("property", "og:title", seo.title);
+    upsertMeta("property", "og:description", seo.description);
+    upsertMeta("name", "twitter:title", seo.title);
+    upsertMeta("name", "twitter:description", seo.description);
+    upsertMeta("property", "og:url", `https://riffastudio.site${location.pathname}`);
+  }, [location.pathname]);
 
   // Detect Telegram Mini App context (initData is non-empty only inside Telegram,
   // window.Telegram.WebApp exists in ALL browsers since the SDK is always loaded).
