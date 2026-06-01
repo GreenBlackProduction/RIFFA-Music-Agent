@@ -719,9 +719,16 @@ export function AgentChat({
       return;
     }
 
+    // Reference scene-tags (post-hardcore, progressive metal…) become the custom
+    // genre so the worker LEADS the style with them, not the broad "rock". Mirrors
+    // the manual flow (typing tags into the genre field), which routes via the
+    // top-level custom_genre and works perfectly — agent_music_params can drop.
+    const refGenre = p.refTags.slice(0, 5).join(", ");
+    const customGenre = p.customGenre || refGenre;
+
     const musicParams: Record<string, unknown> = {};
     if (p.genre) musicParams.genre = p.genre;
-    if (p.customGenre) musicParams.custom_genre = p.customGenre;
+    if (customGenre) musicParams.custom_genre = customGenre;
     if (p.mood) musicParams.mood = p.mood;
     if (p.tempo) musicParams.tempo = p.tempo;
     if (m === "instrumental") musicParams.vocal = "no_vocal";
@@ -729,8 +736,7 @@ export function AgentChat({
     // Reference-track enrichment (Deezer) — feeds SongParams.era / suggested_bpm.
     if (p.era) musicParams.era = p.era;
     if (p.suggestedBpm) musicParams.suggested_bpm = p.suggestedBpm;
-    // Reference scene-tags (Last.fm) drive the specific style, not the broad genre.
-    if (p.refTags.length) musicParams.subgenre = p.refTags.slice(0, 4).join(", ");
+    if (refGenre) musicParams.subgenre = refGenre;
 
     const topic = p.topic.trim();
     const params: AgentIntentParams = {};
@@ -739,7 +745,7 @@ export function AgentChat({
     } else {
       params.description = topic;
       if (p.genre) params.genre = p.genre;
-      if (p.customGenre) params.custom_genre = p.customGenre;
+      if (customGenre) params.custom_genre = customGenre;
       if (p.mood) params.mood = p.mood;
       if (p.tempo) params.tempo = p.tempo;
       if (m === "song") {
