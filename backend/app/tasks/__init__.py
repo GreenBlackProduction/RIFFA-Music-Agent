@@ -75,6 +75,21 @@ def _dump_payload(gen_id: str, gen_type: str, payload: dict[str, Any]) -> None:
 _PROGRESS_CHANNEL = "gen:progress:{}"
 
 
+def _ensure_rich_style(enriched: str | None, preset_style: str) -> str:
+    """Never ship a lazier prompt than the deterministic preset.
+
+    ``enrich_music_prompt`` runs GPT at temperature 0.55 and, with a thin/empty
+    user description, occasionally returns a 4-word stub ("aggressive rock
+    instrumental") despite the system prompt forbidding it. The preset built by
+    ``build_suno_style`` is always detailed (instruments, production, era,
+    dynamics), so fall back to it whenever the enricher comes back short.
+    """
+    enriched = (enriched or "").strip()
+    if len(enriched) < max(240, int(len(preset_style) * 0.6)):
+        return preset_style
+    return enriched
+
+
 async def _publish(ctx: dict[str, Any], gen_id: str, payload: dict[str, Any]) -> None:
     redis = ctx["redis"]
     await redis.publish(_PROGRESS_CHANNEL.format(gen_id), json.dumps(payload))
@@ -358,7 +373,8 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 agent_prompt=agent_prompt_text,
                 agent_research_notes=agent_research,
                 preset_style_hint=preset_style,
-            ) or preset_style
+            )
+            style = _ensure_rich_style(style, preset_style)
 
             _dump_payload(gen_id, "song", {
                 "title": gen.title,
@@ -437,7 +453,8 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 approved_lyrics="",
                 agent_prompt=params.get("agent_prompt", ""),
                 preset_style_hint=preset_style,
-            ) or preset_style
+            )
+            style = _ensure_rich_style(style, preset_style)
 
             _dump_payload(gen_id, "instrumental", {
                 "title": title,
@@ -722,7 +739,8 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 agent_prompt=agent_prompt_text,
                 agent_research_notes=agent_research,
                 preset_style_hint=preset_style,
-            ) or preset_style
+            )
+            style = _ensure_rich_style(style, preset_style)
 
             _dump_payload(gen_id, "occasion", {
                 "title": gen.title,
