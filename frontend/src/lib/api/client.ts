@@ -440,6 +440,7 @@ export function generateSoundEffect(params: SoundEffectParams): Promise<Generate
 
 export interface OccasionParams {
   occasion_type: string;
+  track_name?: string;
   answers?: Record<string, string>;
   genre?: string;
   mood?: string;

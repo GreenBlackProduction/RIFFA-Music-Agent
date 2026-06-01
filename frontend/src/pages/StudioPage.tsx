@@ -1520,6 +1520,17 @@ export function StudioPage() {
     const agentPromptVersion = result.promptVersion || "";
     const agentModel = result.model || "";
 
+    // Track name: SAME rule as the manual form — "Artist - Idea (RIFFAMusic)".
+    // The agent didn't request one, so the worker fell back to "Nick — <raw
+    // description>". Compute it here via the same auto-title endpoint.
+    let agentTrackName = "";
+    try {
+      const idea = (params.description || enrichedPrompt || params.custom_genre || params.genre || "")
+        .trim()
+        .slice(0, 1000);
+      if (idea) agentTrackName = (await requestAutoTitle(idea)).track_name;
+    } catch { /* best-effort — worker falls back to a default title */ }
+
     if (intent.module === "cover_art") {
       try {
         const promptText = (enrichedPrompt || params.description || "").trim();
@@ -1569,6 +1580,7 @@ export function StudioPage() {
       if (intent.module === "song") {
         const description = (params.description || enrichedPrompt).slice(0, 1000);
         response = await generateSong({
+          track_name: agentTrackName,
           description,
           text_mode: params.text_mode || "ai",
           lyrics: params.text_mode === "custom" ? (params.lyrics || "") : "",
@@ -1589,6 +1601,7 @@ export function StudioPage() {
         trackKind = "song";
       } else if (intent.module === "instrumental") {
         response = await generateInstrumental({
+          track_name: agentTrackName,
           description: (params.description || enrichedPrompt).slice(0, 500),
           genre: params.genre || "",
           custom_genre: params.custom_genre || "",
@@ -1607,6 +1620,7 @@ export function StudioPage() {
       } else if (intent.module === "sound_effect") {
         const sfxPrompt = (params.description || enrichedPrompt).slice(0, 500) || "ambient";
         response = await generateSoundEffect({
+          track_name: agentTrackName,
           prompt: sfxPrompt,
           agent_prompt: enrichedPrompt,
           agent_music_params: agentMusicParams,
@@ -1618,6 +1632,7 @@ export function StudioPage() {
         trackKind = "sound_effect";
       } else if (intent.module === "occasion") {
         response = await generateOccasion({
+          track_name: agentTrackName,
           occasion_type: params.occasion_type || "general",
           answers: { description: params.description || "" },
           genre: params.genre || "",
