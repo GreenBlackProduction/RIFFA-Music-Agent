@@ -317,12 +317,16 @@
   align-items: center;
   gap: 6px;
   padding: 7px 16px;
+  border: 1px solid var(--rule);
+  background: var(--paper-2);
+  color: var(--ink-2);
   border-radius: 10px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 120ms, border-color 120ms;
+  transition: background 120ms, border-color 120ms, color 120ms;
 }
+.agent-lyrics-btn:hover { border-color: var(--ink); color: var(--ink); }
 .agent-lyrics-btn:active { transform: scale(0.97); }
 
 .agent-lyrics-btn--accept {
@@ -536,6 +540,57 @@
   background: var(--ink);
   border-color: var(--ink);
   color: var(--paper);
+}
+
+/* ── Suno lyrics: inline editor (chat) + brief lyrics block ── */
+
+.agent-lyrics-edit { display: grid; gap: 8px; padding: 4px 0 6px 0; }
+.agent-lyrics-edit__area,
+.agent-edit__lyrics {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--paper-2);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  resize: vertical;
+}
+.agent-lyrics-edit__area:focus,
+.agent-edit__lyrics:focus { border-color: var(--ink); outline: none; }
+
+.agent-edit__lyrics-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px dashed var(--rule);
+  border-radius: 8px;
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.agent-edit__lyrics-preview:hover { border-color: var(--ink); color: var(--ink); }
+.agent-edit__lyrics-preview > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-edit__lyrics-preview > em {
+  flex: none;
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
 }
 
 /* ── Error ─────────────────────────────────────── */

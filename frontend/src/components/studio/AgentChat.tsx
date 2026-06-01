@@ -9,6 +9,8 @@ import {
   type AgentChatResponse,
   streamAgentChat,
   classifyAgent,
+  createLyricsDraft,
+  fetchLyricsDraft,
   type AgentChatMessage,
   type AgentIntent,
   type AgentIntentParams,
@@ -168,6 +170,7 @@ interface EditableBrief {
   mood: string;
   tempo: string;
   vocal: string;
+  lyrics: string;       // Suno-written, user-approved lyrics (songs only)
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -325,6 +328,10 @@ export function AgentChat({
   // Brief editor (#2) — user can tweak the finalized params before launch.
   const [editorOpen, setEditorOpen] = useState(false);
   const [editedBrief, setEditedBrief] = useState<EditableBrief | null>(null);
+  // Inline lyrics editor (chat): non-null = the lyrics text being edited.
+  const [editingLyrics, setEditingLyrics] = useState<string | null>(null);
+  // Collapsible lyrics block inside the brief editor.
+  const [briefLyricsOpen, setBriefLyricsOpen] = useState(false);
 
   // Seed the brief editor from the finalized result (and reset when the chat
   // re-opens for refinement). User edits live in `editedBrief`, not `result`.
@@ -340,6 +347,7 @@ export function AgentChat({
         mood: str("mood") || ip.mood || "",
         tempo: str("tempo") || ip.tempo || "",
         vocal: str("vocal") || ip.vocal || "",
+        lyrics: ip.lyrics || wizardParams.current.lyrics || "",
       });
       setEditorOpen(false);
     } else if (!done) {
@@ -600,8 +608,10 @@ export function AgentChat({
 
     const scriptable =
       cls.module === "song" || cls.module === "instrumental" || cls.module === "sound_effect";
+    // Songs with lyrics stay in the scripted wizard — Suno writes the text
+    // (approved in-chat), so `needs_lyrics` no longer forces the GPT path.
     const needsGpt =
-      cls.too_vague || cls.obscure_genre || cls.needs_lyrics || (cls.artist_ref && !hasReference);
+      cls.too_vague || cls.obscure_genre || (cls.artist_ref && !hasReference);
 
     if (scriptable && !needsGpt) {
       enterScriptedWizard();
@@ -702,6 +712,13 @@ export function AgentChat({
     const p = wizardParams.current;
     const m = effectiveModuleRef.current;
 
+    // Song with vocals: Suno writes the lyrics and the user approves them in
+    // chat BEFORE the brief is built. Detour to the lyrics step if not done yet.
+    if (m === "song" && !p.lyrics) {
+      void runSunoLyrics();
+      return;
+    }
+
     const musicParams: Record<string, unknown> = {};
     if (p.genre) musicParams.genre = p.genre;
     if (p.customGenre) musicParams.custom_genre = p.customGenre;
@@ -725,7 +742,12 @@ export function AgentChat({
       if (p.tempo) params.tempo = p.tempo;
       if (m === "song") {
         params.vocal = p.vocal;
-        params.text_mode = "ai"; // Suno writes the lyrics from the brief
+        if (p.lyrics) {
+          params.lyrics = p.lyrics;
+          params.text_mode = "custom"; // Suno-written, user-approved lyrics
+        } else {
+          params.text_mode = "ai";
+        }
       }
     }
 
@@ -810,26 +832,95 @@ export function AgentChat({
     await sendInternal(finalizeMsg, nextHistory, { isFinalize: true });
   }
 
-  // Called when user clicks "Accept lyrics" (GPT path only).
-  function handleAcceptLyrics() {
-    const first = nextScriptedPhase(null);
-    if (first === "finalize") {
-      addLocalPair(
-        isEn ? "Accept lyrics" : "Принимаю текст",
-        isEn ? "Building the final prompt…" : "Собираю финальный промт…",
-      );
-      void gptFinalize(isEn ? "Accept lyrics" : "Принимаю текст");
-      return;
+  // ── Suno-written lyrics (songs) ──────────────────────────────────────────
+  // The brief is collected with chips; for a song we then ask Suno's /lyrics
+  // endpoint to WRITE the text (Russian) and the user approves / regenerates /
+  // edits it in chat before the brief is built. No GPT lyric drafting → no
+  // chatty appendix leaking into the prompt.
+  async function runSunoLyrics() {
+    const p = wizardParams.current;
+    setWizardPhase("lyrics_review");
+    setEditingLyrics(null);
+    setThinking(true);
+    startThinking(true, false);
+    try {
+      const { task_id } = await createLyricsDraft({
+        topic: p.topic || firstUserMsgRef.current || p.customGenre || p.genre || "песня",
+        genre: p.customGenre || p.genre || "",
+        mood: p.mood || "",
+        tempo: p.tempo || "",
+        vocal: p.vocal || "",
+        language: "ru",
+      });
+      let lyrics = "";
+      for (let i = 0; i < 40; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const res = await fetchLyricsDraft(task_id);
+        if (res.status === "completed" && res.lyrics) { lyrics = res.lyrics; break; }
+        if (res.status === "failed") throw new Error(res.error || "lyrics failed");
+      }
+      setThinking(false);
+      stopThinking();
+      if (!lyrics) {
+        pushAgentMessage(isEn ? "Suno is still writing — tap “Build brief” to retry." : "Suno ещё пишет — нажми «Собрать бриф», чтобы повторить.");
+        setWizardPhase("confirm");
+        return;
+      }
+      wizardParams.current.lyrics = lyrics;
+      lyricsGeneratedRef.current = true;
+      pushAgentMessage(isEn ? "Suno wrote the lyrics 👇 Accept, regenerate or edit." : "Suno написала текст 👇 Прими, перегенерируй или поправь.");
+      setMessages((prev) => [
+        ...prev,
+        { id: `lyr-${Date.now()}`, role: "agent", text: lyrics, isLyricsMessage: true },
+      ]);
+    } catch {
+      setThinking(false);
+      stopThinking();
+      wizardParams.current.lyrics = "";
+      pushAgentMessage(isEn ? "Couldn't get lyrics from Suno. Tap “Build brief” to retry." : "Не удалось получить текст от Suno. Нажми «Собрать бриф», чтобы повторить.");
+      setWizardPhase("confirm");
     }
-    addLocalPair(
-      isEn ? "Accept lyrics" : "Принимаю текст",
-      `${isEn ? "Lyrics accepted!" : "Текст принят!"} ${questionFor(first)}`,
-    );
-    setWizardPhase(first);
   }
 
+  // Accept the Suno lyrics → build the brief (text_mode=custom).
+  function handleAcceptLyrics() {
+    addLocalPair(
+      isEn ? "Accept lyrics" : "Принимаю текст",
+      isEn ? "Building the brief…" : "Собираю бриф…",
+    );
+    finalizeDeterministic();
+  }
+
+  // Ask Suno for another version of the lyrics.
+  function handleRegenerateLyrics() {
+    addLocalPair(
+      isEn ? "Regenerate" : "Перегенерировать",
+      isEn ? "Asking Suno for another version…" : "Прошу у Suno другой вариант…",
+    );
+    wizardParams.current.lyrics = "";
+    void runSunoLyrics();
+  }
+
+  // Open / save the inline lyrics editor.
   function handleEditLyrics() {
-    setWizardPhase("free");
+    setEditingLyrics(wizardParams.current.lyrics || "");
+  }
+
+  function saveEditedLyrics() {
+    if (editingLyrics === null) return;
+    const v = editingLyrics.trim();
+    wizardParams.current.lyrics = v;
+    setMessages((prev) => {
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].isLyricsMessage) {
+          const copy = [...prev];
+          copy[i] = { ...copy[i], text: v };
+          return copy;
+        }
+      }
+      return prev;
+    });
+    setEditingLyrics(null);
   }
 
   function handleGenreSelect(value: string, label: string) {
@@ -1170,6 +1261,10 @@ export function AgentChat({
       mp.mood = e.mood;
       mp.tempo = e.tempo;
       mp.vocal = isInstr ? "no_vocal" : e.vocal;
+      if (!isInstr && e.lyrics) {
+        params.lyrics = e.lyrics;
+        params.text_mode = "custom";
+      }
     }
     return { ...r, intent: { ...r.intent, params }, musicParams: mp, prompt: e.description || r.prompt };
   }
@@ -1191,6 +1286,10 @@ export function AgentChat({
     if (e.tempo) lines.push(`${isEn ? "Tempo" : "Темп"}: ${chips.tempoLabel(e.tempo)}`);
     if (m === "instrumental") lines.push(`${isEn ? "Vocals" : "Вокал"}: ${isEn ? "none" : "нет"}`);
     else lines.push(`${isEn ? "Vocals" : "Вокал"}: ${e.vocal ? chips.vocalLabel(e.vocal) : (isEn ? "AI decides" : "на выбор")}`);
+    if (m !== "instrumental" && e.lyrics) {
+      const firstLine = e.lyrics.split("\n").find((l) => l.trim() && !l.trim().startsWith("[")) || "";
+      if (firstLine) lines.push(`${isEn ? "Lyrics" : "Текст"}: ${firstLine.slice(0, 48)}…`);
+    }
     // era / BPM come from a reference track (not edited) — read from musicParams.
     const mp = (result?.musicParams ?? {}) as Record<string, unknown>;
     if (typeof mp.era === "string" && mp.era) lines.push(`${isEn ? "Era" : "Эпоха"}: ${mp.era}`);
@@ -1369,6 +1468,29 @@ export function AgentChat({
                 </div>
               </div>
             )}
+
+            {m !== "instrumental" && e.lyrics && (
+              <div className="agent-edit__field">
+                <label>{isEn ? "Lyrics" : "Текст"}</label>
+                {briefLyricsOpen ? (
+                  <textarea
+                    className="agent-edit__lyrics"
+                    value={e.lyrics}
+                    onChange={(ev) => setF({ lyrics: ev.target.value })}
+                    rows={12}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="agent-edit__lyrics-preview"
+                    onClick={() => setBriefLyricsOpen(true)}
+                  >
+                    <span>{e.lyrics.split("\n").filter((l) => l.trim() && !l.trim().startsWith("[")).slice(0, 2).join(" / ").slice(0, 90) || "…"}</span>
+                    <em>{isEn ? "expand & edit" : "развернуть и править"}</em>
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
@@ -1456,24 +1578,39 @@ export function AgentChat({
                 <p style={{ whiteSpace: "pre-wrap" }}>{msg.text}</p>
               </div>
 
-              {/* Lyrics accept / edit buttons */}
+              {/* Lyrics approve / regenerate / edit buttons (Suno-written text) */}
               {msg.isLyricsMessage && wizardPhase === "lyrics_review" && isLastAgent && !thinking && (
-                <div className="agent-lyrics-actions">
-                  <button
-                    type="button"
-                    className="agent-lyrics-btn agent-lyrics-btn--accept"
-                    onClick={handleAcceptLyrics}
-                  >
-                    <IconCheck /> Принять текст
-                  </button>
-                  <button
-                    type="button"
-                    className="agent-lyrics-btn agent-lyrics-btn--edit"
-                    onClick={handleEditLyrics}
-                  >
-                    <IconPencil /> Редактировать
-                  </button>
-                </div>
+                editingLyrics !== null ? (
+                  <div className="agent-lyrics-edit">
+                    <textarea
+                      className="agent-lyrics-edit__area"
+                      value={editingLyrics}
+                      onChange={(ev) => setEditingLyrics(ev.target.value)}
+                      rows={12}
+                      autoFocus
+                    />
+                    <div className="agent-lyrics-actions">
+                      <button type="button" className="agent-lyrics-btn agent-lyrics-btn--accept" onClick={saveEditedLyrics}>
+                        <IconCheck /> {isEn ? "Save" : "Сохранить"}
+                      </button>
+                      <button type="button" className="agent-lyrics-btn" onClick={() => setEditingLyrics(null)}>
+                        <IconClose /> {isEn ? "Cancel" : "Отмена"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="agent-lyrics-actions">
+                    <button type="button" className="agent-lyrics-btn agent-lyrics-btn--accept" onClick={handleAcceptLyrics}>
+                      <IconCheck /> {isEn ? "Accept" : "Принять текст"}
+                    </button>
+                    <button type="button" className="agent-lyrics-btn" onClick={handleRegenerateLyrics}>
+                      <IconRefresh /> {isEn ? "Regenerate" : "Перегенерировать"}
+                    </button>
+                    <button type="button" className="agent-lyrics-btn agent-lyrics-btn--edit" onClick={handleEditLyrics}>
+                      <IconPencil /> {isEn ? "Edit" : "Редактировать"}
+                    </button>
+                  </div>
+                )
               )}
 
               {/* Wizard or GPT chips */}
