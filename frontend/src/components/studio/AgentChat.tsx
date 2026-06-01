@@ -729,6 +729,8 @@ export function AgentChat({
     // Reference-track enrichment (Deezer) — feeds SongParams.era / suggested_bpm.
     if (p.era) musicParams.era = p.era;
     if (p.suggestedBpm) musicParams.suggested_bpm = p.suggestedBpm;
+    // Reference scene-tags (Last.fm) drive the specific style, not the broad genre.
+    if (p.refTags.length) musicParams.subgenre = p.refTags.slice(0, 4).join(", ");
 
     const topic = p.topic.trim();
     const params: AgentIntentParams = {};
