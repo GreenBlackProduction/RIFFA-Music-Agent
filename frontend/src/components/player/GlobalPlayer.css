@@ -414,6 +414,12 @@
   gap: 2px;
 }
 
+/* Desktop has plenty of vertical room — the 300px cap (sized for mobile) made
+   the queue feel cut off. Open it up to use the available height. */
+@media (min-width: 768px) {
+  .gp-queue { max-height: min(64vh, 520px); }
+}
+
 .gp-queue-item {
   display: flex;
   align-items: center;
