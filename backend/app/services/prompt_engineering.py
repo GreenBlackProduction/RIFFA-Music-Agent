@@ -192,9 +192,11 @@ def build_suno_style(
         for category in rng.sample(pool, min(num_dynamic, len(pool))):
             style_parts.append(rng.choice(DYNAMIC_ELEMENTS[category]))
 
-    # Step 7.4: agent subgenre (NEW — most specific genre signal)
+    # Step 7.4: agent subgenre (most specific genre signal — e.g. Last.fm tags
+    # "post-hardcore, progressive metal"). LEADS the style so the specific scene
+    # beats the broad genre preset and survives the 1000-char trim.
     if params.subgenre:
-        style_parts.append(params.subgenre.strip())
+        style_parts.insert(0, params.subgenre.strip())
 
     # Step 7.45: agent key_instruments (NEW — explicit instrument lineup from research)
     if params.key_instruments:
@@ -214,6 +216,10 @@ def build_suno_style(
     # Step 8: user override / agent prompt has the highest authority
     if params.style_prompt:
         style_parts.append(params.style_prompt.strip())
+
+    # Step 8.7: nudge Suno toward a full-length, multi-section track — thin
+    # prompts yield 30-second snippets, an explicit structure cue lengthens them.
+    style_parts.append("full-length multi-section arrangement, intro build development and outro")
 
     # Step 9: assemble + trim to Suno V5.5 limit
     raw = ", ".join(p for p in style_parts if p)

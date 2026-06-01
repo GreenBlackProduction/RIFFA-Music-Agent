@@ -97,6 +97,10 @@ Hard rules:
     sections (Instrumentation / Rhythm / Texture / Vocals / Dynamics / Mix references / Mood arc).
 - Respect explicit exclusions: if the user says "no vocals", "drums only", "no synths",
   state these as hard constraints in the prompt ("instrumental", "no synths", "no vocals", etc.).
+- Describe a COMPLETE multi-section arrangement (intro → development → climax → outro) so
+  Suno renders a FULL-LENGTH track — never a short loop or a 30-second snippet.
+- If a subgenre / reference scene is given (e.g. "post-hardcore, progressive metal"), LEAD with
+  it and let it define the sound — do NOT flatten it to the broad parent genre ("rock").
 - If `Mode: INSTRUMENTAL` is set, the prompt must not describe lead vocals;
   it may describe vocal samples, choral pads, or chants only if the user asked for them.
 - Do not invent lyrics. Do not output a song title.
