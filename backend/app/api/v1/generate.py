@@ -208,18 +208,21 @@ async def _create_generation(
     # visible in "all" view, just not under a specific mood category.
     normalised_mood = canonical_mood(mood) or mood
 
+    # Clamp the category columns to their DB widths — the full values live in
+    # `params` (what the worker actually generates from). A long free-text
+    # custom genre would otherwise overflow genre VARCHAR(64) and 500 the request.
     gen = Generation(
         id=uuid.uuid4(),
         user_id=user.id,
         type=gen_type,
         status=GenerationStatus.queued,
-        title=title,
+        title=title[:120],
         params=params,
         cost_tokens=cost,
-        genre=genre or None,
-        mood=normalised_mood or None,
-        tempo=tempo or None,
-        vocal=vocal or None,
+        genre=(genre or "")[:64] or None,
+        mood=(normalised_mood or "")[:32] or None,
+        tempo=(tempo or "")[:32] or None,
+        vocal=(vocal or "")[:32] or None,
     )
     session.add(gen)
     await session.flush()
