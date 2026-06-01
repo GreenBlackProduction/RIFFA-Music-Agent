@@ -1722,9 +1722,26 @@ def _postprocess_agent_reply(
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
-        logger.warning("agent_chat: GPT returned non-JSON, falling back to plain reply")
+        # GPT broke JSON (truncation, literal newlines inside a string, ```json
+        # fences…). Salvage ONLY the user-facing reply — never dump the raw JSON
+        # blob, which renders as a huge, mostly-empty bubble in the chat.
+        logger.warning("agent_chat: GPT returned non-JSON, salvaging reply")
+        salvaged = ""
+        mm = _REPLY_FIELD_RE.search(raw)
+        if mm:
+            try:
+                salvaged = json.loads(f'"{mm.group(1)}"')
+            except json.JSONDecodeError:
+                salvaged = mm.group(1)
+        salvaged = re.sub(r"\n{3,}", "\n\n", salvaged).strip()
+        if not salvaged:
+            salvaged = (
+                "Sorry, I glitched for a second — could you say that again?"
+                if reply_lang == "English"
+                else "Извини, я на секунду завис — повтори, пожалуйста?"
+            )
         return AgentChatResponse(
-            reply=raw[:1500] or "...", done=False,
+            reply=salvaged[:1500], done=False,
             prompt_version=AGENT_PROMPT_VERSION, model=chosen_model,
         )
 
