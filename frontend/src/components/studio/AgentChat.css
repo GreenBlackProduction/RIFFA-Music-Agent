@@ -195,6 +195,9 @@
   color: var(--paper);
 }
 
+/* Right-align the user's column; agent rows stay left (unstyled block). */
+.agent-row--user { display: flex; justify-content: flex-end; }
+
 /* ── Индикатор «думает» ─────────────────────────── */
 
 .agent-bubble--thinking {

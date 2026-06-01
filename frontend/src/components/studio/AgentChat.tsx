@@ -1573,9 +1573,9 @@ export function AgentChat({
           const isLastAgent = isLast && msg.role === "agent";
 
           return (
-            <div key={msg.id}>
+            <div key={msg.id} className={`agent-row agent-row--${msg.role}`}>
               <div className={`agent-bubble agent-bubble--${msg.role}`}>
-                <p style={{ whiteSpace: "pre-wrap" }}>{msg.text}</p>
+                <p style={{ whiteSpace: "pre-wrap" }}>{(msg.text || "").replace(/\n{3,}/g, "\n\n").trim() || "…"}</p>
               </div>
 
               {/* Lyrics approve / regenerate / edit buttons (Suno-written text) */}
