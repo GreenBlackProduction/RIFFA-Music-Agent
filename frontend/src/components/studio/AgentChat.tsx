@@ -944,6 +944,21 @@ export function AgentChat({
     advanceAfterSlot(vocal, "vocal");
   }
 
+  // "No vocals" turns the song into an instrumental — keeps every collected
+  // param (genre/mood/tempo/reference), just drops the vocal + lyrics path.
+  // A chip (not free text) so nothing gets re-classified and lost.
+  function handleNoVocal() {
+    addLocalPair(
+      isEn ? "No vocals" : "Без вокала",
+      isEn ? "Building the prompt…" : "Собираю промт…",
+    );
+    setEffectiveModule("instrumental");
+    effectiveModuleRef.current = "instrumental";
+    wizardParams.current.vocal = "no_vocal";
+    wizardParams.current.lyrics = "";
+    finalizeDeterministic();
+  }
+
   // Free-typed text mid-wizard is NOT a blind slot answer — re-interpret it.
   // Re-classify (cheap, also resolves Deezer references): a new reference or
   // new params get merged and we re-ask what's missing; anything the classifier
@@ -1371,6 +1386,7 @@ export function AgentChat({
           {chips.vocalChips.map((v) => (
             <button key={v} type="button" className="agent-suggestion-chip" onClick={() => void handleVocalSelect(v)}>{v}</button>
           ))}
+          <button key="__novocal" type="button" className="agent-suggestion-chip" onClick={handleNoVocal}>{isEn ? "🎹 No vocals" : "🎹 Без вокала"}</button>
           {buildChip}
         </div>
       );
