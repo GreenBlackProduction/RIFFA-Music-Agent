@@ -144,7 +144,16 @@ def _safe_filename(name: str, ext: str) -> str:
     return f"{cleaned}.{ext}"
 
 
-def _embed_id3(mp3_bytes: bytes, *, title: str, artist: str, album: str, comment: str, cover_bytes: bytes | None) -> bytes:
+def _embed_id3(
+    mp3_bytes: bytes,
+    *,
+    title: str,
+    artist: str,
+    album: str,
+    comment: str,
+    cover_bytes: bytes | None,
+    genre: str = "",
+) -> bytes:
     """Write ID3v2.3 tags into the mp3 buffer. Best-effort: returns original on failure."""
     try:
         # mutagen ships partial type info but doesn't re-export the ID3 frame
@@ -157,6 +166,7 @@ def _embed_id3(mp3_bytes: bytes, *, title: str, artist: str, album: str, comment
             COMM,
             ID3,
             TALB,
+            TCON,
             TIT2,
             TPE1,
             ID3NoHeaderError,
@@ -187,10 +197,13 @@ def _embed_id3(mp3_bytes: bytes, *, title: str, artist: str, album: str, comment
     tags.delall("TPE1")
     tags.delall("TALB")
     tags.delall("COMM")
+    tags.delall("TCON")
     tags.add(TIT2(encoding=3, text=title))  # type: ignore[no-untyped-call]
     tags.add(TPE1(encoding=3, text=artist))  # type: ignore[no-untyped-call]
     tags.add(TALB(encoding=3, text=album))  # type: ignore[no-untyped-call]
     tags.add(COMM(encoding=3, lang="eng", desc="", text=comment))  # type: ignore[no-untyped-call]
+    if genre:
+        tags.add(TCON(encoding=3, text=genre))  # type: ignore[no-untyped-call]
 
     if cover_bytes:
         tags.delall("APIC")
@@ -250,10 +263,15 @@ async def download_track(
     short_title = (gen.title or track.get("title") or _shorten_idea((gen.params or {}).get("description") or "")).strip()
     if not short_title:
         short_title = "RIFFA Track"
+    # Per-variant version label: Suno returns up to 2 variants per generation
+    # (V1 / V2). The "Vers N" (similar) / "Cover V N" markers already live in
+    # gen.title; this V{n} is the within-generation variant.
+    variant = f" V{track_index + 1}" if len(raw_tracks) > 1 else ""
     if _RIFFA_SUFFIX in short_title:
-        track_name = short_title
+        base = short_title.replace(_RIFFA_SUFFIX, "").strip()
+        track_name = f"{base}{variant} {_RIFFA_SUFFIX}".strip()
     else:
-        track_name = format_track_name(artist, short_title)
+        track_name = format_track_name(artist, f"{short_title}{variant}")
 
     cover_url = track.get("image_url")
 
@@ -275,13 +293,24 @@ async def download_track(
             except Exception as exc:
                 logger.warning("cover fetch failed for {}: {}", cover_url, exc)
 
+    # Auto-tagging: bake type + genre/mood/tempo + the RIFFA AI mark into the
+    # file so the metadata travels with the download.
+    gtype = gen.type.value if hasattr(gen.type, "value") else str(gen.type)
+    tag_bits = [b for b in (gen.genre, gen.mood, gen.tempo) if b]
+    comment = (
+        f"RIFFA AI · {gtype}"
+        + (f" · {' · '.join(tag_bits)}" if tag_bits else "")
+        + " · Suno V5.5"
+        + f" (gen {gen.id})"
+    )
     tagged = _embed_id3(
         mp3_bytes,
         title=track_name,
         artist=artist,
         album="RIFFAMusic",
-        comment=f"Generated with RIFFAMusic / Suno V5.5 (gen {gen.id})",
+        comment=comment,
         cover_bytes=cover_bytes,
+        genre=gen.genre or "",
     )
 
     filename = _safe_filename(track_name, "mp3")

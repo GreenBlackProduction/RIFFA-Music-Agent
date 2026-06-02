@@ -215,7 +215,7 @@ export function LibraryCard() {
         title: i.title,
         url: i.audioUrl,
         cover: i.coverUrl ?? undefined,
-        meta: `${typeLabel(i.type)} · ${i.genre} · ${i.mood}`,
+        meta: [typeLabel(i.type), i.genre, i.mood, i.tempo].filter(Boolean).join(" · "),
         isOwn: i.isOwn !== false,
         canRadio: RADIO_TYPES.has(i.type) && i.isOwn !== false,
         isMusicType: MUSIC_TYPES.has(i.type),
@@ -228,7 +228,7 @@ export function LibraryCard() {
       title: item.title,
       url: item.audioUrl,
       cover: item.coverUrl ?? undefined,
-      meta: `${typeLabel(item.type)} · ${item.genre} · ${item.mood}`,
+      meta: [typeLabel(item.type), item.genre, item.mood, item.tempo].filter(Boolean).join(" · "),
       isOwn: item.isOwn !== false,
       canRadio: RADIO_TYPES.has(item.type) && item.isOwn !== false,
       isMusicType: MUSIC_TYPES.has(item.type),
@@ -377,7 +377,7 @@ export function LibraryCard() {
               <div className="file-item__info">
                 <strong className="file-item__title">{it.title}</strong>
                 <span className="file-item__meta">
-                  {typeLabel(it.type)} · {it.genre} · {it.mood} · {it.duration}
+                  {[typeLabel(it.type), it.genre, it.mood, it.tempo, it.duration].filter(Boolean).join(" · ")}
                 </span>
               </div>
 
