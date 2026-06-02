@@ -153,8 +153,15 @@ export function FileActions({
         "wav_convert",
         `WAV: ${title || t("fileActions.fallbackTrack")}`,
       );
-    } catch {
-      // silently fail — the generation card will appear in the sidebar with an error if so
+      setShareToast(t("fileActions.wavStarted", { defaultValue: "WAV-конвертация запущена — трек появится в библиотеке" }));
+    } catch (err) {
+      // Surface the failure (was silent — looked like "the button does nothing").
+      const status = (err as { status?: number })?.status;
+      setShareToast(
+        status === 402
+          ? t("fileActions.wavNoTokens", { defaultValue: "Недостаточно токенов для WAV" })
+          : t("fileActions.wavError", { defaultValue: "Не удалось запустить WAV-конвертацию" }),
+      );
     } finally {
       setWavPending(false);
     }

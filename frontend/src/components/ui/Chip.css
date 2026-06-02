@@ -57,6 +57,16 @@
   opacity: 0.55;
 }
 
+/* Genre multi-select cap reached — chip looks inert until one is deselected. */
+.chip--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.chip--disabled:hover {
+  border-color: var(--rule);
+  background: var(--paper-3);
+}
+
 .chip-row {
   display: flex;
   flex-wrap: wrap;

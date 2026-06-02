@@ -814,8 +814,14 @@ export function GlobalPlayer() {
     try {
       const resp = await convertToWav({ generation_id: gId, audio_id: currentAudioId });
       trackGeneration(resp.generation_id, resp.ws_url, "wav_convert", `WAV: ${currentTitle}`);
-    } catch {
-      // generation card in sidebar will show error state
+      setShareToast(t("fileActions.wavStarted", { defaultValue: "WAV-конвертация запущена — трек появится в библиотеке" }));
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      setShareToast(
+        status === 402
+          ? t("fileActions.wavNoTokens", { defaultValue: "Недостаточно токенов для WAV" })
+          : t("fileActions.wavError", { defaultValue: "Не удалось запустить WAV-конвертацию" }),
+      );
     } finally {
       setWavPending(false);
     }

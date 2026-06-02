@@ -130,6 +130,33 @@ const GENRES = [
   "Rock","Metal","Djent","Experimental",
 ] as const;
 
+const MAX_GENRES = 5;
+
+// Combine the selected genre chips + the free-typed custom genres into one
+// de-duplicated, comma-separated string (for display + worker enrichment).
+function combineGenres(genres: string[], custom: string): string {
+  const customParts = custom.split(",").map((s) => s.trim()).filter(Boolean);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const g of [...genres, ...customParts]) {
+    const k = g.toLowerCase();
+    if (g && !seen.has(k)) { seen.add(k); out.push(g); }
+  }
+  return out.join(", ");
+}
+
+// Split into the API shape: a single canonical chip → `genre`; anything multi
+// or custom → `custom_genre` (the worker LEADS the style with it).
+function splitGenreForApi(genres: string[], custom: string): { genre: string; custom_genre: string } {
+  const combined = combineGenres(genres, custom);
+  const parts = combined.split(",").map((s) => s.trim()).filter(Boolean);
+  if (parts.length === 1 && genres.length === 1 && !custom.trim()
+      && (GENRES as readonly string[]).includes(genres[0])) {
+    return { genre: genres[0], custom_genre: "" };
+  }
+  return { genre: "", custom_genre: combined };
+}
+
 const MOODS_RU: ReadonlyArray<readonly [string, string]> = [
   ["happy", "😊 Радостное"], ["calm", "😌 Спокойное"], ["sad", "😢 Грустное"],
   ["energetic", "😤 Энергичное"], ["confident", "😎 Уверенное"], ["dreamy", "🌙 Мечтательное"],
@@ -243,6 +270,7 @@ interface SongState {
   timbre: string;
   customTimbre: string;
   genre: string;
+  genres: string[];      // multi-select (song/instrumental) — up to 5 genre chips
   customGenre: string;
   mood: string;
   customMood: string;
@@ -294,6 +322,7 @@ const INITIAL_STATE: SongState = {
   timbre: "balanced",
   customTimbre: "",
   genre: "Pop",
+  genres: ["Pop"],
   customGenre: "",
   mood: "energetic",
   customMood: "",
@@ -378,8 +407,7 @@ function buildPrompt(module: Module, state: SongState): string {
   const meta = MODULES.find((m) => m.id === module);
   const parts: string[] = [`Task: ${meta?.title ?? module}`];
 
-  const genreValue =
-    state.genre === "custom" && state.customGenre.trim() ? state.customGenre.trim() : state.genre;
+  const genreValue = combineGenres(state.genres, state.customGenre) || state.genre;
   const timbreValue =
     state.timbre === "custom" && state.customTimbre.trim()
       ? state.customTimbre.trim()
@@ -910,6 +938,15 @@ export function StudioPage() {
   const update = <K extends keyof SongState>(key: K, value: SongState[K]) =>
     setState((prev) => ({ ...prev, [key]: value }));
 
+  // Multi-select genre toggle (song/instrumental) — up to MAX_GENRES chips.
+  const toggleGenre = (g: string) =>
+    setState((prev) => {
+      const has = prev.genres.includes(g);
+      if (has) return { ...prev, genres: prev.genres.filter((x) => x !== g) };
+      if (prev.genres.length >= MAX_GENRES) return prev; // cap reached — ignore
+      return { ...prev, genres: [...prev.genres, g] };
+    });
+
   const renderChipRow = <K extends keyof SongState>(
     options: ReadonlyArray<readonly [string, string]>,
     key: K,
@@ -1076,10 +1113,7 @@ export function StudioPage() {
       lyricsTitle: "",
     }));
     try {
-      const genreValue =
-        state.genre === "custom" && state.customGenre.trim()
-          ? state.customGenre.trim()
-          : state.genre;
+      const genreValue = combineGenres(state.genres, state.customGenre) || state.genre;
       const moodValue =
         state.mood === "custom" && state.customMood.trim()
           ? state.customMood.trim()
@@ -1104,7 +1138,7 @@ export function StudioPage() {
     }
   }, [
     state.lyricsTopic,
-    state.genre,
+    state.genres,
     state.customGenre,
     state.mood,
     state.customMood,
@@ -1336,8 +1370,8 @@ export function StudioPage() {
       return;
     }
 
-    const genreValue =
-      state.genre === "custom" && state.customGenre.trim() ? state.customGenre.trim() : state.genre;
+    const genreValue = combineGenres(state.genres, state.customGenre) || state.genre;
+    const apiGenre = splitGenreForApi(state.genres, state.customGenre);
     // Always send the stable KEY (e.g. "happy") to the backend so the Radio mood
     // grid can group by mood reliably. Labels are for display only.
     const moodValue =
@@ -1389,8 +1423,8 @@ export function StudioPage() {
           description: description.slice(0, 1000),
           text_mode: lyricsModeBackend,
           lyrics: state.lyricsMode === "instrumental" ? "" : state.lyricsText,
-          genre: state.genre !== "custom" ? state.genre : "",
-          custom_genre: state.genre === "custom" ? state.customGenre : "",
+          genre: apiGenre.genre,
+          custom_genre: apiGenre.custom_genre,
           mood: moodValue,
           tempo: tempoValue,
           vocal: valueLabel(state.vocal, VOCAL_TYPES),
@@ -1404,8 +1438,8 @@ export function StudioPage() {
       } else if (activeModule === "instrumental") {
         response = await generateInstrumental({
           description: (state.instrumentalExtra || prompt).slice(0, 500),
-          genre: state.genre !== "custom" ? state.genre : "",
-          custom_genre: state.genre === "custom" ? state.customGenre : "",
+          genre: apiGenre.genre,
+          custom_genre: apiGenre.custom_genre,
           mood: moodValue,
           tempo: tempoValue,
           track_name: resolvedTrackName,
@@ -1796,11 +1830,7 @@ export function StudioPage() {
             key={agentSeed ?? "fresh"}
             module="song"
             initialAnswer={agentSeed ?? undefined}
-            selectedGenre={
-              state.genre === "custom" && state.customGenre.trim()
-                ? state.customGenre.trim()
-                : state.genre
-            }
+            selectedGenre={combineGenres(state.genres, state.customGenre) || state.genre}
             selectedMood={
               state.mood === "custom" && state.customMood.trim()
                 ? state.customMood.trim()
@@ -2359,29 +2389,40 @@ export function StudioPage() {
               aria-disabled={songParamsLocked}
             >
               <strong>{t("studio.genreLabel")}</strong>
-              <span className="muted">{t("studio.genreDesc")}</span>
+              <span className="muted">
+                {t("studio.genreMultiDesc", {
+                  defaultValue: `Выберите до ${MAX_GENRES} жанров — агент смешает их в один стиль`,
+                })}
+              </span>
               <div className="chip-row chip-row--dense">
-                {GENRES.map((g) => (
-                  <Chip key={g} active={state.genre === g} onClick={() => update("genre", g)}>
-                    {g}
-                  </Chip>
-                ))}
-                <Chip
-                  active={state.genre === "custom"}
-                  onClick={() => update("genre", "custom")}
-                  className="chip--custom"
-                >
-                  {t("studio.customVariant")}
-                </Chip>
+                {GENRES.map((g) => {
+                  const active = state.genres.includes(g);
+                  const capped = !active && state.genres.length >= MAX_GENRES;
+                  return (
+                    <Chip
+                      key={g}
+                      active={active}
+                      onClick={() => toggleGenre(g)}
+                      className={capped ? "chip--disabled" : undefined}
+                    >
+                      {g}
+                    </Chip>
+                  );
+                })}
               </div>
-              {state.genre === "custom" && (
-                <input
-                  className="inline-input"
-                  placeholder={t("studio.genreCustomPlaceholder")}
-                  value={state.customGenre}
-                  onChange={(e) => update("customGenre", e.target.value)}
-                />
-              )}
+              <textarea
+                className="inline-input"
+                rows={2}
+                maxLength={500}
+                placeholder={t("studio.genreCustomMultiPlaceholder", {
+                  defaultValue: "Или впишите свои жанры через запятую (до 500 символов)",
+                })}
+                value={state.customGenre}
+                onChange={(e) => update("customGenre", e.target.value)}
+              />
+              <span className="muted" style={{ fontSize: 11 }}>
+                {state.genres.length}/{MAX_GENRES} · {state.customGenre.length}/500
+              </span>
             </div>
 
             <div
