@@ -7,6 +7,7 @@ import {
   deleteGeneration,
   renameGeneration,
   generateSimilar,
+  updateGenerationTags,
   fetchTrash,
   purgeTrash,
   restoreGeneration,
@@ -174,6 +175,14 @@ export function LibraryCard() {
 
   const similarMutation = useMutation({
     mutationFn: (generationId: string) => generateSimilar(generationId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
+    },
+  });
+
+  const tagsMutation = useMutation({
+    mutationFn: ({ generationId, tags }: { generationId: string; tags: { genre: string; mood: string; tempo: string } }) =>
+      updateGenerationTags(generationId, tags),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
     },
@@ -422,6 +431,14 @@ export function LibraryCard() {
                     ? () => similarMutation.mutate(it.generationId)
                     : undefined
                 }
+                onEditTags={
+                  it.generationId
+                    ? (tags) => tagsMutation.mutateAsync({ generationId: it.generationId, tags })
+                    : undefined
+                }
+                currentGenre={it.genre}
+                currentMood={it.mood}
+                currentTempo={it.tempo}
               />
             </div>
           );

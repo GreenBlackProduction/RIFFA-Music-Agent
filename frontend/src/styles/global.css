@@ -819,10 +819,18 @@ a {
   box-shadow: 0 4px 24px rgba(22, 20, 19, 0.16);
   animation: file-bolt-menu-in 140ms ease;
 }
-@media (max-width: 480px) {
+/* Mobile: center the menu in the screen, matching player width.
+   Override JS-calculated right/bottom with centered horizontal placement.
+   Width tracks screen width so it syncs with the player on rotation. */
+@media (max-width: 768px) {
   .file-bolt-menu {
-    min-width: 180px;
-    max-width: calc(100vw - 12px);
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
+    width: min(calc(100vw - 16px), 400px) !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    animation: file-bolt-menu-in-mobile 140ms ease;
   }
   .file-bolt-menu button {
     white-space: normal;
@@ -832,6 +840,10 @@ a {
 @keyframes file-bolt-menu-in {
   from { opacity: 0; transform: translateY(6px) scale(0.96); }
   to   { opacity: 1; transform: none; }
+}
+@keyframes file-bolt-menu-in-mobile {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(-50%); }
 }
 .file-bolt-menu button {
   display: flex;

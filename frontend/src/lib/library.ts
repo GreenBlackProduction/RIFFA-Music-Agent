@@ -37,6 +37,7 @@ export interface LibraryItem {
   type: LibraryItemType;
   genre: string;
   mood: string;
+  tempo: string;
   createdAt: string;
   duration: string;
   audioUrl: string;
@@ -139,6 +140,7 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
         type: "cover_art" as const,
         genre: "",
         mood: "",
+        tempo: "",
         createdAt: gen.created_at,
         duration: "—",
         audioUrl: "",
@@ -162,6 +164,7 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
         type: "wav" as const,
         genre: gen.genre ?? "",
         mood: gen.mood ?? "",
+        tempo: gen.tempo ?? "",
         createdAt: gen.created_at,
         duration: "—",
         audioUrl: gen.wav_url,
@@ -183,6 +186,7 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
         type: libType,
         genre: gen.genre ?? "",
         mood: gen.mood ?? "",
+        tempo: gen.tempo ?? "",
         createdAt: gen.created_at,
         duration: "—",
         audioUrl: "",
@@ -201,6 +205,7 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
     type: libType,
     genre: gen.genre ?? "",
     mood: gen.mood ?? "",
+    tempo: gen.tempo ?? "",
     createdAt: gen.created_at,
     duration: formatDuration(t.duration),
     audioUrl: t.audio_url,

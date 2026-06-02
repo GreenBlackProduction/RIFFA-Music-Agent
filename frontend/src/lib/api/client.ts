@@ -898,6 +898,16 @@ export function renameGeneration(
   });
 }
 
+export function updateGenerationTags(
+  id: string,
+  tags: { genre?: string; mood?: string; tempo?: string },
+): Promise<unknown> {
+  return apiFetch(`/api/v1/history/${id}/tags`, {
+    method: "PATCH",
+    body: JSON.stringify(tags),
+  });
+}
+
 export function shareGeneration(id: string): Promise<{ share_id: string; share_url: string }> {
   return apiFetch(`/api/v1/history/${id}/share`, { method: "POST" });
 }

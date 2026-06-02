@@ -50,6 +50,12 @@ interface Props {
   onRename?: (next: string) => void | Promise<unknown>;
   /** Generate a similar track from this one. When omitted the menu hides the option. */
   onSimilar?: () => void | Promise<unknown>;
+  /** Edit genre / mood / tempo tags. When omitted the menu hides the option. */
+  onEditTags?: (tags: { genre: string; mood: string; tempo: string }) => void | Promise<unknown>;
+  /** Current tag values used to pre-fill the edit form. */
+  currentGenre?: string;
+  currentMood?: string;
+  currentTempo?: string;
   /** Extra elements rendered inside the file-actions div (e.g. Radio vote buttons). */
   children?: React.ReactNode;
 }
@@ -75,6 +81,10 @@ export function FileActions({
   shareKind = "library",
   onRename,
   onSimilar,
+  onEditTags,
+  currentGenre = "",
+  currentMood = "",
+  currentTempo = "",
   children,
 }: Props) {
   const dlHref = downloadUrl || audioUrl;
@@ -88,6 +98,9 @@ export function FileActions({
   const [renameValue, setRenameValue] = useState("");
   const [renamePending, setRenamePending] = useState(false);
   const renameInputRef = useRef<HTMLInputElement>(null);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [tagsValue, setTagsValue] = useState({ genre: "", mood: "", tempo: "" });
+  const [tagsPending, setTagsPending] = useState(false);
   const boltBtnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
@@ -211,6 +224,26 @@ export function FileActions({
       // Stays open so the user can retry / cancel manually.
     } finally {
       setRenamePending(false);
+    }
+  }
+
+  function openEditTags() {
+    setMenuOpen(false);
+    setTagsValue({ genre: currentGenre, mood: currentMood, tempo: currentTempo });
+    setTagsOpen(true);
+  }
+
+  async function submitTags(e: React.FormEvent) {
+    e.preventDefault();
+    if (!onEditTags) return;
+    setTagsPending(true);
+    try {
+      await onEditTags(tagsValue);
+      setTagsOpen(false);
+    } catch {
+      // stays open for retry
+    } finally {
+      setTagsPending(false);
     }
   }
 
@@ -409,6 +442,15 @@ export function FileActions({
                     ⚡&nbsp; {t("fileActions.generateSimilar", { defaultValue: "Сгенерировать похожий" })}
                   </button>
                 )}
+                {onEditTags && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={openEditTags}
+                  >
+                    🏷️&nbsp; {t("fileActions.editTags", { defaultValue: "Редактировать теги" })}
+                  </button>
+                )}
                 {generationId && (
                   <button
                     type="button"
@@ -466,6 +508,74 @@ export function FileActions({
                   disabled={renamePending || !renameValue.trim()}
                 >
                   {renamePending
+                    ? t("common.saving", { defaultValue: "Сохраняю…" })
+                    : t("common.save", { defaultValue: "Сохранить" })}
+                </button>
+              </div>
+            </form>
+          </div>,
+          document.body,
+        )}
+
+      {tagsOpen &&
+        createPortal(
+          <div
+            className="rename-modal-backdrop"
+            onClick={() => !tagsPending && setTagsOpen(false)}
+          >
+            <form
+              className="rename-modal"
+              onClick={(e) => e.stopPropagation()}
+              onSubmit={submitTags}
+            >
+              <label className="rename-modal__label">
+                {t("fileActions.tagsLabel", { defaultValue: "Жанр / Настроение / Темп" })}
+              </label>
+              <input
+                type="text"
+                placeholder={t("fileActions.genrePlaceholder", { defaultValue: "Жанр (Rock, Pop…)" })}
+                value={tagsValue.genre}
+                maxLength={64}
+                onChange={(e) => setTagsValue((v) => ({ ...v, genre: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Escape" && !tagsPending) setTagsOpen(false); }}
+                disabled={tagsPending}
+                autoFocus
+              />
+              <input
+                type="text"
+                placeholder={t("fileActions.moodPlaceholder", { defaultValue: "Настроение (Energetic, Sad…)" })}
+                value={tagsValue.mood}
+                maxLength={32}
+                onChange={(e) => setTagsValue((v) => ({ ...v, mood: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Escape" && !tagsPending) setTagsOpen(false); }}
+                disabled={tagsPending}
+                style={{ marginTop: 8 }}
+              />
+              <input
+                type="text"
+                placeholder={t("fileActions.tempoPlaceholder", { defaultValue: "Темп (120 BPM, Быстрый…)" })}
+                value={tagsValue.tempo}
+                maxLength={32}
+                onChange={(e) => setTagsValue((v) => ({ ...v, tempo: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === "Escape" && !tagsPending) setTagsOpen(false); }}
+                disabled={tagsPending}
+                style={{ marginTop: 8 }}
+              />
+              <div className="rename-modal__actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setTagsOpen(false)}
+                  disabled={tagsPending}
+                >
+                  {t("common.cancel", { defaultValue: "Отмена" })}
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-ink btn-sm"
+                  disabled={tagsPending}
+                >
+                  {tagsPending
                     ? t("common.saving", { defaultValue: "Сохраняю…" })
                     : t("common.save", { defaultValue: "Сохранить" })}
                 </button>

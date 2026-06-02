@@ -376,6 +376,49 @@ async def rename_generation(
     return _to_out(gen)
 
 
+class TagsUpdateRequest(BaseModel):
+    genre: str | None = Field(default=None, max_length=64)
+    mood: str | None = Field(default=None, max_length=32)
+    tempo: str | None = Field(default=None, max_length=32)
+
+
+@router.patch("/{gen_id}/tags", response_model=GenerationOut)
+async def update_tags(
+    gen_id: str,
+    body: TagsUpdateRequest,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+) -> GenerationOut:
+    """Update genre / mood / tempo on an existing generation.
+
+    Only non-None fields are written — pass only the fields you want to change.
+    Empty string clears the field (sets it to NULL in the DB).
+    """
+    try:
+        gid = uuid.UUID(gen_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found") from exc
+
+    gen = (
+        await session.execute(
+            select(Generation).where(Generation.id == gid, Generation.user_id == user.id)
+        )
+    ).scalar_one_or_none()
+    if gen is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
+
+    if body.genre is not None:
+        gen.genre = body.genre.strip()[:64] or None
+    if body.mood is not None:
+        gen.mood = body.mood.strip()[:32] or None
+    if body.tempo is not None:
+        gen.tempo = body.tempo.strip()[:32] or None
+
+    await session.commit()
+    await session.refresh(gen)
+    return _to_out(gen)
+
+
 @router.post("/{gen_id}/share", response_model=ShareResponse)
 async def share_generation(
     gen_id: str,
@@ -548,13 +591,6 @@ async def toggle_radio(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="this generation type is not eligible for the radio",
-        )
-
-    # Require mood for radio publication
-    if body.is_public and not gen.mood:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Треки без настроения не могут быть опубликованы в радио. Укажите настроение при создании трека.",
         )
 
     result_data = gen.result if isinstance(gen.result, dict) else {}
