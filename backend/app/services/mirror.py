@@ -28,7 +28,11 @@ from app.core.config import Settings
 logger = logging.getLogger(__name__)
 
 _HTTP_TIMEOUT = 60.0  # seconds per file fetch
-_COVER_RETRY_DELAY = 2.0  # seconds between cover fetch retries
+_COVER_RETRY_DELAY = 3.0  # seconds between cover fetch retries
+# Suno renders the cover image a few seconds AFTER the audio is ready, so a
+# single retry often grabs the audio but misses the cover — the temporary CDN
+# URL is then kept and expires (→ 403). Give the cover a wider window.
+_COVER_RETRIES = 5
 
 
 def _embed_cover_into_mp3(mp3_bytes: bytes, cover_bytes: bytes, *, title: str = "") -> bytes:
@@ -290,7 +294,7 @@ async def mirror_generation_result(
                     except Exception as exc:
                         logger.warning("[mirror] decode data-URI failed for gen %s: %s", gen_id, exc)
                 else:
-                    img_bytes = await _fetch_with_retry(image_url, http, retries=1)
+                    img_bytes = await _fetch_with_retry(image_url, http, retries=_COVER_RETRIES)
                     if img_bytes:
                         _, mime = _guess_ext_and_type(image_url)
                 if img_bytes:
@@ -324,7 +328,7 @@ async def mirror_generation_result(
             # ── Cover image (fetched FIRST so we can embed into MP3) ─────
             cover_bytes: bytes | None = None
             if image_url and not image_url.startswith(settings.s3_public_base_url):
-                cover_bytes = await _fetch_with_retry(image_url, http, retries=1)
+                cover_bytes = await _fetch_with_retry(image_url, http, retries=_COVER_RETRIES)
 
             # ── Audio (with embedded cover for MP3) ──────────────────────
             if audio_url and not audio_url.startswith(settings.s3_public_base_url):
