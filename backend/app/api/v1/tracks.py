@@ -61,15 +61,21 @@ def _resolve_artist(user: User, override: str = "") -> str:
     return "RIFFA"
 
 
-def _shorten_idea(idea: str, max_chars: int = 40) -> str:
-    """Cheap fallback if GPT title fails. Trim/clean the user's idea."""
-    cleaned = re.sub(r"\s+", " ", idea).strip(" .,;:-—")
-    if len(cleaned) <= max_chars:
-        return cleaned
-    head = cleaned[:max_chars]
-    if " " in head:
+def _shorten_idea(idea: str, max_chars: int = 50) -> str:
+    """Cheap fallback when GPT titling fails: first 3-7 words of the request.
+
+    Word-based (not a blind char cut) so the fallback reads like a real title —
+    e.g. "Закат над ночным городом" rather than "Закат над ночным горо".
+    Capped at ``max_chars`` so it still fits the canonical name format.
+    """
+    cleaned = re.sub(r"\s+", " ", idea).strip(" .,;:-—\"'")
+    if not cleaned:
+        return ""
+    words = cleaned.split(" ")
+    head = " ".join(words[:7])
+    while len(head) > max_chars and " " in head:
         head = head.rsplit(" ", 1)[0]
-    return head.rstrip(" .,;:-—")
+    return head.strip(" .,;:-—\"'")
 
 
 def format_track_name(artist: str, short_title: str) -> str:

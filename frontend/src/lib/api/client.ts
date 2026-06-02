@@ -477,6 +477,8 @@ export interface CoverSongParams {
   /** ISO code: ru/en/es/fr/de/it/pt/ja/ko/zh. Empty = Suno auto. */
   lyrics_language?: string;
   track_name?: string;
+  /** Original uploaded filename — backend seeds the "<name> Cover V{N}" title from it. */
+  source_name?: string;
 }
 
 export function generateCoverSong(params: CoverSongParams): Promise<GenerateResponse> {

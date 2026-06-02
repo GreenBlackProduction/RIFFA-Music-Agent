@@ -6,6 +6,10 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { AppShell } from "@/components/layout/AppShell";
 import { CookieConsent } from "@/components/CookieConsent";
 import { GlobalPlayer } from "@/components/player/GlobalPlayer";
+import { usePlayer } from "@/store/player";
+
+const FAVICON_DEFAULT = "/brand/04-applications/riffa-favicon-32.svg?v=2";
+const FAVICON_PLAYING = "/brand/04-applications/riffa-favicon-playing.svg?v=2";
 
 const AdminPage         = lazy(() => import("@/pages/AdminPage").then((m) => ({ default: m.AdminPage })));
 const AgentPage         = lazy(() => import("@/pages/AgentPage").then((m) => ({ default: m.AgentPage })));
@@ -59,6 +63,16 @@ function upsertMeta(attr: "name" | "property", key: string, content: string) {
 export default function App() {
   const location = useLocation();
   const standalone = STANDALONE_PATHS.has(location.pathname);
+  const isPlaying = usePlayer((s) => s.isPlaying && s.current !== null);
+
+  // Swap the browser-tab favicon to a bare orange triangle while audio plays,
+  // back to the default mark when paused/stopped. Only touches the SVG icon
+  // link (the one modern browsers actually render).
+  useEffect(() => {
+    const link = document.head.querySelector<HTMLLinkElement>('link[rel="icon"][type="image/svg+xml"]');
+    if (!link) return;
+    link.href = isPlaying ? FAVICON_PLAYING : FAVICON_DEFAULT;
+  }, [isPlaying]);
 
 
   // Yandex.Metrika: трек переходов между страницами в SPA.

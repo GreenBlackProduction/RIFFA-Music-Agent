@@ -800,9 +800,9 @@ a {
 }
 .file-bolt:hover,
 .file-bolt--open {
-  border-color: var(--ink);
-  color: var(--ink);
-  background: var(--paper-2);
+  border-color: var(--hi);
+  color: var(--hi);
+  background: rgba(255, 59, 31, 0.10);
 }
 
 .file-bolt-menu {

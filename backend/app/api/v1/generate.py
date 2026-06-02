@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+import re as _re_naming
 import secrets
 import uuid
 from contextlib import suppress
@@ -14,7 +15,7 @@ from arq.connections import RedisSettings
 from botocore.client import Config
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -148,6 +149,9 @@ class CoverSongRequest(BaseModel):
     style_weight: float | None = Field(default=None, ge=0.0, le=1.0)
     weirdness_constraint: float | None = Field(default=None, ge=0.0, le=1.0)
     track_name: str = Field(default="", max_length=80)
+    # Original uploaded filename (with or without extension). Used to seed the
+    # cover title when the user didn't type a manual name.
+    source_name: str = Field(default="", max_length=160)
     idempotency_key: str = Field(default="", max_length=64)
 
 
@@ -364,12 +368,34 @@ async def generate_cover_song(
     session: AsyncSession = Depends(db_session),
     settings: Settings = Depends(get_settings),
 ) -> GenerateResponse:
+    # Title seed: user's manual name wins; otherwise the uploaded filename
+    # (extension stripped); otherwise a generic fallback. Then append "Cover V{N}"
+    # where N counts the caller's existing covers of the same base.
+    artist = _resolve_artist(user)
+    manual = body.track_name.strip()
+    if manual:
+        base = _extract_short_title(manual)
+    else:
+        fname = body.source_name.strip()
+        base = _re_naming.sub(r"\.[A-Za-z0-9]{1,5}$", "", fname).strip() if fname else ""
+    if not base:
+        base = "Cover"
+    version = await _next_version(
+        session,
+        user_id=user.id,
+        gen_type=GenerationType.cover_song,
+        base_name=base,
+        marker="Cover V",
+        start=1,
+    )
+    cover_title = format_track_name(artist, f"{base} Cover V{version}")
+
     gen = await _create_generation(
         session,
         user,
         GenerationType.cover_song,
         params=body.model_dump(),
-        title=body.track_name,
+        title=cover_title,
         genre=body.genre or body.custom_genre,
         mood=body.mood,
         tempo=body.tempo,
@@ -488,18 +514,61 @@ async def list_active_generations(
 # ── Similar track — remix a published Radio track ──────────────────────────
 
 
-def _extract_short_title(title: str) -> str:
-    """Strip 'Artist - ' prefix and '(RIFFAMusic)' suffix to get the bare track name.
+# Trailing version markers we add ourselves: " Vers2", " Cover V3", " (WAV)".
+# Stripped before re-versioning so chains never stack ("Name Vers2 Vers3").
+_VERSION_SUFFIX_RE = _re_naming.compile(
+    r"\s*(?:[-–·]\s*)?(?:vers|version|v|cover\s*v)\s*\d+\s*$",
+    _re_naming.IGNORECASE,
+)
 
-    Prevents title-duplication like 'Похожий — Похожий — ...' when chaining
-    generate_similar calls.
+
+def _extract_short_title(title: str) -> str:
+    """Strip 'Artist - ' prefix, '(RIFFAMusic)' suffix and any trailing version
+    marker to get the bare base track name.
+
+    Prevents title-duplication like 'Похожий — Похожий — ...' and version
+    stacking like 'Name Vers2 Vers3' when chaining generate_similar calls.
     """
     t = title.strip()
     t = t.replace(f" {_TRK_SUFFIX}", "").replace(_TRK_SUFFIX, "").strip()
     # 'Artist - Track Name' → 'Track Name'
     if " - " in t:
         t = t.split(" - ", 1)[1].strip()
-    return t or title
+    # Drop a trailing 'Vers2' / 'Cover V3' so re-versioning starts from the base.
+    base = _VERSION_SUFFIX_RE.sub("", t).strip()
+    return base or t or title
+
+
+async def _next_version(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    gen_type: GenerationType,
+    base_name: str,
+    marker: str,
+    start: int,
+) -> int:
+    """Return the next version number for a versioned title family.
+
+    Counts the caller's existing generations of ``gen_type`` whose title already
+    carries ``marker`` (e.g. 'Vers', 'Cover V') for the same ``base_name``, then
+    returns count + ``start``. ``start`` lets 'similar' begin at 2 (the source is
+    implicitly version 1) while 'cover' begins at 1.
+    """
+    if not base_name:
+        return start
+    pattern = f"%{base_name}%{marker}%"
+    existing = (
+        await session.execute(
+            select(func.count(Generation.id)).where(
+                Generation.user_id == user_id,
+                Generation.type == gen_type,
+                Generation.deleted_at.is_(None),
+                Generation.title.ilike(pattern),
+            )
+        )
+    ).scalar_one()
+    return int(existing or 0) + start
 
 
 def _remix_agent_params(agent_mp: dict[str, Any]) -> dict[str, Any]:
@@ -626,7 +695,16 @@ async def generate_similar(
     # Never carry over the source's artist name or prefix-stack "Похожий — Похожий".
     artist = _resolve_artist(user)
     src_short = _extract_short_title(src.title or "трек")
-    new_title = format_track_name(artist, src_short)
+    # Source track is implicitly version 1 → similars start at Vers2 and count up.
+    version = await _next_version(
+        session,
+        user_id=user.id,
+        gen_type=new_type,
+        base_name=src_short,
+        marker="Vers",
+        start=2,
+    )
+    new_title = format_track_name(artist, f"{src_short} Vers{version}")
 
     # Populate genre/mood/tempo — fall back to agent_music_params if src fields are blank.
     bpm_str = str(remixed_mp.get("suggested_bpm") or "").strip()

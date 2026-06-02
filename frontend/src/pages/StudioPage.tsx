@@ -1452,12 +1452,14 @@ export function StudioPage() {
           style_weight: parseRatio(state.coverStyleWeight),
           weirdness_constraint: parseRatio(state.coverWeirdness),
           lyrics_language: state.coverLanguage || "",
-          track_name: resolvedTrackName,
+          // Cover title comes from the uploaded filename (backend appends
+          // "Cover V{N}"). Manual mode still wins; auto-GPT title is skipped here.
+          track_name: state.trackNameMode === "manual" ? state.trackName.trim() : "",
+          source_name: state.coverFileName || "",
         });
         title =
-          resolvedTrackName ||
           state.coverTitle.trim() ||
-          `Кавер · ${state.coverFileName || "upload"}`;
+          (state.coverFileName ? `${state.coverFileName} · Cover` : "Кавер · upload");
       } else if (activeModule === "cover_art") {
         if (!state.coverArtPrompt?.trim()) {
           setSubmitError(t("studio.errCoverArtNoPrompt"));
