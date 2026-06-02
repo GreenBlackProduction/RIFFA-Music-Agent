@@ -1392,32 +1392,71 @@ export function AgentChat({
     if (!isMusicModule(m)) {
       return [`${isEn ? "Description" : "Описание"}: ${e.description || "—"}`];
     }
-    // Keep the brief human-sized: 2-3 genres + mood + a short atmosphere line.
-    // The user must NOT see the full Suno prompt here — only this distillation.
-    const shortWords = (s: string, n = 12) => {
+
+    const shortWords = (s: string, n = 25) => {
       const w = s.trim().split(/\s+/);
       return w.length <= n ? s.trim() : w.slice(0, n).join(" ") + "…";
     };
-    const lines: string[] = [];
-    // Limit displayed genres to the first 3.
-    const gRaw = e.customGenre || e.genre;
-    const g = gRaw
-      ? gRaw.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 3).join(", ")
-      : "";
-    lines.push(`${isEn ? "Genre" : "Жанр"}: ${g || (isEn ? "agent's pick" : "на выбор агента")}`);
-    if (e.mood) lines.push(`${isEn ? "Mood" : "Настроение"}: ${chips.moodLabel(e.mood)}`);
-    if (e.tempo) lines.push(`${isEn ? "Tempo" : "Темп"}: ${chips.tempoLabel(e.tempo)}`);
-    if (e.description) lines.push(`${isEn ? "Atmosphere" : "Атмосфера"}: ${shortWords(e.description)}`);
-    if (m === "instrumental") lines.push(`${isEn ? "Vocals" : "Вокал"}: ${isEn ? "none" : "нет"}`);
-    else lines.push(`${isEn ? "Vocals" : "Вокал"}: ${e.vocal ? chips.vocalLabel(e.vocal) : (isEn ? "AI decides" : "на выбор")}`);
-    // era / BPM come from a reference track (not edited) — read from musicParams.
     const mp = (result?.musicParams ?? {}) as Record<string, unknown>;
-    if (typeof mp.era === "string" && mp.era) lines.push(`${isEn ? "Era" : "Эпоха"}: ${mp.era}`);
-    // Show BPM only when it agrees with the tempo label (avoid "Темп: medium / BPM: 154"
-    // contradiction that confuses users when Deezer returns a raw float outside the bucket).
-    if (typeof mp.suggested_bpm === "string" && mp.suggested_bpm && !e.tempo) {
-      lines.push(`BPM: ~${mp.suggested_bpm}`);
+    const lines: string[] = [];
+
+    // 1. Жанр — все выбранные (не ограничиваем 3)
+    const gRaw = e.customGenre || e.genre;
+    const g = gRaw ? gRaw.split(",").map((x) => x.trim()).filter(Boolean).join(", ") : "";
+    lines.push(`${isEn ? "Genre" : "Жанр"}: ${g || (isEn ? "agent's pick" : "на выбор агента")}`);
+
+    // 2. Субжанры / теги стиля (Last.fm, Deezer)
+    const subgenre = typeof mp.subgenre === "string" ? mp.subgenre.trim() : "";
+    if (subgenre) {
+      lines.push(`${isEn ? "Style tags" : "Теги стиля"}: ${subgenre}`);
     }
+
+    // 3. Настроение
+    if (e.mood) lines.push(`${isEn ? "Mood" : "Настроение"}: ${chips.moodLabel(e.mood)}`);
+
+    // 4. Темп
+    if (e.tempo) lines.push(`${isEn ? "Tempo" : "Темп"}: ${chips.tempoLabel(e.tempo)}`);
+
+    // 5. BPM — показываем когда есть (даже вместе с темпом — разные единицы)
+    const bpm = typeof mp.suggested_bpm === "string" ? mp.suggested_bpm.trim() : "";
+    if (bpm) lines.push(`BPM: ~${bpm}`);
+
+    // 6. Вокал
+    if (m === "instrumental") {
+      lines.push(`${isEn ? "Vocals" : "Вокал"}: ${isEn ? "none" : "нет"}`);
+    } else {
+      lines.push(`${isEn ? "Vocals" : "Вокал"}: ${e.vocal ? chips.vocalLabel(e.vocal) : (isEn ? "AI decides" : "на выбор")}`);
+    }
+
+    // 7. Атмосфера / тема (до 25 слов)
+    if (e.description) {
+      lines.push(`${isEn ? "Atmosphere" : "Атмосфера"}: ${shortWords(e.description)}`);
+    }
+
+    // 8. Эпоха
+    const era = typeof mp.era === "string" ? mp.era.trim() : "";
+    if (era) lines.push(`${isEn ? "Era" : "Эпоха"}: ${era}`);
+
+    // 9. Описание стиля из референс-трека (Last.fm теги в researchNotes)
+    // Показываем только первые 10 слов — полный набор тегов уже есть в «Теги стиля»
+    const rn = result?.researchNotes ?? "";
+    if (rn && !subgenre) {
+      // researchNotes: "Reference style tags (Last.fm): tag1, tag2, …"
+      const tagsMatch = /(?:tags?[:\s]+)(.*)/i.exec(rn);
+      const tagStr = tagsMatch ? tagsMatch[1].trim() : "";
+      if (tagStr) lines.push(`${isEn ? "Style tags" : "Теги стиля"}: ${shortWords(tagStr, 10)}`);
+    }
+
+    // 10. Текст / лирика (для песни)
+    if (m === "song") {
+      if (e.lyrics) {
+        const firstLine = e.lyrics.split("\n").find((l) => l.trim() && !l.trim().startsWith("[")) || "";
+        if (firstLine) lines.push(`${isEn ? "Lyrics" : "Текст"}: ${firstLine.slice(0, 60)}…`);
+      } else {
+        lines.push(`${isEn ? "Lyrics" : "Текст"}: ${isEn ? "Suno writes" : "пишет Suno"}`);
+      }
+    }
+
     return lines;
   }
 
