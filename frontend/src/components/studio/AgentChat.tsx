@@ -140,7 +140,7 @@ function useWizardChips(lang: string) {
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type WizardPhase = "free" | "lyrics_review" | "genre" | "mood" | "tempo" | "vocal" | "confirm";
+type WizardPhase = "free" | "lyrics_review" | "lyrics_confirm" | "genre" | "mood" | "tempo" | "vocal" | "confirm";
 
 interface WizardParams {
   lyrics: string;
@@ -158,11 +158,17 @@ interface WizardParams {
   // confirms with a chip or types a new value; only then do we skip the step.
   moodConfirmed: boolean;
   tempoConfirmed: boolean;
+  // Lyrics decision for songs — the agent NEVER generates text without the
+  // user picking one of these first. "" = not asked yet, "write" = pre-write
+  // via Suno + review, "ai" = let Suno write during generation, "instrumental"
+  // = no words at all.
+  lyricsDecision: "" | "write" | "ai" | "instrumental";
 }
 
 const EMPTY_WIZARD: WizardParams = {
   lyrics: "", topic: "", genre: "", customGenre: "", mood: "", tempo: "", vocal: "",
   era: "", suggestedBpm: "", refTags: [], moodConfirmed: false, tempoConfirmed: false,
+  lyricsDecision: "",
 };
 
 // Editable copy of the finalized brief — lets the user tweak the core params
@@ -615,8 +621,12 @@ export function AgentChat({
       cls.module === "song" || cls.module === "instrumental" || cls.module === "sound_effect";
     // Songs with lyrics stay in the scripted wizard — Suno writes the text
     // (approved in-chat), so `needs_lyrics` no longer forces the GPT path.
+    // `obscure_genre` no longer forces GPT either: multiple/niche genres stay
+    // in the fast wizard and route via custom_genre, which the worker's
+    // build_suno_style + enrich step turns into a rich style description. This
+    // stops the "had to name my genres twice" stall.
     const needsGpt =
-      cls.too_vague || cls.obscure_genre || (cls.artist_ref && !hasReference);
+      cls.too_vague || (cls.artist_ref && !hasReference);
 
     if (scriptable && !needsGpt) {
       enterScriptedWizard();
@@ -729,11 +739,27 @@ export function AgentChat({
     const p = wizardParams.current;
     const m = effectiveModuleRef.current;
 
-    // Song with vocals: Suno writes the lyrics and the user approves them in
-    // chat BEFORE the brief is built. Detour to the lyrics step if not done yet.
+    // Song without lyrics yet: NEVER auto-write text. Ask the user first what
+    // they want (decision saved in p.lyricsDecision):
+    //   "write" → pre-write via Suno + review in chat
+    //   "ai"    → let Suno write the words during music generation (no review)
+    //   ""      → not asked yet → show the lyrics_confirm chips and stop here
     if (m === "song" && !p.lyrics) {
-      void runSunoLyrics();
-      return;
+      if (p.lyricsDecision === "write") {
+        void runSunoLyrics();
+        return;
+      }
+      if (p.lyricsDecision !== "ai") {
+        setWizardPhase("lyrics_confirm");
+        pushAgentMessage(
+          isEn
+            ? "Want me to write the lyrics for you to review, let Suno write them, or make it instrumental (no words)?"
+            : "Написать текст песни (покажу на проверку), пусть Suno сама сочинит, или сделать инструментал без слов?",
+        );
+        return;
+      }
+      // "ai" → fall through; text_mode is set to "ai" below and Suno writes
+      // the words during generation.
     }
 
     // Reference scene-tags (post-hardcore, progressive metal…) become the custom
@@ -952,6 +978,43 @@ export function AgentChat({
     wizardParams.current.genre = value;
     wizardParams.current.customGenre = "";
     advanceAfterSlot(label, "genre");
+  }
+
+  // Free-typed genre answer (e.g. "phonk, drum and bass, neurofunk"). Stored
+  // verbatim as custom_genre (up to 5 styles) — the worker enriches it into a
+  // full style description. No re-classification → no "name it twice" stall.
+  function handleGenreText(text: string) {
+    const genres = text
+      .split(/[,;/]|\bи\b|\band\b|·|\+/i)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 5);
+    const joined = genres.join(", ") || text.trim();
+    wizardParams.current.genre = "";
+    wizardParams.current.customGenre = joined;
+    advanceAfterSlot(joined, "genre");
+  }
+
+  // Lyrics-confirm chips — the agent only writes text after the user picks one.
+  function handleLyricsWrite() {
+    wizardParams.current.lyricsDecision = "write";
+    addLocalPair(
+      isEn ? "Write the lyrics" : "Напиши текст",
+      isEn ? "Writing the lyrics with Suno…" : "Пишу текст через Suno…",
+    );
+    void runSunoLyrics();
+  }
+  function handleLyricsAuto() {
+    wizardParams.current.lyricsDecision = "ai";
+    addLocalPair(
+      isEn ? "Let Suno write" : "Пусть Suno сочинит",
+      isEn ? "Building the prompt…" : "Собираю промт…",
+    );
+    finalizeDeterministic();
+  }
+  function handleLyricsInstrumental() {
+    wizardParams.current.lyricsDecision = "instrumental";
+    handleNoVocal();
   }
 
   function handleMoodSelect(mood: string) {
@@ -1248,11 +1311,20 @@ export function AgentChat({
     if (!text || thinking || done) return;
     setDraft("");
 
+    // Genre phase: typed text IS the genre answer (one or several styles).
+    // Take it verbatim as custom_genre and advance — no re-classification, so
+    // multi-genre answers never bounce the user back to "name your genre again".
+    if (wizardPhase === "genre" && scriptedRef.current) {
+      appendUserMessage(text);
+      handleGenreText(text);
+      return;
+    }
+
     // Typed text mid-wizard is a message, not a blind slot answer. In the
     // scripted path re-interpret it (refineFromText); in the GPT path just
     // converse. Chips remain the instant scripted route.
     if (
-      wizardPhase === "genre" || wizardPhase === "mood" || wizardPhase === "tempo" ||
+      wizardPhase === "mood" || wizardPhase === "tempo" ||
       wizardPhase === "vocal" || wizardPhase === "confirm"
     ) {
       appendUserMessage(text);
@@ -1320,18 +1392,24 @@ export function AgentChat({
     if (!isMusicModule(m)) {
       return [`${isEn ? "Description" : "Описание"}: ${e.description || "—"}`];
     }
+    // Keep the brief human-sized: 2-3 genres + mood + a short atmosphere line.
+    // The user must NOT see the full Suno prompt here — only this distillation.
+    const shortWords = (s: string, n = 12) => {
+      const w = s.trim().split(/\s+/);
+      return w.length <= n ? s.trim() : w.slice(0, n).join(" ") + "…";
+    };
     const lines: string[] = [];
-    if (e.description) lines.push(`${isEn ? "Topic" : "Тема"}: ${e.description}`);
-    const g = e.customGenre || e.genre;
+    // Limit displayed genres to the first 3.
+    const gRaw = e.customGenre || e.genre;
+    const g = gRaw
+      ? gRaw.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 3).join(", ")
+      : "";
     lines.push(`${isEn ? "Genre" : "Жанр"}: ${g || (isEn ? "agent's pick" : "на выбор агента")}`);
     if (e.mood) lines.push(`${isEn ? "Mood" : "Настроение"}: ${chips.moodLabel(e.mood)}`);
     if (e.tempo) lines.push(`${isEn ? "Tempo" : "Темп"}: ${chips.tempoLabel(e.tempo)}`);
+    if (e.description) lines.push(`${isEn ? "Atmosphere" : "Атмосфера"}: ${shortWords(e.description)}`);
     if (m === "instrumental") lines.push(`${isEn ? "Vocals" : "Вокал"}: ${isEn ? "none" : "нет"}`);
     else lines.push(`${isEn ? "Vocals" : "Вокал"}: ${e.vocal ? chips.vocalLabel(e.vocal) : (isEn ? "AI decides" : "на выбор")}`);
-    if (m !== "instrumental" && e.lyrics) {
-      const firstLine = e.lyrics.split("\n").find((l) => l.trim() && !l.trim().startsWith("[")) || "";
-      if (firstLine) lines.push(`${isEn ? "Lyrics" : "Текст"}: ${firstLine.slice(0, 48)}…`);
-    }
     // era / BPM come from a reference track (not edited) — read from musicParams.
     const mp = (result?.musicParams ?? {}) as Record<string, unknown>;
     if (typeof mp.era === "string" && mp.era) lines.push(`${isEn ? "Era" : "Эпоха"}: ${mp.era}`);
@@ -1442,6 +1520,21 @@ export function AgentChat({
           ))}
           <button key="__novocal" type="button" className="agent-suggestion-chip" onClick={handleNoVocal}>{isEn ? "🎹 No vocals" : "🎹 Без вокала"}</button>
           {buildChip}
+        </div>
+      );
+    }
+    if (wizardPhase === "lyrics_confirm") {
+      return (
+        <div className="agent-suggestions">
+          <button type="button" className="agent-suggestion-chip agent-suggestion-chip--build" onClick={handleLyricsWrite}>
+            {isEn ? "✍️ Write the lyrics" : "✍️ Напиши текст"}
+          </button>
+          <button type="button" className="agent-suggestion-chip" onClick={handleLyricsAuto}>
+            {isEn ? "🤖 Let Suno write" : "🤖 Пусть Suno сочинит"}
+          </button>
+          <button type="button" className="agent-suggestion-chip" onClick={handleLyricsInstrumental}>
+            {isEn ? "🎹 Instrumental (no words)" : "🎹 Инструментал без слов"}
+          </button>
         </div>
       );
     }
@@ -1759,16 +1852,9 @@ export function AgentChat({
             ) : (
               <pre className="agent-result__summary">{briefLines().join("\n") || result.summary || "—"}</pre>
             )}
-            {result.shortPrompt && result.model !== "scripted" && (
-              <div className="agent-result__suno">
-                <span className="agent-result__suno-label">
-                  {isEn ? "Suno prompt" : "Suno-промт"}
-                </span>
-                <p className="agent-result__suno-text">{result.shortPrompt}</p>
-              </div>
-            )}
-            {/* The FULL prompt (with research notes + every param) stays
-                hidden — only the short distillation goes to the user. */}
+            {/* The Suno prompt (short OR full) is intentionally NOT shown — the
+                user only sees the distilled brief above (genres + mood + a short
+                atmosphere line). The worker builds the real prompt server-side. */}
           </div>
         )}
       </div>
