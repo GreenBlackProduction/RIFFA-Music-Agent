@@ -48,6 +48,8 @@ interface Props {
    *  which gives us the "disabled on radio" requirement for free —
    *  radio rows never wire this callback. */
   onRename?: (next: string) => void | Promise<unknown>;
+  /** Generate a similar track from this one. When omitted the menu hides the option. */
+  onSimilar?: () => void | Promise<unknown>;
   /** Extra elements rendered inside the file-actions div (e.g. Radio vote buttons). */
   children?: React.ReactNode;
 }
@@ -72,6 +74,7 @@ export function FileActions({
   isImageType,
   shareKind = "library",
   onRename,
+  onSimilar,
   children,
 }: Props) {
   const dlHref = downloadUrl || audioUrl;
@@ -395,6 +398,15 @@ export function FileActions({
                     onClick={openRename}
                   >
                     ✏️&nbsp; {t("fileActions.rename", { defaultValue: "Переименовать" })}
+                  </button>
+                )}
+                {onSimilar && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => { setMenuOpen(false); void onSimilar(); }}
+                  >
+                    ⚡&nbsp; {t("fileActions.generateSimilar", { defaultValue: "Сгенерировать похожий" })}
                   </button>
                 )}
                 {generationId && (

@@ -6,6 +6,7 @@ import { useShallow } from "zustand/react/shallow";
 import {
   deleteGeneration,
   renameGeneration,
+  generateSimilar,
   fetchTrash,
   purgeTrash,
   restoreGeneration,
@@ -168,6 +169,13 @@ export function LibraryCard() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
       await queryClient.invalidateQueries({ queryKey: ["radio"] });
+    },
+  });
+
+  const similarMutation = useMutation({
+    mutationFn: (generationId: string) => generateSimilar(generationId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
     },
   });
 
@@ -408,6 +416,11 @@ export function LibraryCard() {
                     trackIndex: it.trackIndex,
                     title: next,
                   })
+                }
+                onSimilar={
+                  it.generationId
+                    ? () => similarMutation.mutate(it.generationId)
+                    : undefined
                 }
               />
             </div>
