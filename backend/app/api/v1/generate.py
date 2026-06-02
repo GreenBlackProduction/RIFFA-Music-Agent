@@ -22,6 +22,7 @@ from app.core.deps import current_user, db_session
 from app.core.limiter import limiter
 from app.db.models import Generation, GenerationStatus, GenerationType, User
 from app.services.mood_canonical import canonical_mood
+from app.api.v1.tracks import _RIFFA_SUFFIX as _TRK_SUFFIX, _resolve_artist, format_track_name
 
 router = APIRouter(prefix="/generate", tags=["generate"])
 
@@ -487,6 +488,20 @@ async def list_active_generations(
 # ── Similar track — remix a published Radio track ──────────────────────────
 
 
+def _extract_short_title(title: str) -> str:
+    """Strip 'Artist - ' prefix and '(RIFFAMusic)' suffix to get the bare track name.
+
+    Prevents title-duplication like 'Похожий — Похожий — ...' when chaining
+    generate_similar calls.
+    """
+    t = title.strip()
+    t = t.replace(f" {_TRK_SUFFIX}", "").replace(_TRK_SUFFIX, "").strip()
+    # 'Artist - Track Name' → 'Track Name'
+    if " - " in t:
+        t = t.split(" - ", 1)[1].strip()
+    return t or title
+
+
 def _remix_agent_params(agent_mp: dict[str, Any]) -> dict[str, Any]:
     """Light remix: keep genre+mood, shuffle techniques/instruments, jitter BPM ±10 %.
 
@@ -607,9 +622,17 @@ async def generate_similar(
         "similar_source_generation_id": generation_id,
     }
 
-    title_prefix = "Похожий" if new_type == GenerationType.song else "Похожий инструментал"
-    base_title = src.title or "трек"
-    new_title = f"{title_prefix} — {base_title}"[:120]
+    # Build canonical title for the new owner: "CurrentUser - Track Name (RIFFAMusic)".
+    # Never carry over the source's artist name or prefix-stack "Похожий — Похожий".
+    artist = _resolve_artist(user)
+    src_short = _extract_short_title(src.title or "трек")
+    new_title = format_track_name(artist, src_short)
+
+    # Populate genre/mood/tempo — fall back to agent_music_params if src fields are blank.
+    bpm_str = str(remixed_mp.get("suggested_bpm") or "").strip()
+    genre_val = (src.genre or remixed_mp.get("genre") or "")[:64]
+    mood_val = (src.mood or remixed_mp.get("mood") or "")[:32]
+    tempo_val = (src.tempo or bpm_str or "")[:32]
 
     gen = await _create_generation(
         session,
@@ -617,9 +640,9 @@ async def generate_similar(
         new_type,
         params=new_params,
         title=new_title,
-        genre=src.genre or "",
-        mood=src.mood or "",
-        tempo=src.tempo or "",
+        genre=genre_val,
+        mood=mood_val,
+        tempo=tempo_val,
         vocal=src.vocal or "" if new_type == GenerationType.song else "",
     )
     await session.commit()
