@@ -153,11 +153,16 @@ interface WizardParams {
   era: string;         // from a reference track (e.g. "2010s")
   suggestedBpm: string; // from a reference track
   refTags: string[];   // Last.fm scene tags from a reference track
+  // true only when the USER explicitly chose the value (chip / typed).
+  // Classifier pre-fills mood/tempo but we still ask — the user either
+  // confirms with a chip or types a new value; only then do we skip the step.
+  moodConfirmed: boolean;
+  tempoConfirmed: boolean;
 }
 
 const EMPTY_WIZARD: WizardParams = {
   lyrics: "", topic: "", genre: "", customGenre: "", mood: "", tempo: "", vocal: "",
-  era: "", suggestedBpm: "", refTags: [],
+  era: "", suggestedBpm: "", refTags: [], moodConfirmed: false, tempoConfirmed: false,
 };
 
 // Editable copy of the finalized brief — lets the user tweak the core params
@@ -634,8 +639,11 @@ export function AgentChat({
     const p = wizardParams.current;
     const filled = (slot: WizardPhase) =>
       slot === "genre" ? !!(p.genre || p.customGenre)
-        : slot === "mood" ? !!p.mood
-        : slot === "tempo" ? !!p.tempo
+        // mood/tempo: only skip when the USER explicitly confirmed (chip/typed).
+        // Classifier pre-fills them, but we still want to ask so the user can
+        // adjust or confirm — avoids "the agent decided for me" confusion.
+        : slot === "mood" ? p.moodConfirmed
+        : slot === "tempo" ? p.tempoConfirmed
         : slot === "vocal" ? !!p.vocal
         : false;
     const start = current === null ? 0 : seq.indexOf(current) + 1;
@@ -646,10 +654,19 @@ export function AgentChat({
   }
 
   function questionFor(phase: WizardPhase): string {
+    const p = wizardParams.current;
     switch (phase) {
       case "genre": return isEn ? "Which genre?" : "Какой жанр?";
-      case "mood":  return isEn ? "What mood?" : "Какое настроение?";
-      case "tempo": return isEn ? "Tempo?" : "Какой темп?";
+      case "mood": {
+        const hint = p.mood ? (isEn ? ` (auto: ${chips.moodLabel(p.mood)})` : ` (авто: ${chips.moodLabel(p.mood)})`) : "";
+        return isEn ? `What mood?${hint}` : `Какое настроение?${hint}`;
+      }
+      case "tempo": {
+        const hint = p.tempo
+          ? (isEn ? ` (auto: ${chips.tempoLabel(p.tempo)}${p.suggestedBpm ? `, ~${p.suggestedBpm} BPM` : ""})` : ` (авто: ${chips.tempoLabel(p.tempo)}${p.suggestedBpm ? `, ~${p.suggestedBpm} BPM` : ""})`)
+          : "";
+        return isEn ? `Tempo?${hint}` : `Какой темп?${hint}`;
+      }
       case "vocal": return isEn ? "Vocals?" : "Какой вокал?";
       default: return "";
     }
@@ -939,11 +956,13 @@ export function AgentChat({
 
   function handleMoodSelect(mood: string) {
     wizardParams.current.mood = chips.moodValue(mood);
+    wizardParams.current.moodConfirmed = true;
     advanceAfterSlot(mood, "mood");
   }
 
   function handleTempoSelect(tempo: string) {
     wizardParams.current.tempo = chips.tempoValue(tempo);
+    wizardParams.current.tempoConfirmed = true;
     advanceAfterSlot(tempo, "tempo");
   }
 
@@ -1019,8 +1038,8 @@ export function AgentChat({
       changed = true;
     } else {
       if (cls.slots.genre) { p.genre = cls.slots.genre; p.customGenre = ""; changed = true; }
-      if (cls.slots.mood) { p.mood = cls.slots.mood; changed = true; }
-      if (cls.slots.tempo) { p.tempo = cls.slots.tempo; changed = true; }
+      if (cls.slots.mood) { p.mood = cls.slots.mood; p.moodConfirmed = true; changed = true; }
+      if (cls.slots.tempo) { p.tempo = cls.slots.tempo; p.tempoConfirmed = true; changed = true; }
       if (cls.slots.vocal) { p.vocal = cls.slots.vocal; changed = true; }
       if (cls.slots.topic) { p.topic = cls.slots.topic; changed = true; }
       const m = cls.module;
@@ -1316,7 +1335,11 @@ export function AgentChat({
     // era / BPM come from a reference track (not edited) — read from musicParams.
     const mp = (result?.musicParams ?? {}) as Record<string, unknown>;
     if (typeof mp.era === "string" && mp.era) lines.push(`${isEn ? "Era" : "Эпоха"}: ${mp.era}`);
-    if (typeof mp.suggested_bpm === "string" && mp.suggested_bpm) lines.push(`BPM: ~${mp.suggested_bpm}`);
+    // Show BPM only when it agrees with the tempo label (avoid "Темп: medium / BPM: 154"
+    // contradiction that confuses users when Deezer returns a raw float outside the bucket).
+    if (typeof mp.suggested_bpm === "string" && mp.suggested_bpm && !e.tempo) {
+      lines.push(`BPM: ~${mp.suggested_bpm}`);
+    }
     return lines;
   }
 
@@ -1369,9 +1392,20 @@ export function AgentChat({
       );
     }
     if (wizardPhase === "mood") {
+      const autoMood = wizardParams.current.mood ? chips.moodLabel(wizardParams.current.mood) : null;
       return (
         <div className="agent-suggestions">
-          {chips.moodChips.map((m) => (
+          {autoMood && (
+            <button
+              key="__auto"
+              type="button"
+              className="agent-suggestion-chip agent-suggestion-chip--build"
+              onClick={() => handleMoodSelect(autoMood)}
+            >
+              {isEn ? `✓ Auto: ${autoMood}` : `✓ Авто: ${autoMood}`}
+            </button>
+          )}
+          {chips.moodChips.filter((m) => m !== autoMood).slice(0, 4).map((m) => (
             <button key={m} type="button" className="agent-suggestion-chip" onClick={() => handleMoodSelect(m)}>{m}</button>
           ))}
           {buildChip}
@@ -1379,9 +1413,21 @@ export function AgentChat({
       );
     }
     if (wizardPhase === "tempo") {
+      const autoTempo = wizardParams.current.tempo ? chips.tempoLabel(wizardParams.current.tempo) : null;
       return (
         <div className="agent-suggestions">
-          {chips.tempoChips.map((tp) => (
+          {autoTempo && (
+            <button
+              key="__auto"
+              type="button"
+              className="agent-suggestion-chip agent-suggestion-chip--build"
+              onClick={() => handleTempoSelect(autoTempo)}
+            >
+              {isEn ? `✓ Auto: ${autoTempo}` : `✓ Авто: ${autoTempo}`}
+              {wizardParams.current.suggestedBpm ? ` (~${wizardParams.current.suggestedBpm} BPM)` : ""}
+            </button>
+          )}
+          {chips.tempoChips.filter((t) => t !== autoTempo).map((tp) => (
             <button key={tp} type="button" className="agent-suggestion-chip" onClick={() => handleTempoSelect(tp)}>{tp}</button>
           ))}
           {buildChip}
