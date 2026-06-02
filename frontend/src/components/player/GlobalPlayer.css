@@ -511,6 +511,13 @@
 
   .gp-actions { justify-content: flex-end; flex-wrap: wrap; gap: 4px; }
   .gp-act--radio { display: inline-flex; font-size: 10px; padding: 0 8px; }
+
+  /* Queue dropdown: ignore JS-calculated left/width and span full screen width */
+  .gp-queue {
+    left: 8px !important;
+    right: 8px !important;
+    width: auto !important;
+  }
 }
 
 /* ── Collapsed ── */
@@ -541,6 +548,8 @@
     padding: 8px 12px !important;
     gap: 6px !important;
   }
+  /* Show bolt (⚡) in collapsed mini-player so Generate Similar is always reachable */
+  .global-player--collapsed .gp-act--bolt { display: inline-flex !important; }
   .global-player--collapsed .gp-track {
     padding: 0 4px;
     width: auto !important;
