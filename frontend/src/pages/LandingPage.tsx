@@ -20,12 +20,13 @@ function useReveal() {
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
-    const items = Array.from(root.querySelectorAll<HTMLElement>(".lp-reveal"));
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce || !("IntersectionObserver" in window)) {
-      items.forEach((i) => i.classList.add("is-in"));
-      return;
-    }
+    // Progressive enhancement: content is visible by default. Only once JS is
+    // running (and motion is allowed) do we "arm" the hide-then-reveal — so a
+    // failed observer or disabled JS can never leave sections invisible.
+    if (reduce || !("IntersectionObserver" in window)) return;
+    root.classList.add("is-armed");
+    const items = Array.from(root.querySelectorAll<HTMLElement>(".lp-reveal"));
     const io = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
@@ -35,7 +36,7 @@ function useReveal() {
           }
         });
       },
-      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+      { threshold: 0, rootMargin: "0px 0px -10% 0px" },
     );
     items.forEach((i) => io.observe(i));
     return () => io.disconnect();
@@ -79,7 +80,7 @@ export function LandingPage() {
         <MetaRow left="riffa studio · 2026" center="песни с вокалом за минуту" right="riffastudio.site" />
 
         {/* ─── HERO ─── */}
-        <section className="lp-hero lp-reveal">
+        <section className="lp-hero">
           <aside className="lp-hero__side">
             <div className="lp-kv">
               <div className="lp-kv__k">движок</div><div className="lp-kv__v">нейросеть</div>
@@ -106,7 +107,7 @@ export function LandingPage() {
         </section>
 
         {/* ─── HERO STAGE ─── */}
-        <div className="lp-stage lp-reveal">
+        <div className="lp-stage">
           <Stage dark topLeft="RIFFA · IDENTITY" bottomRight="play, twice" aspectRatio={2.4} padding={48} maxContentWidth={900}>
             <div className="lp-stage__lockup">
               <Mark size={180} variant="inverted" />
@@ -215,6 +216,7 @@ function ExamplesSection() {
   const [tracks, setTracks] = useState<RadioTrackOut[]>([]);
   const [playingKey, setPlayingKey] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -223,6 +225,25 @@ function ExamplesSection() {
       .catch(() => { if (alive) setTracks([]); });
     return () => { alive = false; };
   }, []);
+
+  // Self-reveal: this block renders *after* the async radio fetch, so the
+  // page-level reveal observer (set up at mount) never sees it. Observe our
+  // own root once the cards are in the DOM.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !("IntersectionObserver" in window)) {
+      el.classList.add("is-in");
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => { if (e.isIntersecting) { el.classList.add("is-in"); io.disconnect(); } }),
+      { threshold: 0, rootMargin: "0px 0px -10% 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [tracks.length]);
 
   const toggle = (t: RadioTrackOut) => {
     const key = `${t.id}:${t.track_index}`;
@@ -241,7 +262,7 @@ function ExamplesSection() {
   if (tracks.length === 0) return null;
 
   return (
-    <div id="lp-examples" className="lp-reveal">
+    <div id="lp-examples" ref={rootRef} className="lp-reveal">
       <SectionHead num="◆" label="примеры" title="чарт радио — послушай, что делают другие." right="топ по прослушиваниям" />
       <div className="lp-ex-grid">
         {tracks.map((t) => {

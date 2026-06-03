@@ -267,7 +267,9 @@
 .lp-ex-grid {
   margin-top: var(--r-s-5);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* minmax(0,1fr) lets columns shrink below content so the long nowrap titles
+     ellipsis instead of forcing the 3rd column to overflow the row. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   background: var(--r-rule);
   border: 1px solid var(--r-rule);
@@ -302,14 +304,17 @@
 .lp-ex__plays { color: var(--r-ink-2); }
 .lp-ex-foot { margin-top: var(--r-s-5); display: flex; justify-content: center; }
 
-/* ── SCROLL REVEAL ── */
-.lp-reveal {
+/* ── SCROLL REVEAL ──
+   Progressive enhancement: .lp-reveal is fully visible by default. The hook
+   adds .is-armed to .r-app only when JS runs + motion is allowed, which is
+   when the hide-then-reveal kicks in. JS off → everything stays visible. */
+.r-app.is-armed .lp-reveal {
   opacity: 0;
   transform: translateY(18px);
   transition: opacity 620ms cubic-bezier(0.2, 0.7, 0.2, 1), transform 620ms cubic-bezier(0.2, 0.7, 0.2, 1);
   will-change: opacity, transform;
 }
-.lp-reveal.is-in { opacity: 1; transform: none; }
+.r-app.is-armed .lp-reveal.is-in { opacity: 1; transform: none; }
 
 /* ── RESPONSIVE ── */
 @media (max-width: 960px) {
@@ -320,7 +325,7 @@
   .lp-hero { grid-template-columns: 1fr; gap: var(--r-s-4); }
   .lp-types { grid-template-columns: 1fr 1fr; }
   .lp-foot { grid-template-columns: 1fr 1fr; }
-  .lp-ex-grid { grid-template-columns: 1fr 1fr; }
+  .lp-ex-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 @media (max-width: 560px) {
   .lp-types { grid-template-columns: 1fr; }
