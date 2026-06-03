@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import {
   loginWithEmail,
+  loginWithGoogle,
   loginWithTelegramInitData,
   loginWithTelegramWidget,
   pollBotLinkLogin,
@@ -17,6 +18,8 @@ import { useT } from "@/lib/i18n";
 import "./LoginPage.css";
 
 const TG_BOT = (import.meta.env.VITE_TG_BOT_USERNAME as string | undefined) ?? "The_Riffa_bot";
+const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ?? "";
+const GOOGLE_GSI_SRC = "https://accounts.google.com/gsi/client";
 
 /** First login → /guide, subsequent logins → /studio. Marker stored locally. */
 function firstVisitDest(): string {
@@ -40,9 +43,28 @@ interface TgWidgetData {
   hash: string;
 }
 
+// Minimal Google Identity Services typings (we only touch these two methods).
+interface GoogleIdConfig {
+  client_id: string;
+  callback: (response: { credential?: string }) => void;
+}
+interface GoogleButtonOptions {
+  theme?: string;
+  size?: string;
+  width?: number;
+  text?: string;
+  shape?: string;
+  logo_alignment?: string;
+}
+interface GoogleAccountsId {
+  initialize: (config: GoogleIdConfig) => void;
+  renderButton: (el: HTMLElement, options: GoogleButtonOptions) => void;
+}
+
 declare global {
   interface Window {
     _riffa_tg_auth?: (data: TgWidgetData) => void;
+    google?: { accounts?: { id?: GoogleAccountsId } };
   }
 }
 
@@ -62,6 +84,8 @@ export function LoginPage() {
   const [tgBtnError, setTgBtnError] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const tgLoadingRef = useRef(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+  const googleBtnRef = useRef<HTMLDivElement | null>(null);
 
   // ── Bot-link auth: state for the magic-link via bot flow ──────────────────
   const [botLinkStatus, setBotLinkStatus] = useState<
@@ -170,6 +194,63 @@ export function LoginPage() {
       }
     };
   }, []);
+
+  // ── Google sign-in (Google Identity Services) ──────────────────────────────
+  // Google verifies the email, so this is an instant verified login: the user
+  // gets the welcome bonus and skips the (unwired) email magic-link step.
+  const handleGoogleCredential = useCallback(
+    async (credential: string) => {
+      setGoogleError(null);
+      try {
+        await loginWithGoogle(credential);
+        await refresh();
+        navigate(firstVisitDest(), { replace: true });
+      } catch (err) {
+        setGoogleError(toMessage(err) || t.errors.generic);
+      }
+    },
+    [navigate, refresh, t],
+  );
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+
+    const renderBtn = () => {
+      const gid = window.google?.accounts?.id;
+      const host = googleBtnRef.current;
+      if (!gid || !host) return;
+      gid.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: (resp) => {
+          if (resp?.credential) void handleGoogleCredential(resp.credential);
+        },
+      });
+      host.innerHTML = "";
+      gid.renderButton(host, {
+        theme: "filled_black",
+        size: "large",
+        width: 300,
+        text: "continue_with",
+        shape: "pill",
+        logo_alignment: "center",
+      });
+    };
+
+    if (window.google?.accounts?.id) {
+      renderBtn();
+      return;
+    }
+    let script = document.querySelector<HTMLScriptElement>(`script[src="${GOOGLE_GSI_SRC}"]`);
+    if (!script) {
+      script = document.createElement("script");
+      script.src = GOOGLE_GSI_SRC;
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+    script.addEventListener("load", renderBtn, { once: true });
+    return () => { script?.removeEventListener("load", renderBtn); };
+  }, [handleGoogleCredential]);
 
   async function handleBotLinkLogin() {
     if (botLinkStatus === "waiting") return;
@@ -385,6 +466,19 @@ export function LoginPage() {
             {tgError && <div className="login-error">{tgError}</div>}
             <p className="muted login-hint">{t.telegram.miniHint}</p>
           </section>
+
+          {GOOGLE_CLIENT_ID && (
+            <section className="login-block login-block--google">
+              <div className="login-google">
+                <div ref={googleBtnRef} className="login-google__btn" />
+              </div>
+              {googleError && (
+                <p className="muted login-hint" style={{ color: "var(--accent)", textAlign: "center" }}>
+                  {googleError}
+                </p>
+              )}
+            </section>
+          )}
 
           <div className="login-divider"><span>{t.divider}</span></div>
 

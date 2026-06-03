@@ -202,6 +202,16 @@ export function loginWithEmail(
   });
 }
 
+/** Sign in with a Google Identity Services ID token (the `credential` field). */
+export function loginWithGoogle(
+  credential: string,
+): Promise<{ user_id: number; created: boolean }> {
+  return apiFetch("/api/v1/auth/google", {
+    method: "POST",
+    body: JSON.stringify({ credential }),
+  });
+}
+
 export function requestEmailMagicLink(email: string): Promise<{ status: string }> {
   return apiFetch("/api/v1/auth/email/request", {
     method: "POST",

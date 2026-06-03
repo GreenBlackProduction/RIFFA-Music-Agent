@@ -737,3 +737,14 @@
 }
 
 .login-bot-gate__btn:hover { background: var(--hi); border-color: var(--hi); }
+
+/* Google sign-in — center the GIS-rendered button. */
+.login-block--google { padding-top: 4px; padding-bottom: 4px; }
+.login-google {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 44px;
+}
+.login-google__btn { display: inline-flex; }
+.login-google__btn iframe { margin: 0 auto !important; }
