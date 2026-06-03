@@ -467,19 +467,6 @@ export function LoginPage() {
             <p className="muted login-hint">{t.telegram.miniHint}</p>
           </section>
 
-          {GOOGLE_CLIENT_ID && (
-            <section className="login-block login-block--google">
-              <div className="login-google">
-                <div ref={googleBtnRef} className="login-google__btn" />
-              </div>
-              {googleError && (
-                <p className="muted login-hint" style={{ color: "var(--accent)", textAlign: "center" }}>
-                  {googleError}
-                </p>
-              )}
-            </section>
-          )}
-
           <div className="login-divider"><span>{t.divider}</span></div>
 
           <section className="login-block">
@@ -610,6 +597,20 @@ export function LoginPage() {
             )}
 
             {emailStatus === "error" && emailError && <div className="login-error">{emailError}</div>}
+
+            {GOOGLE_CLIENT_ID && (
+              <>
+                <div className="login-divider login-divider--sm"><span>{t.divider}</span></div>
+                <div className="login-google">
+                  <div ref={googleBtnRef} className="login-google__btn" />
+                </div>
+                {googleError && (
+                  <p className="muted login-hint" style={{ color: "var(--accent)", textAlign: "center" }}>
+                    {googleError}
+                  </p>
+                )}
+              </>
+            )}
           </section>
 
           <footer className="login-footer">
