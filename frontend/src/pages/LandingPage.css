@@ -335,3 +335,78 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-reveal { opacity: 1; transform: none; transition: none; }
 }
+
+/* ════════════════════════════════════════════════
+   EDIT MODE (?edit=1) — visual tweak panel (beta only)
+   ════════════════════════════════════════════════ */
+body.lp-editing [data-edit] { cursor: pointer; }
+body.lp-editing [data-edit]:hover { outline: 1px dashed rgba(255, 59, 31, 0.6); outline-offset: 2px; }
+.lp-edit-selected { outline: 2px solid var(--r-hi) !important; outline-offset: 2px; }
+
+.lp-edit-panel {
+  position: fixed;
+  right: 16px; bottom: 16px;
+  z-index: 9999;
+  width: 300px;
+  max-height: 86vh;
+  overflow-y: auto;
+  background: #161413;
+  color: #E9E5DA;
+  border: 1px solid rgba(233, 229, 218, 0.25);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  padding: 14px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+}
+.lp-edit-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
+.lp-edit-head strong { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+.lp-edit-sel { color: var(--r-hi); font-size: 10px; }
+.lp-edit-hint { color: rgba(233, 229, 218, 0.6); line-height: 1.5; font-size: 11px; margin: 0 0 12px; }
+
+.lp-edit-controls { display: flex; flex-direction: column; gap: 9px; }
+.lp-edit-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lp-edit-row > span { color: rgba(233, 229, 218, 0.7); text-transform: uppercase; letter-spacing: 0.04em; flex: 1; }
+.lp-edit-row input[type="number"],
+.lp-edit-row select {
+  width: 78px; background: #0c0b0a; color: #E9E5DA;
+  border: 1px solid rgba(233, 229, 218, 0.25); padding: 4px 6px;
+  font-family: inherit; font-size: 11px; border-radius: 0;
+}
+.lp-edit-row input[type="range"] { width: 110px; accent-color: #FF3B1F; }
+
+.lp-edit-seg { display: flex; }
+.lp-edit-seg button {
+  width: 30px; height: 26px; background: #0c0b0a; color: #E9E5DA;
+  border: 1px solid rgba(233, 229, 218, 0.25); cursor: pointer; font-size: 13px;
+}
+.lp-edit-seg button.on { background: var(--r-hi); border-color: var(--r-hi); color: #fff; }
+
+.lp-edit-swatches { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.lp-edit-swatches button {
+  width: 20px; height: 20px; border: 1px solid rgba(233, 229, 218, 0.3);
+  cursor: pointer; padding: 0; color: #E9E5DA; font-size: 12px; line-height: 1;
+}
+.lp-edit-swatches button.on { outline: 2px solid var(--r-hi); outline-offset: 1px; }
+.lp-edit-swatches input[type="color"] { width: 24px; height: 22px; padding: 0; border: 1px solid rgba(233,229,218,0.3); background: none; cursor: pointer; }
+
+.lp-edit-reset {
+  margin-top: 4px; background: transparent; color: rgba(233, 229, 218, 0.7);
+  border: 1px solid rgba(233, 229, 218, 0.25); padding: 6px; cursor: pointer; font-family: inherit; font-size: 11px;
+}
+.lp-edit-reset:hover { color: #E9E5DA; border-color: rgba(233, 229, 218, 0.5); }
+
+.lp-edit-foot { display: flex; gap: 6px; margin-top: 14px; }
+.lp-edit-copy {
+  flex: 1; background: var(--r-hi); color: #fff; border: none; padding: 9px;
+  cursor: pointer; font-family: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
+}
+.lp-edit-copy:hover { background: #e02e14; }
+.lp-edit-resetall {
+  background: transparent; color: rgba(233, 229, 218, 0.6);
+  border: 1px solid rgba(233, 229, 218, 0.25); padding: 9px; cursor: pointer; font-family: inherit; font-size: 11px;
+}
+.lp-edit-export {
+  margin-top: 10px; width: 100%; height: 70px; resize: vertical;
+  background: #0c0b0a; color: rgba(233, 229, 218, 0.8);
+  border: 1px solid rgba(233, 229, 218, 0.2); font-family: inherit; font-size: 10px; padding: 6px; border-radius: 0;
+}

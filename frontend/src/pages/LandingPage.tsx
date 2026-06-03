@@ -11,7 +11,10 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { fetchRadio, type RadioTrackOut } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth";
 import { Button, Mark, MetaRow, Pill, SectionHead, Stage, TwoCol, Wordmark } from "./landing/brand";
+import { EditMode } from "./landing/EditMode";
 import "./LandingPage.css";
+
+const EDIT_MODE = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("edit") === "1";
 
 /* Reveal-on-scroll: добавляет .is-in элементам .lp-reveal при попадании во
    вьюпорт. Уважает prefers-reduced-motion (тогда показываем сразу). */
@@ -24,7 +27,8 @@ function useReveal() {
     // Progressive enhancement: content is visible by default. Only once JS is
     // running (and motion is allowed) do we "arm" the hide-then-reveal — so a
     // failed observer or disabled JS can never leave sections invisible.
-    if (reduce || !("IntersectionObserver" in window)) return;
+    // In edit mode everything stays visible so the owner can tweak any block.
+    if (reduce || EDIT_MODE || !("IntersectionObserver" in window)) return;
     root.classList.add("is-armed");
     const items = Array.from(root.querySelectorAll<HTMLElement>(".lp-reveal"));
     const io = new IntersectionObserver(
@@ -55,7 +59,8 @@ export function LandingPage() {
   const revealRef = useReveal();
 
   // Залогиненных — сразу в студию, маркетинговая главная им не нужна.
-  if (!isLoading && user) return <Navigate to="/studio" replace />;
+  // В режиме правок (?edit=1) не редиректим — чтобы можно было редактировать.
+  if (!isLoading && user && !EDIT_MODE) return <Navigate to="/studio" replace />;
 
   return (
     <div className="r-app" ref={revealRef}>
@@ -80,8 +85,8 @@ export function LandingPage() {
         <MetaRow left="riffa studio · 2026" center="песни с вокалом за минуту" right="riffastudio.site" />
 
         {/* ─── HERO ─── */}
-        <section className="lp-hero">
-          <aside className="lp-hero__side">
+        <section className="lp-hero" data-edit="hero">
+          <aside className="lp-hero__side" data-edit="hero-spec">
             <div className="lp-kv">
               <div className="lp-kv__k">движок</div><div className="lp-kv__v">нейросеть</div>
               <div className="lp-kv__k">песня</div><div className="lp-kv__v">≈1–2 мин</div>
@@ -92,14 +97,14 @@ export function LandingPage() {
             </div>
           </aside>
           <div>
-            <h1 className="lp-h1">
+            <h1 className="lp-h1" data-edit="hero-title">
               сделай <em>песню</em>.<br />любую <span className="lp-h1__emr">песню</span>.
             </h1>
-            <p className="lp-lede">
+            <p className="lp-lede" data-edit="hero-lede">
               RIFFA Studio — онлайн-сервис на русском, который собирает полноценную песню с вокалом за минуту.{" "}
               <b>Опиши идею словами</b> — или попроси агента: он сам задаст вопросы и соберёт промт. Готово — скачиваешь в MP3 или WAV.
             </p>
-            <div className="lp-cta">
+            <div className="lp-cta" data-edit="hero-cta">
               <Button variant="primary" size="lg" href="/studio">создать песню →</Button>
               <Button variant="ghost" size="lg" onClick={scrollToExamples}>послушать примеры</Button>
             </div>
@@ -107,7 +112,7 @@ export function LandingPage() {
         </section>
 
         {/* ─── HERO STAGE ─── */}
-        <div className="lp-stage">
+        <div className="lp-stage" data-edit="stage">
           <Stage dark topLeft="RIFFA · IDENTITY" bottomRight="play, twice" aspectRatio={2.4} padding={48} maxContentWidth={900}>
             <div className="lp-stage__lockup">
               <Mark size={180} variant="inverted" />
@@ -120,7 +125,7 @@ export function LandingPage() {
         <ExamplesSection />
 
         {/* ─── ЧТО МОЖНО СОЗДАТЬ ─── */}
-        <div className="lp-reveal">
+        <div className="lp-reveal" data-edit="types">
           <SectionHead num="01" label="что можно создать" title="пять типов на одном экране." right="все на одних токенах" />
           <div className="lp-types">
             <TypeCard num="01" name="Песня с вокалом" desc="2–4 минуты · м/ж голос · с куплетами и припевом" meta="MP3 · WAV" />
@@ -132,7 +137,7 @@ export function LandingPage() {
         </div>
 
         {/* ─── КАК ПОЛЬЗОВАТЬСЯ ─── */}
-        <div className="lp-reveal">
+        <div className="lp-reveal" data-edit="steps">
           <SectionHead num="02" label="как пользоваться" title="три шага, около минуты." right="60 сек" />
           <TwoCol label="Шаг 01" description="Опиши идею своими словами" note="Можно на русском, в свободной форме. До 500 символов. Или попроси агента — он сам задаст вопросы.">
             <div className="lp-step">
@@ -159,9 +164,9 @@ export function LandingPage() {
         </div>
 
         {/* ─── ИТОГОВЫЙ CTA ─── */}
-        <div className="lp-cta-block lp-reveal">
-          <h2 className="lp-cta-block__title">стартовые токены — бесплатно.</h2>
-          <p className="lp-cta-block__sub">
+        <div className="lp-cta-block lp-reveal" data-edit="cta-block">
+          <h2 className="lp-cta-block__title" data-edit="cta-title">стартовые токены — бесплатно.</h2>
+          <p className="lp-cta-block__sub" data-edit="cta-sub">
             Регистрация по email, через Google или Telegram. Дальше — пакеты от 100 ₽, оплата картой РФ через Robokassa или Telegram Stars.
           </p>
           <div className="lp-cta-block__btns">
@@ -171,7 +176,7 @@ export function LandingPage() {
         </div>
 
         {/* ─── FOOTER ─── */}
-        <footer className="lp-foot">
+        <footer className="lp-foot" data-edit="footer">
           <div><b>продукт</b><LpLink href="/studio">студия</LpLink><LpLink href="/radio">радио</LpLink><LpLink href="/guide">гайд</LpLink></div>
           <div><b>контакт</b><LpLink href="https://t.me/The_Riffa_bot">telegram-бот</LpLink><LpLink href="https://t.me/RiffaSupportBot">поддержка</LpLink></div>
           <div><b>правовое</b><LpLink href="/docs/offer.txt">условия</LpLink><LpLink href="/docs/privacy.txt">приватность</LpLink></div>
@@ -183,6 +188,7 @@ export function LandingPage() {
           <span>сделано в россии</span>
         </div>
       </div>
+      {EDIT_MODE && <EditMode />}
     </div>
   );
 }
@@ -191,7 +197,7 @@ export function LandingPage() {
 
 function TypeCard({ num, name, desc, meta }: { num: string; name: string; desc: string; meta: string }) {
   return (
-    <div className="lp-type">
+    <div className="lp-type" data-edit="type-card">
       <div className="lp-type__num">{num}</div>
       <h3 className="lp-type__name">{name}</h3>
       <p className="lp-type__desc">{desc}</p>
@@ -262,7 +268,7 @@ function ExamplesSection() {
   if (tracks.length === 0) return null;
 
   return (
-    <div id="lp-examples" ref={rootRef} className="lp-reveal">
+    <div id="lp-examples" ref={rootRef} className="lp-reveal" data-edit="examples">
       <SectionHead num="◆" label="примеры" title="чарт радио — послушай, что делают другие." right="топ по прослушиваниям" />
       <div className="lp-ex-grid">
         {tracks.map((t) => {
