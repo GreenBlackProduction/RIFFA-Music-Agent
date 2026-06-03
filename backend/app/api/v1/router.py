@@ -20,6 +20,7 @@ from app.api.v1 import (
     upload,
     upload_new,
     users,
+    webhooks,
     ws,
 )
 
@@ -41,4 +42,5 @@ api_router.include_router(reviews.router)
 api_router.include_router(share.router)
 api_router.include_router(tracks.router)
 api_router.include_router(legal.router)
+api_router.include_router(webhooks.router)
 api_router.include_router(ws.router)

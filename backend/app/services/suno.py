@@ -92,12 +92,20 @@ class SunoLyricsResult:
 
 
 class SunoClient:
-    def __init__(self, api_key: str, base_url: str = _SUNO_BASE) -> None:
+    def __init__(
+        self, api_key: str, base_url: str = _SUNO_BASE, callback_url: str = ""
+    ) -> None:
         self._headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
         self._base = base_url.rstrip("/")
+        # Suno requires a callBackUrl. We poll for results regardless, so this
+        # is only a courtesy ping — but it should hit our own backend, not a
+        # hardcoded third-party domain.
+        self._callback_url = (callback_url or "").strip() or (
+            "https://riffastudio.site/api/v1/webhooks/suno"
+        )
 
     # ------------------------------------------------------------------ internal
 
@@ -266,7 +274,7 @@ class SunoClient:
             "customMode": True,
             "instrumental": instrumental,
             "model": "V5_5",
-            "callBackUrl": "https://google.com",
+            "callBackUrl": self._callback_url,
         }
         if vocal_gender in {"m", "f"}:
             payload["vocalGender"] = vocal_gender
@@ -303,7 +311,7 @@ class SunoClient:
         """
         payload: dict[str, Any] = {
             "prompt": prompt[:200],
-            "callBackUrl": "https://google.com",
+            "callBackUrl": self._callback_url,
         }
 
         if progress_cb:
@@ -436,7 +444,7 @@ class SunoClient:
                 "model": "V5_5",
                 "style": clean_style,
                 "title": clean_title,
-                "callBackUrl": "https://google.com",
+                "callBackUrl": self._callback_url,
             }
         elif prompt:
             payload = {
@@ -447,7 +455,7 @@ class SunoClient:
                 "style": clean_style,
                 "title": clean_title,
                 "prompt": prompt[:5000],
-                "callBackUrl": "https://google.com",
+                "callBackUrl": self._callback_url,
             }
         else:
             # Custom Mode requires prompt when not instrumental; without lyrics
@@ -461,7 +469,7 @@ class SunoClient:
                 "instrumental": False,
                 "model": "V5_5",
                 "prompt": desc,
-                "callBackUrl": "https://google.com",
+                "callBackUrl": self._callback_url,
             }
         if vocal_gender in {"m", "f"} and not instrumental:
             payload["vocalGender"] = vocal_gender
@@ -504,14 +512,14 @@ class SunoClient:
                 "defaultParamFlag": False,
                 "audioId": audio_id,
                 "model": "V5_5",
-                "callBackUrl": "https://google.com",
+                "callBackUrl": self._callback_url,
             }
         else:
             payload = {
                 "defaultParamFlag": True,
                 "audioId": audio_id,
                 "model": "V5_5",
-                "callBackUrl": "https://google.com",
+                "callBackUrl": self._callback_url,
                 "prompt": prompt[:5000],
                 "style": style[:1000],
                 "title": title[:100],
@@ -541,7 +549,7 @@ class SunoClient:
         progress_cb: ProgressCb | None = None,
     ) -> str:
         """Returns WAV URL."""
-        payload = {"taskId": task_id, "audioId": audio_id, "callBackUrl": "https://google.com"}
+        payload = {"taskId": task_id, "audioId": audio_id, "callBackUrl": self._callback_url}
 
         if progress_cb:
             progress_cb({"step": "submitting_wav"})
@@ -600,4 +608,8 @@ class SunoClient:
 
 
 def make_suno_client(settings: Any) -> SunoClient:
-    return SunoClient(api_key=settings.suno_api_key, base_url=settings.suno_base_url)
+    return SunoClient(
+        api_key=settings.suno_api_key,
+        base_url=settings.suno_base_url,
+        callback_url=getattr(settings, "suno_callback_url", "") or "",
+    )
