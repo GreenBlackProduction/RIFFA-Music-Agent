@@ -1451,48 +1451,12 @@
   gap: 8px;
 }
 
-.doc-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
-  background: var(--rule-soft);
-  border: 1px solid var(--border);
-  color: var(--text);
-  text-decoration: none;
-  min-width: 0;
-  overflow: hidden;
-  transition: border-color 160ms ease, background 160ms ease;
-}
-
-.doc-row:hover { border-color: rgba(124, 255, 31, 0.4); background: var(--paper-3); }
-
-.doc-row > div {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.doc-row strong {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.doc-row small {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.doc-row > span { flex-shrink: 0; }
+/* The canonical .doc-row layout is the grid above (32px 1fr auto): icon │
+   left-aligned text column │ chevron. An older flex/space-between override
+   that lived here fought that grid and scattered the text — removed so every
+   row's title/hint lines up on the same left grid column.
+   .doc-row > div keeps the text cell from overflowing the 1fr column. */
+.doc-row > div { min-width: 0; }
 
 /* ─────────── Отзывы ─────────── */
 
