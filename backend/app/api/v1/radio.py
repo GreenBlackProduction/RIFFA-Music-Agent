@@ -6,11 +6,13 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel
+from redis.asyncio import Redis
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import Settings, get_settings
 from app.core.deps import current_user, current_user_optional, db_session
 from app.services.mood_canonical import canonical_mood
 from app.db.models import (
@@ -200,6 +202,14 @@ def _to_out(
         published_at=(gen.published_at or gen.created_at).isoformat(),
         is_own=is_own,
     )
+
+
+def _client_ip(request: Request) -> str:
+    """Real client IP behind the nginx proxy (X-Forwarded-For first hop)."""
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "anon"
 
 
 def _period_threshold(period: str) -> datetime | None:
@@ -556,19 +566,29 @@ async def vote_track(
 
     track_index = int(body.track_index or 0)
 
+    # Lock the generation row for the duration of the vote so concurrent voters
+    # on the same track can't lose each other's counter increments (the
+    # track_stats JSON is read-modify-write).
     gen = (
         await session.execute(
             select(Generation).where(
                 Generation.id == gid,
                 Generation.is_public.is_(True),
                 Generation.status == GenerationStatus.completed,
-            )
+            ).with_for_update()
         )
     ).scalar_one_or_none()
 
     if gen is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="track not found"
+        )
+
+    # No self-voting — an author can't pad their own track's score.
+    if gen.user_id == me.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="нельзя голосовать за свой трек",
         )
 
     existing = (
@@ -627,13 +647,18 @@ async def vote_track(
 @router.post("/{gen_id}/play", status_code=status.HTTP_204_NO_CONTENT)
 async def record_play(
     gen_id: str,
+    request: Request,
     body: PlayRequest | None = None,
+    me: User | None = Depends(current_user_optional),
+    settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(db_session),
 ) -> Response:
     """Increment the per-track play counter. Anonymous-friendly.
 
-    Accepts a JSON body with ``track_index`` (defaults to 0 if omitted) so
-    the legacy /play call without a body still works for the first variant.
+    Anti-inflation: each viewer (user id when logged in, else client IP) counts
+    at most once per track per 5 minutes — a Redis NX key throttles repeats so
+    a curl loop can't pump the "by plays" chart. The 204 is returned either way
+    so the player never sees an error.
     """
     try:
         gid = uuid.UUID(gen_id)
@@ -644,13 +669,27 @@ async def record_play(
 
     track_index = int(body.track_index) if body is not None else 0
 
+    viewer = f"u{me.id}" if me is not None else _client_ip(request)
+    throttle_key = f"radio:play:{viewer}:{gid}:{track_index}"
+    redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    try:
+        fresh = await redis.set(throttle_key, "1", ex=300, nx=True)
+    except Exception:
+        fresh = True  # Redis hiccup → don't block legitimate plays.
+    finally:
+        await redis.aclose()  # type: ignore[attr-defined]
+    if not fresh:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+    # Lock the row so concurrent plays don't lose increments (track_stats is
+    # read-modify-write on a JSON column).
     gen = (
         await session.execute(
             select(Generation).where(
                 Generation.id == gid,
                 Generation.is_public.is_(True),
                 Generation.status == GenerationStatus.completed,
-            )
+            ).with_for_update()
         )
     ).scalar_one_or_none()
 

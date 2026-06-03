@@ -25,7 +25,9 @@ from typing import Any, Literal
 
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+
+from app.core.limiter import limiter
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from openai import AsyncOpenAI
@@ -1618,7 +1620,9 @@ async def _stream_agent_completion(
 
 
 @router.post("/chat", response_model=AgentChatResponse)
+@limiter.limit("30/minute")
 async def agent_chat(
+    request: Request,
     body: AgentChatRequest,
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),
@@ -1673,7 +1677,9 @@ async def agent_chat(
     except Exception as exc:
         logger.warning("agent_chat: stats lookup failed for user {}: {}", user.id, exc)
 
-    for m in body.messages:
+    # Only the windowed slice (last 40 turns) goes to GPT — keeps token cost and
+    # latency bounded on long chats and avoids blowing the model context.
+    for m in windowed:
         chat_messages.append(
             {
                 "role": "assistant" if m.role == "agent" else "user",
@@ -1831,7 +1837,9 @@ def _postprocess_agent_reply(
 
 
 @router.post("/chat/stream")
+@limiter.limit("30/minute")
 async def agent_chat_stream(
+    request: Request,
     body: AgentChatRequest,
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),
@@ -1896,7 +1904,8 @@ async def agent_chat_stream(
     except Exception as exc:
         logger.warning("agent_chat_stream: stats lookup failed for user {}: {}", user.id, exc)
 
-    for m in body.messages:
+    # Only the windowed slice (last 40 turns) goes to GPT — see agent_chat.
+    for m in windowed:
         chat_messages.append(
             {
                 "role": "assistant" if m.role == "agent" else "user",
@@ -2002,7 +2011,9 @@ class AgentClassifyResponse(BaseModel):
 
 
 @router.post("/classify", response_model=AgentClassifyResponse)
+@limiter.limit("30/minute")
 async def agent_classify(
+    request: Request,
     body: AgentClassifyRequest,
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),

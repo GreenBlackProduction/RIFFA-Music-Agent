@@ -190,6 +190,40 @@ def _ws_url(request: Request, gen_id: str) -> str:
     return f"{scheme}://{host}/api/v1/ws/generation/{gen_id}"
 
 
+async def _find_idempotent(
+    session: AsyncSession,
+    user_id: int,
+    gen_type: GenerationType,
+    idempotency_key: str,
+) -> Generation | None:
+    """Return a recent generation created by this user under the same
+    idempotency key, if any. Guards against double-submits (network retry,
+    double-click) that would otherwise create two generations and charge twice.
+
+    Window is 1 hour — long enough to absorb retries, short enough that an
+    intentional re-run an hour later still goes through.
+    """
+    if not idempotency_key:
+        return None
+    from datetime import datetime, timedelta, timezone
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+    return (
+        await session.execute(
+            select(Generation)
+            .where(
+                Generation.user_id == user_id,
+                Generation.type == gen_type,
+                Generation.deleted_at.is_(None),
+                Generation.created_at >= cutoff,
+                Generation.params["idempotency_key"].astext == idempotency_key,
+            )
+            .order_by(Generation.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
 async def _create_generation(
     session: AsyncSession,
     user: User,
@@ -200,7 +234,16 @@ async def _create_generation(
     mood: str = "",
     tempo: str = "",
     vocal: str = "",
-) -> Generation:
+    idempotency_key: str = "",
+) -> tuple[Generation, bool]:
+    """Create a queued generation, or return an existing one for a repeated
+    idempotency key. Returns ``(generation, created)`` — ``created=False`` means
+    the caller must NOT re-enqueue or re-charge (it's a duplicate submit).
+    """
+    existing = await _find_idempotent(session, user.id, gen_type, idempotency_key)
+    if existing is not None:
+        return existing, False
+
     cost = COSTS.get(gen_type, 0)
     if not user.is_admin and user.balance_tokens < cost:
         raise HTTPException(
@@ -231,7 +274,7 @@ async def _create_generation(
     )
     session.add(gen)
     await session.flush()
-    return gen
+    return gen, True
 
 
 # ---------------------------------------------------------------------------
@@ -240,6 +283,7 @@ async def _create_generation(
 
 
 @router.post("/song", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("20/minute")
 async def generate_song(
     body: SongRequest,
     request: Request,
@@ -247,7 +291,7 @@ async def generate_song(
     session: AsyncSession = Depends(db_session),
     settings: Settings = Depends(get_settings),
 ) -> GenerateResponse:
-    gen = await _create_generation(
+    gen, created = await _create_generation(
         session,
         user,
         GenerationType.song,
@@ -257,15 +301,18 @@ async def generate_song(
         mood=body.mood,
         tempo=body.tempo,
         vocal=body.vocal,
+        idempotency_key=body.idempotency_key,
     )
     await session.commit()
-    await _enqueue(settings.redis_url, str(gen.id))
+    if created:
+        await _enqueue(settings.redis_url, str(gen.id))
     return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
 
 
 @router.post(
     "/instrumental", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED
 )
+@limiter.limit("20/minute")
 async def generate_instrumental(
     body: InstrumentalRequest,
     request: Request,
@@ -273,7 +320,7 @@ async def generate_instrumental(
     session: AsyncSession = Depends(db_session),
     settings: Settings = Depends(get_settings),
 ) -> GenerateResponse:
-    gen = await _create_generation(
+    gen, created = await _create_generation(
         session,
         user,
         GenerationType.instrumental,
@@ -282,15 +329,18 @@ async def generate_instrumental(
         genre=body.genre or body.custom_genre,
         mood=body.mood,
         tempo=body.tempo,
+        idempotency_key=body.idempotency_key,
     )
     await session.commit()
-    await _enqueue(settings.redis_url, str(gen.id))
+    if created:
+        await _enqueue(settings.redis_url, str(gen.id))
     return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
 
 
 @router.post(
     "/sound_effect", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED
 )
+@limiter.limit("20/minute")
 async def generate_sound_effect(
     body: SoundEffectRequest,
     request: Request,
@@ -300,21 +350,24 @@ async def generate_sound_effect(
 ) -> GenerateResponse:
     # Use supplied track_name; fall back to first 60 chars of the user's prompt.
     title = body.track_name.strip() or body.prompt.strip()[:60]
-    gen = await _create_generation(
+    gen, created = await _create_generation(
         session,
         user,
         GenerationType.sound_effect,
         params=body.model_dump(),
         title=title,
+        idempotency_key=body.idempotency_key,
     )
     await session.commit()
-    await _enqueue(settings.redis_url, str(gen.id))
+    if created:
+        await _enqueue(settings.redis_url, str(gen.id))
     return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
 
 
 @router.post(
     "/cover_art", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED
 )
+@limiter.limit("20/minute")
 async def generate_cover_art(
     body: CoverArtRequest,
     request: Request,
@@ -323,19 +376,22 @@ async def generate_cover_art(
     settings: Settings = Depends(get_settings),
 ) -> GenerateResponse:
     title = body.title.strip() or body.prompt.strip()[:60] or "Обложка"
-    gen = await _create_generation(
+    gen, created = await _create_generation(
         session,
         user,
         GenerationType.cover_art,
         params=body.model_dump(),
         title=title,
+        idempotency_key=body.idempotency_key,
     )
     await session.commit()
-    await _enqueue(settings.redis_url, str(gen.id))
+    if created:
+        await _enqueue(settings.redis_url, str(gen.id))
     return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
 
 
 @router.post("/occasion", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("20/minute")
 async def generate_occasion(
     body: OccasionRequest,
     request: Request,
@@ -344,7 +400,7 @@ async def generate_occasion(
     settings: Settings = Depends(get_settings),
 ) -> GenerateResponse:
     # Occasion uses song under the hood
-    gen = await _create_generation(
+    gen, created = await _create_generation(
         session,
         user,
         GenerationType.occasion,
@@ -352,15 +408,18 @@ async def generate_occasion(
         genre=body.genre,
         mood=body.mood,
         vocal=body.vocal,
+        idempotency_key=body.idempotency_key,
     )
     await session.commit()
-    await _enqueue(settings.redis_url, str(gen.id))
+    if created:
+        await _enqueue(settings.redis_url, str(gen.id))
     return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
 
 
 @router.post(
     "/cover_song", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED
 )
+@limiter.limit("20/minute")
 async def generate_cover_song(
     body: CoverSongRequest,
     request: Request,
@@ -390,7 +449,7 @@ async def generate_cover_song(
     )
     cover_title = format_track_name(artist, f"{base} Cover V{version}")
 
-    gen = await _create_generation(
+    gen, created = await _create_generation(
         session,
         user,
         GenerationType.cover_song,
@@ -399,13 +458,16 @@ async def generate_cover_song(
         genre=body.genre or body.custom_genre,
         mood=body.mood,
         tempo=body.tempo,
+        idempotency_key=body.idempotency_key,
     )
     await session.commit()
-    await _enqueue(settings.redis_url, str(gen.id))
+    if created:
+        await _enqueue(settings.redis_url, str(gen.id))
     return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
 
 
 @router.post("/extend", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED)
+@limiter.limit("20/minute")
 async def extend_track(
     body: ExtendRequest,
     request: Request,
@@ -413,20 +475,23 @@ async def extend_track(
     session: AsyncSession = Depends(db_session),
     settings: Settings = Depends(get_settings),
 ) -> GenerateResponse:
-    gen = await _create_generation(
+    gen, created = await _create_generation(
         session,
         user,
         GenerationType.extend,
         params=body.model_dump(),
+        idempotency_key=body.idempotency_key,
     )
     await session.commit()
-    await _enqueue(settings.redis_url, str(gen.id))
+    if created:
+        await _enqueue(settings.redis_url, str(gen.id))
     return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
 
 
 @router.post(
     "/wav_convert", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED
 )
+@limiter.limit("20/minute")
 async def convert_to_wav(
     body: WavConvertRequest,
     request: Request,
@@ -452,15 +517,17 @@ async def convert_to_wav(
 
     wav_title = f"{parent_title} WAV" if parent_title else "WAV"
 
-    gen = await _create_generation(
+    gen, created = await _create_generation(
         session,
         user,
         GenerationType.wav_convert,
         params=body.model_dump(),
         title=wav_title,
+        idempotency_key=body.idempotency_key,
     )
     await session.commit()
-    await _enqueue(settings.redis_url, str(gen.id))
+    if created:
+        await _enqueue(settings.redis_url, str(gen.id))
     return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
 
 
@@ -621,6 +688,7 @@ def _remix_agent_params(agent_mp: dict[str, Any]) -> dict[str, Any]:
     response_model=GenerateResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
+@limiter.limit("20/minute")
 async def generate_similar(
     generation_id: str,
     request: Request,
@@ -712,7 +780,7 @@ async def generate_similar(
     mood_val = (src.mood or remixed_mp.get("mood") or "")[:32]
     tempo_val = (src.tempo or bpm_str or "")[:32]
 
-    gen = await _create_generation(
+    gen, created = await _create_generation(
         session,
         user,
         new_type,
@@ -724,7 +792,8 @@ async def generate_similar(
         vocal=src.vocal or "" if new_type == GenerationType.song else "",
     )
     await session.commit()
-    await _enqueue(settings.redis_url, str(gen.id))
+    if created:
+        await _enqueue(settings.redis_url, str(gen.id))
     return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
 
 

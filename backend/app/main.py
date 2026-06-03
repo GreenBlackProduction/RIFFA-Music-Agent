@@ -53,10 +53,17 @@ def _resolve_static_dir() -> Path | None:
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     settings = get_settings()
+    # Hide the interactive API schema in production. Endpoints are auth-gated,
+    # but exposing the full surface + Swagger "try it out" is needless attack
+    # recon. In dev/staging the docs stay on for convenience.
+    _docs_enabled = settings.app_env != "production"
     app = FastAPI(
         title=settings.app_name,
         version=__version__,
         lifespan=lifespan,
+        docs_url="/docs" if _docs_enabled else None,
+        redoc_url="/redoc" if _docs_enabled else None,
+        openapi_url="/openapi.json" if _docs_enabled else None,
     )
 
     # Rate limiting
