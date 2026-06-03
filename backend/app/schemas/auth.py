@@ -47,6 +47,14 @@ class EmailPasswordLoginRequest(BaseModel):
     password: str
 
 
+class GoogleLoginPayload(BaseModel):
+    """Body posted by the frontend after Google Identity Services returns an
+    ID token (the ``credential`` field of the GIS callback)."""
+
+    credential: str
+    referral_code: str | None = None
+
+
 class EmailVerifyResponse(BaseModel):
     ok: bool
     user_id: int

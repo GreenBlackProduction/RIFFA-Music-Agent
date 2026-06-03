@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.email import InvalidEmailError, normalize_email, send_magic_link
+from app.auth.google import GoogleAuthError, verify_google_id_token
 from app.auth.telegram import (
     TelegramAuthError,
     verify_init_data,
@@ -31,6 +32,7 @@ from app.schemas.auth import (
     EmailPasswordLoginRequest,
     EmailRegisterRequest,
     EmailVerifyResponse,
+    GoogleLoginPayload,
     TelegramInitDataPayload,
     TelegramLoginPayload,
 )
@@ -329,7 +331,8 @@ async def email_verify_login(
         email = read_email_token(token)
     except TokenError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    user, _ = await get_or_create_user_by_email(session, email)
+    # Magic-link possession proves email ownership → verified.
+    user, _ = await get_or_create_user_by_email(session, email, verified=True)
     await session.commit()
     _set_session_cookie(response, settings, make_session_token(user.id))
     return EmailVerifyResponse(ok=True, user_id=user.id)
@@ -393,6 +396,54 @@ async def email_password_login(
     await session.commit()
     _set_session_cookie(response, settings, make_session_token(user.id))
     return {"user_id": user.id}
+
+
+@router.post("/google", status_code=status.HTTP_200_OK)
+@limiter.limit("20/minute")
+async def google_login(
+    request: Request,
+    payload: GoogleLoginPayload,
+    response: Response,
+    settings: Settings = Depends(get_settings),
+    session: AsyncSession = Depends(db_session),
+) -> dict[str, int | bool]:
+    """Verify a Google Identity Services ID token, set the session cookie.
+
+    Google has already verified the email, so this is a *verified* sign-in:
+    the user gets the welcome bonus (once) and can use the service without the
+    email magic-link step (which isn't wired in production).
+    """
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Google sign-in is not configured",
+        )
+    try:
+        account = await verify_google_id_token(payload.credential, settings.google_client_id)
+    except GoogleAuthError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    try:
+        email = normalize_email(account.email)
+    except InvalidEmailError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    user, created = await get_or_create_user_by_email(
+        session,
+        email,
+        referral_code=payload.referral_code,
+        verified=True,
+        display_name=account.name,
+        avatar_url=account.picture,
+        source="google",
+    )
+    await session.commit()
+
+    if user.is_banned:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="banned")
+
+    _set_session_cookie(response, settings, make_session_token(user.id))
+    return {"user_id": user.id, "created": created}
 
 
 @router.post("/logout")

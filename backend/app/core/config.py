@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     # Redis / queue
     redis_url: str = "redis://localhost:6379/0"
 
+    # Google sign-in (Google Identity Services ID-token flow).
+    # Only the public OAuth Web client_id is needed — no client secret.
+    google_client_id: str = ""
+
     # Telegram
     telegram_bot_token: str = ""
     telegram_bot_username: str = "The_Riffa_bot"
@@ -60,6 +64,9 @@ class Settings(BaseSettings):
     # External AI APIs
     suno_api_key: str = ""
     suno_base_url: str = "https://api.sunoapi.org/api/v1"
+    # Where Suno POSTs the async result. We poll regardless (source of truth),
+    # but a real RIFFA endpoint beats pinging an unrelated third party.
+    suno_callback_url: str = ""
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     apiyi_key: str = ""
