@@ -21,11 +21,11 @@ import asyncio
 import json
 import re
 from collections import Counter
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 
 from app.core.limiter import limiter
 from fastapi.responses import StreamingResponse
@@ -1625,7 +1625,7 @@ async def _stream_agent_completion(
 @router.post("/chat", response_model=AgentChatResponse)
 @limiter.limit("30/minute")
 async def agent_chat(
-    body: AgentChatRequest,
+    body: Annotated[AgentChatRequest, Body()],
     request: Request,
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),
@@ -1842,7 +1842,7 @@ def _postprocess_agent_reply(
 @router.post("/chat/stream")
 @limiter.limit("30/minute")
 async def agent_chat_stream(
-    body: AgentChatRequest,
+    body: Annotated[AgentChatRequest, Body()],
     request: Request,
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),
@@ -2016,7 +2016,7 @@ class AgentClassifyResponse(BaseModel):
 @router.post("/classify", response_model=AgentClassifyResponse)
 @limiter.limit("30/minute")
 async def agent_classify(
-    body: AgentClassifyRequest,
+    body: Annotated[AgentClassifyRequest, Body()],
     request: Request,
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),
