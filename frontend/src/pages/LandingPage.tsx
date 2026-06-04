@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
+import { fetchRadio, type RadioTrackOut } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth";
 import { EditMode } from "./landing/EditMode";
 import "./LandingPage.css";
@@ -139,6 +140,18 @@ export function LandingPage() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
   const [activeTrack, setActiveTrack] = useState<number | null>(null);
+  const [hoverTrack, setHoverTrack] = useState<number | null>(null);
+  const [realRadioTracks, setRealRadioTracks] = useState<RadioTrackOut[]>([]);
+  const radioAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Fetch real radio tracks for the landing chart
+  useEffect(() => {
+    let alive = true;
+    fetchRadio({ sort: "plays", period: "week", limit: 6 })
+      .then((r) => { if (alive && r.items.length > 0) setRealRadioTracks(r.items); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 10);
@@ -212,14 +225,27 @@ export function LandingPage() {
     { h: "Ждите около 2–4 минут.", p: "Нейросеть обрабатывает промт, пишет структуру, лирику и рендерит аудио. Прогресс виден в карточке задачи.", tip: "≈ от 30 сек для треков\n≈ 20 сек для обложки" },
     { h: "Скачайте MP3 или WAV. Используйте где угодно.", p: "Без копирайта — заливайте в YouTube, TikTok, Reels, на стриминги. Все треки хранятся в профиле.", tip: "mp3 · конвертация в wav без сжатия" },
   ];
-  const tracks = [
-    { rank: "01", title: "Монолог в дождь", genre: "Ло-фай", mood: "меланхолия", dur: "2:48" },
-    { rank: "02", title: "Последний автобус", genre: "Поп", mood: "ностальгия", dur: "3:12" },
-    { rank: "03", title: "Северный ветер", genre: "Инструментал", mood: "атмосфера", dur: "4:05" },
-    { rank: "04", title: "Апрельский джаз", genre: "Джаз", mood: "лёгкость", dur: "3:44" },
-    { rank: "05", title: "Летний кавер", genre: "Кавер", mood: "энергия", dur: "2:58" },
-    { rank: "06", title: "Городские огни", genre: "R&B", mood: "вечер", dur: "3:28" },
+  // Fallback demo tracks shown until real ones load
+  const demoTracks = [
+    { rank: "01", title: "Монолог в дождь", genre: "Ло-фай", mood: "меланхолия", dur: "2:48", audioUrl: "" },
+    { rank: "02", title: "Последний автобус", genre: "Поп", mood: "ностальгия", dur: "3:12", audioUrl: "" },
+    { rank: "03", title: "Северный ветер", genre: "Инструментал", mood: "атмосфера", dur: "4:05", audioUrl: "" },
+    { rank: "04", title: "Апрельский джаз", genre: "Джаз", mood: "лёгкость", dur: "3:44", audioUrl: "" },
+    { rank: "05", title: "Летний кавер", genre: "Кавер", mood: "энергия", dur: "2:58", audioUrl: "" },
+    { rank: "06", title: "Городские огни", genre: "R&B", mood: "вечер", dur: "3:28", audioUrl: "" },
   ];
+  const tracks = realRadioTracks.length > 0
+    ? realRadioTracks.slice(0, 6).map((t, i) => ({
+        rank: String(i + 1).padStart(2, "0"),
+        title: t.title || "Без названия",
+        genre: t.genre || "–",
+        mood: t.mood || "",
+        dur: t.duration > 0 ? `${Math.floor(t.duration / 60)}:${String(t.duration % 60).padStart(2, "0")}` : "–",
+        audioUrl: t.audio_url,
+      }))
+    : demoTracks;
+  // Cycling brand colours for rank numbers: emerald → orange → dark
+  const rankColors = ["#0F5D47", "#FF3B1F", "#161413"];
   const bars = [
     [4, 9, 13, 6, 15, 8, 5, 11, 7, 12, 9, 4, 8, 10, 6], [6, 11, 8, 14, 6, 12, 10, 5, 8, 13, 7, 9, 11, 6, 8],
     [8, 5, 12, 10, 6, 14, 9, 7, 11, 5, 8, 12, 6, 9, 7], [5, 12, 7, 9, 14, 6, 10, 8, 5, 11, 7, 12, 9, 6, 10],
@@ -371,25 +397,53 @@ export function LandingPage() {
             <div className="right" style={{ fontSize: "15px" }}>обновляется еженедельно</div>
           </div>
           <div className="radio-chart" style={{ borderColor: c.rule }}>
-            {tracks.map((tr, i) => (
-              <div key={i} className="radio-track" style={{ borderColor: c.rule, background: activeTrack === i ? "rgba(22,20,19,0.04)" : "transparent" }}>
-                <div className="radio-rank" style={{ color: activeTrack === i ? c.accent : c.ink, opacity: activeTrack === i ? 1 : 0.2 }}>{tr.rank}</div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: c.ink }}>{tr.title}</div>
-                  <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", opacity: 0.5, marginTop: 3, color: c.ink }}>{tr.genre} · {tr.mood}</div>
+            {tracks.map((tr, i) => {
+              const isActive = activeTrack === i;
+              const isHover = hoverTrack === i;
+              // Rank colour: on hover cycle through brand colours; active uses accent
+              const rankCol = isActive ? c.accent : isHover ? rankColors[i % 3] : c.ink;
+              const rankOp  = isActive || isHover ? 1 : 0.2;
+              const playFill = isActive ? c.accent : c.rule;
+              return (
+                <div
+                  key={i}
+                  className="radio-track"
+                  style={{ borderColor: c.rule, background: isActive ? "rgba(22,20,19,0.04)" : "transparent" }}
+                  onMouseEnter={() => setHoverTrack(i)}
+                  onMouseLeave={() => setHoverTrack(null)}
+                >
+                  <div className="radio-rank" style={{ color: rankCol, opacity: rankOp }}>{tr.rank}</div>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: c.ink }}>{tr.title}</div>
+                    <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.06em", opacity: 0.5, marginTop: 3, color: c.ink }}>{tr.genre}{tr.mood ? ` · ${tr.mood}` : ""}</div>
+                  </div>
+                  <svg width="110" height="28" viewBox="0 0 110 28" style={{ opacity: isActive ? 1 : 0.3 }}>
+                    {bars[i].map((h, j) => <rect key={j} x={j * 7.5} y={(28 - h) / 2} width="5" height={h} rx="2.5" fill={isActive && j < 9 ? rankCol : c.ink} />)}
+                  </svg>
+                  <div className="radio-dur" style={{ color: c.ink }}>{tr.dur}</div>
+                  <button
+                    className="radio-play-btn"
+                    style={{ borderColor: playFill, background: isActive ? c.accent : "transparent" }}
+                    onClick={() => {
+                      const audio = radioAudioRef.current;
+                      if (!audio) return;
+                      if (isActive) { audio.pause(); setActiveTrack(null); return; }
+                      if (tr.audioUrl) {
+                        audio.src = tr.audioUrl;
+                        void audio.play().catch(() => {});
+                      }
+                      setActiveTrack(i);
+                    }}
+                  >
+                    {isActive
+                      ? <svg width="10" height="12" viewBox="0 0 10 12" fill="#E9E5DA"><rect x="0" y="0" width="3.5" height="12"/><rect x="6.5" y="0" width="3.5" height="12"/></svg>
+                      : <svg width="10" height="12" viewBox="0 0 10 12" fill={c.ink}><polygon points="0,0 10,6 0,12"/></svg>}
+                  </button>
                 </div>
-                <svg width="110" height="28" viewBox="0 0 110 28" style={{ opacity: activeTrack === i ? 1 : 0.3 }}>
-                  {bars[i].map((h, j) => <rect key={j} x={j * 7.5} y={(28 - h) / 2} width="5" height={h} rx="2.5" fill={activeTrack === i && j < 9 ? c.accent : c.ink} />)}
-                </svg>
-                <div className="radio-dur" style={{ color: c.ink }}>{tr.dur}</div>
-                <button className="radio-play-btn" style={{ borderColor: activeTrack === i ? c.accent : c.rule, background: activeTrack === i ? c.accent : "transparent" }} onClick={() => setActiveTrack(activeTrack === i ? null : i)}>
-                  {activeTrack === i
-                    ? <svg width="10" height="12" viewBox="0 0 10 12" fill="#E9E5DA"><rect x="0" y="0" width="3.5" height="12" /><rect x="6.5" y="0" width="3.5" height="12" /></svg>
-                    : <svg width="10" height="12" viewBox="0 0 10 12" fill={c.ink}><polygon points="0,0 10,6 0,12" /></svg>}
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
+          <audio ref={radioAudioRef} onEnded={() => setActiveTrack(null)} preload="none" crossOrigin="anonymous" />
           <div className="radio-cta-wrap">
             <button className="btn-ghost" style={{ color: c.accent, borderColor: c.accent, height: 46, fontSize: 13, letterSpacing: "1.5px", padding: "0 28px" }} onClick={go("/studio")}>Создать свой трек →</button>
           </div>
@@ -465,15 +519,22 @@ export function LandingPage() {
 /* ═══════════ TRACK INTERACTIONS SECTION ═══════════ */
 function TrackInteractionsSection() {
   type ActionVariant = "emr" | "accent" | "hi" | "default";
-  // Icons match the actual SVGs used in the app (GlobalPlayer/FileActions)
+  // Icons from the real app (GlobalPlayer/FileActions)
+  const IcoDown = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+  const IcoBolt = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M9 2L4 9h4l-1 5 5-7H8l1-5z" fill="currentColor"/></svg>;
+  const IcoUp   = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 13V5M5 8l3-3 3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 14h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>;
+  const IcoThumb = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>;
+  const IcoPen  = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+  const IcoLink = () => <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>;
+
   const actions: { n: string; icon: React.ReactNode; label: string; desc: string; variant: ActionVariant }[] = [
-    { n: "1", icon: <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>, label: "MP3", desc: "Скачать трек", variant: "emr" },
-    { n: "2", icon: <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>, label: "WAV", desc: "Конвертировать в WAV", variant: "hi" },
-    { n: "3", icon: <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M9 2L4 9h4l-1 5 5-7H8l1-5z" fill="currentColor"/></svg>, label: "Похожий", desc: "Создать похожий трек", variant: "hi" },
-    { n: "4", icon: <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 3v10M3 8l5 5 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 13h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>, label: "Радио", desc: "Отправить на радио", variant: "accent" },
-    { n: "5", icon: <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>, label: "Лайк / Дизлайк", desc: "Оценить трек", variant: "default" },
-    { n: "6", icon: <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>, label: "Переименовать", desc: "Переименовать трек", variant: "hi" },
-    { n: "7", icon: <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>, label: "Поделиться", desc: "Поделиться ссылкой", variant: "hi" },
+    { n: "1", icon: <IcoDown />,  label: "MP3",           desc: "Скачать трек",              variant: "emr"     },
+    { n: "2", icon: <IcoDown />,  label: "WAV",           desc: "Конвертировать в WAV",       variant: "hi"      },
+    { n: "3", icon: <IcoBolt />,  label: "Похожий",       desc: "Создать похожий трек",       variant: "hi"      },
+    { n: "4", icon: <IcoUp />,    label: "Радио",         desc: "Отправить трек на радио",    variant: "accent"  },
+    { n: "5", icon: <IcoThumb />, label: "Лайк / Дизлайк", desc: "Оценить трек",             variant: "default" },
+    { n: "6", icon: <IcoPen />,   label: "Переименовать", desc: "Сменить название файла",     variant: "hi"      },
+    { n: "7", icon: <IcoLink />,  label: "Поделиться",    desc: "Поделиться страницей песни", variant: "hi"      },
   ];
 
   return (
@@ -503,11 +564,11 @@ function TrackInteractionsSection() {
                 return (
                   <div key={a.n} className="track-action-card" style={{ borderColor: c.rule }}>
                     <div className="tac-badge" style={{ background: col }}>{a.n}</div>
-                    <div className="tac-label" style={{ color: col, display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ color: col, display: "flex", alignItems: "center" }}>{a.icon}</span>
-                      {a.label}
+                    <div className="tac-name-col">
+                      <span className="tac-icon" style={{ color: col }}>{a.icon}</span>
+                      <span className="tac-label" style={{ color: col }}>{a.label}</span>
                     </div>
-                    <div className="tac-desc" style={{ color: c.ink }}>{a.desc}</div>
+                    <div className="tac-desc">{a.desc}</div>
                   </div>
                 );
               })}

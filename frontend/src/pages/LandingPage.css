@@ -116,8 +116,9 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .price-features { display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .rl-root .price-features li { font-size: 13.5px; line-height: 1.4; opacity: 0.75; list-style: none; padding-left: 16px; position: relative; }
 .rl-root .price-features li::before { content: "—"; position: absolute; left: 0; opacity: 0.4; }
-.rl-root .price-cta { margin-top: 16px; height: 44px; width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; cursor: pointer; border: 1px solid; transition: opacity 0.15s, transform 0.12s, background 0.2s; }
-.rl-root .price-cta:hover { opacity: 0.85; transform: translateY(-1px); }
+.rl-root .price-cta { margin-top: 16px; height: 44px; width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; cursor: pointer; border: 1px solid; transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.12s; }
+.rl-root .price-cta:hover { background: #0F5D47 !important; color: #E9E5DA !important; border-color: #0F5D47 !important; transform: translateY(-2px); opacity: 1; }
+.rl-root .price-card.featured .price-cta:hover { background: rgb(220,99,40) !important; border-color: rgb(220,99,40) !important; }
 .rl-root .price-cta:active { transform: scale(0.97); }
 
 /* AGENT */
@@ -179,26 +180,33 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .interactions-actions { display: flex; flex-direction: column; gap: 8px; }
 .rl-root .track-action-card {
   display: grid;
-  grid-template-columns: 28px 80px 1fr;
+  grid-template-columns: 26px auto 1fr;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 10px 14px;
+  padding: 9px 14px;
   border: 1px solid;
-  transition: background 0.15s, transform 0.15s;
+  transition: background 0.15s, transform 0.12s;
 }
-.rl-root .track-action-card:hover { background: rgba(22,20,19,0.03); transform: translateX(4px); }
+.rl-root .track-action-card:hover { background: rgba(22,20,19,0.03); transform: translateX(3px); }
 .rl-root .tac-badge {
   width: 22px; height: 22px; border-radius: 50%;
   display: grid; place-items: center;
   font-family: 'JetBrains Mono', monospace; font-size: 10px;
-  font-weight: 700; color: #E9E5DA;
-  flex-shrink: 0;
+  font-weight: 700; color: #E9E5DA; flex-shrink: 0;
 }
+.rl-root .tac-name-col {
+  display: flex; align-items: center; gap: 7px;
+}
+.rl-root .tac-icon { display: flex; align-items: center; flex-shrink: 0; }
 .rl-root .tac-label {
   font-family: 'JetBrains Mono', monospace; font-size: 11px;
-  letter-spacing: 0.04em; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.04em; font-weight: 700; text-transform: uppercase;
+  white-space: nowrap;
 }
-.rl-root .tac-desc { font-size: 13px; line-height: 1.4; opacity: 0.7; }
+.rl-root .tac-desc {
+  font-size: 12px; line-height: 1.4; opacity: 0.65;
+  text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* RESPONSIVE */
 @media (max-width: 768px) {
