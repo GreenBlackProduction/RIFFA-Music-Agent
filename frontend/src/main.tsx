@@ -17,12 +17,6 @@ const queryClient = new QueryClient({
   },
 });
 
-// Register Service Worker so the browser keeps the page alive in background
-// and doesn't kill audio playback when the screen locks on mobile.
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-}
-
 document.addEventListener("visibilitychange", () => {
   const hidden = document.hidden;
   document.body.classList.toggle("page-hidden", hidden);

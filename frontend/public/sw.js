@@ -1,21 +1,22 @@
-// Service Worker for caching static assets (production only)
-const CACHE_NAME = 'riffa-v2';
-
-self.addEventListener('install', () => {
-  self.skipWaiting();
-});
+// Tombstone service worker.
+//
+// The previous version was a pass-through (`fetch(event.request)` for every
+// request). Once it controlled a page, it re-issued cross-origin requests
+// (Google Fonts) as `fetch()` — which reclassifies them from `style-src` to
+// `connect-src` and trips the page CSP, and it broke Vite's lazy CSS preload
+// (white screen on returning visits). It cached nothing, so it had no upside.
+//
+// This version intercepts no requests (no `fetch` handler), clears any old
+// caches, and unregisters itself. Returning browsers fetch this file on their
+// next navigation (sw.js is served no-cache), evict the old worker, and from
+// then on every request is handled natively by the browser.
+self.addEventListener('install', () => self.skipWaiting());
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) =>
-      Promise.all(cacheNames.map((name) => caches.delete(name)))
-    )
-  );
-});
-
-// Pass through all requests — no caching during Vite dev server usage.
-// The SW is kept registered so a future production build can activate
-// a real caching strategy without re-requesting permissions.
-self.addEventListener('fetch', (event) => {
-  event.respondWith(fetch(event.request));
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+    await self.clients.claim();
+    await self.registration.unregister();
+  })());
 });
