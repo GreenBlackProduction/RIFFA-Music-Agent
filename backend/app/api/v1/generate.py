@@ -1,7 +1,5 @@
 """Generation endpoints — queues Arq tasks and returns generation_id + ws_url."""
 
-from __future__ import annotations
-
 import random
 import re as _re_naming
 import secrets
