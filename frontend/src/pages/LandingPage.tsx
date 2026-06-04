@@ -465,14 +465,15 @@ export function LandingPage() {
 /* ═══════════ TRACK INTERACTIONS SECTION ═══════════ */
 function TrackInteractionsSection() {
   type ActionVariant = "emr" | "accent" | "hi" | "default";
-  const actions: { n: string; label: string; desc: string; variant: ActionVariant }[] = [
-    { n: "1", label: "↓ MP3",      desc: "Скачать трек",          variant: "emr" },
-    { n: "2", label: "↓ WAV",      desc: "Конвертировать в WAV",   variant: "hi" },
-    { n: "3", label: "⟳ похожий",  desc: "Создать похожий трек",   variant: "hi" },
-    { n: "4", label: "◎ радио",    desc: "Отправить на радио",     variant: "accent" },
-    { n: "5", label: "♥ / ✕",      desc: "Лайк / Дизлайк",        variant: "default" },
-    { n: "6", label: "✎ имя",      desc: "Переименовать трек",     variant: "hi" },
-    { n: "7", label: "⛓ ссылка",   desc: "Поделиться треком",      variant: "hi" },
+  // Icons match the actual SVGs used in the app (GlobalPlayer/FileActions)
+  const actions: { n: string; icon: React.ReactNode; label: string; desc: string; variant: ActionVariant }[] = [
+    { n: "1", icon: <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>, label: "MP3", desc: "Скачать трек", variant: "emr" },
+    { n: "2", icon: <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 2v8M5 7l3 3 3-3M3 13h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>, label: "WAV", desc: "Конвертировать в WAV", variant: "hi" },
+    { n: "3", icon: <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M9 2L4 9h4l-1 5 5-7H8l1-5z" fill="currentColor"/></svg>, label: "Похожий", desc: "Создать похожий трек", variant: "hi" },
+    { n: "4", icon: <svg viewBox="0 0 16 16" width="13" height="13" fill="none"><path d="M8 3v10M3 8l5 5 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 13h12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>, label: "Радио", desc: "Отправить на радио", variant: "accent" },
+    { n: "5", icon: <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>, label: "Лайк / Дизлайк", desc: "Оценить трек", variant: "default" },
+    { n: "6", icon: <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>, label: "Переименовать", desc: "Переименовать трек", variant: "hi" },
+    { n: "7", icon: <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>, label: "Поделиться", desc: "Поделиться ссылкой", variant: "hi" },
   ];
 
   return (
@@ -497,22 +498,19 @@ function TrackInteractionsSection() {
               нажми кнопку <strong>⚡</strong> на карточке трека.
             </p>
             <div className="interactions-actions">
-              {actions.map((a) => (
-                <div key={a.n} className="track-action-card" style={{ borderColor: c.rule }}>
-                  <div className="tac-badge" style={{
-                    background: a.variant === "accent" ? c.accent
-                      : a.variant === "emr" ? "#0F5D47"
-                      : a.variant === "hi" ? "#FF3B1F"
-                      : c.ink,
-                  }}>{a.n}</div>
-                  <div className="tac-label" style={{
-                    color: a.variant === "emr" ? "#0F5D47"
-                      : a.variant === "hi" ? "#FF3B1F"
-                      : c.ink,
-                  }}>{a.label}</div>
-                  <div className="tac-desc" style={{ color: c.ink }}>{a.desc}</div>
-                </div>
-              ))}
+              {actions.map((a) => {
+                const col = a.variant === "accent" ? c.accent : a.variant === "emr" ? "#0F5D47" : a.variant === "hi" ? "#FF3B1F" : c.ink;
+                return (
+                  <div key={a.n} className="track-action-card" style={{ borderColor: c.rule }}>
+                    <div className="tac-badge" style={{ background: col }}>{a.n}</div>
+                    <div className="tac-label" style={{ color: col, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ color: col, display: "flex", alignItems: "center" }}>{a.icon}</span>
+                      {a.label}
+                    </div>
+                    <div className="tac-desc" style={{ color: c.ink }}>{a.desc}</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -616,15 +614,15 @@ function TrackCardSVG() {
 
         {/* Row 1 — 4 buttons at y=142, h=32, gap=10 */}
         {/* Available width: x=32 to x=508 = 476. Four buttons + 3 gaps(10) = 30 → 446/4 = 111 each */}
-        {actionBtn(32,  142, 111, "1", "↓  MP3",     "emr")}
-        {actionBtn(153, 142, 111, "2", "↓  WAV",     "hi")}
-        {actionBtn(274, 142, 111, "3", "⟳  похожий", "hi")}
-        {actionBtn(395, 142, 113, "4", "◎  радио",   "accent")}
+        {actionBtn(32,  142, 111, "1", "↓ MP3",        "emr")}
+        {actionBtn(153, 142, 111, "2", "↓ WAV",        "hi")}
+        {actionBtn(274, 142, 111, "3", "⚡ похожий",   "hi")}
+        {actionBtn(395, 142, 113, "4", "↑ радио",      "accent")}
 
         {/* Row 2 — 3 buttons at y=182, h=32, gap=10 */}
-        {actionBtn(32,  182, 152, "5", "♥  /  ✕  оценить",   "default")}
-        {actionBtn(194, 182, 152, "6", "✎  переименовать",    "hi")}
-        {actionBtn(356, 182, 152, "7", "⛓  поделиться",       "hi")}
+        {actionBtn(32,  182, 152, "5", "👍 / 👎 оценить",    "default")}
+        {actionBtn(194, 182, 152, "6", "✏️ переименовать",    "hi")}
+        {actionBtn(356, 182, 152, "7", "🔗 поделиться",       "hi")}
 
         {/* ── Info strip (y 226–280) ── */}
         <line x1="20" y1="226" x2="520" y2="226" stroke={rule} strokeWidth="0.8" />

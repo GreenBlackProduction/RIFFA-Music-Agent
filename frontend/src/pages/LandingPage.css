@@ -26,7 +26,12 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 /* NAV */
 .rl-root .nav { position: fixed; top: 0; left: 0; right: 0; width: 100%; z-index: 100; border-bottom: 1px solid; padding: 14px 0; backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4); transition: background 0.3s, border-color 0.3s, box-shadow 0.3s; }
 .rl-root .nav.glass { backdrop-filter: blur(24px) saturate(1.5); -webkit-backdrop-filter: blur(24px) saturate(1.5); box-shadow: 0 1px 0 rgba(22,20,19,0.06); }
-.rl-root .nav-inner { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 24px; }
+/* Logo at left edge · links truly centred · CTA at right edge */
+.rl-root .nav .wrap { }
+.rl-root .nav-inner { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; }
+.rl-root .nav-brand { justify-self: start; }
+.rl-root .nav-links { justify-self: center; }
+.rl-root .nav-cta { justify-self: end; }
 .rl-root .nav-brand { display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; }
 .rl-root .nav-links { display: flex; gap: 22px; justify-self: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
 .rl-root .nav-links a { text-decoration: none; opacity: 0.55; transition: opacity 0.15s, color 0.2s; cursor: pointer; }
@@ -99,7 +104,12 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .pricing-grid { margin-top: 40px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border: 1px solid; }
 .rl-root .price-card { padding: 32px 28px; border-right: 1px solid; display: flex; flex-direction: column; gap: 14px; transition: background 0.2s, transform 0.15s; }
 .rl-root .price-card:last-child { border-right: none; }
-.rl-root .price-card:not(.featured):hover { transform: translateY(-2px); }
+/* Pricing cards: strong branded hover — each non-featured tier gets its colour */
+.rl-root .price-card:not(.featured):hover { transform: translateY(-3px); box-shadow: 0 6px 24px rgba(22,20,19,0.10); }
+.rl-root .price-card:nth-child(1):hover { border-color: #161413 !important; }
+.rl-root .price-card:nth-child(2):hover { border-color: #161413 !important; }
+.rl-root .price-card:nth-child(3):hover { border-color: #0F5D47 !important; background: rgba(15,93,71,0.04) !important; }
+.rl-root .price-card:nth-child(4).featured:hover { transform: translateY(-3px); box-shadow: 0 8px 32px rgba(220,99,40,0.25); }
 .rl-root .price-tier { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; }
 .rl-root .price-amount { font-family: 'Archivo Black', sans-serif; font-size: 52px; font-weight: 900; letter-spacing: -0.04em; line-height: 1; margin: 4px 0; }
 .rl-root .price-tokens { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.04em; opacity: 0.7; padding: 6px 0; border-top: 1px solid; border-bottom: 1px solid; }
@@ -129,7 +139,8 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .radio-chart { margin-top: 40px; border: 1px solid; }
 .rl-root .radio-track { display: grid; grid-template-columns: 52px 1fr 110px 52px 44px; align-items: center; gap: 16px; padding: 16px 24px; border-bottom: 1px solid; transition: background 0.15s, transform 0.15s; }
 .rl-root .radio-track:last-child { border-bottom: none; }
-.rl-root .radio-track:hover { transform: translateX(4px); }
+.rl-root .radio-track:hover { transform: translateX(4px); background: rgba(22,20,19,0.05) !important; border-left: 3px solid var(--radio-hi, #FF3B1F); padding-left: 21px; }
+.rl-root .radio-track:hover .radio-rank { opacity: 1; color: #FF3B1F; }
 .rl-root .radio-rank { font-family: 'Archivo Black', sans-serif; font-size: 28px; font-weight: 900; letter-spacing: -0.05em; line-height: 1; }
 .rl-root .radio-dur { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; opacity: 0.55; text-align: right; }
 .rl-root .radio-play-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid; display: grid; place-items: center; cursor: pointer; transition: background 0.15s, border-color 0.15s; background: transparent; }
