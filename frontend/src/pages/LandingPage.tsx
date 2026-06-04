@@ -196,8 +196,9 @@ export function LandingPage() {
   const go = (href: string) => () => { if (/^https?:\/\//.test(href)) window.open(href, "_blank", "noopener"); else navigate(href); };
   const scrollTo = (id: string) => (e: React.MouseEvent) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }); };
 
-  const glassBg = scrolled ? "rgba(233,229,218,0.95)" : "rgba(233,229,218,0.6)";
-  const navToSection: Record<string, string> = { types: "студия", agent: "агент", radio: "радио", pricing: "тарифы", interactions: "радио" };
+  // Nav is always 95% opaque so it reads well on any scroll position.
+  const glassBg = "rgba(233,229,218,0.95)";
+  const navToSection: Record<string, string> = { types: "студия", agent: "агент", process: "как пользоваться", radio: "радио", pricing: "тарифы", interactions: "радио" };
 
   const types = [{ name: t.t1, sub: t.t1sub }, { name: t.t2, sub: t.t2sub }, { name: t.t3, sub: t.t3sub }, { name: t.t4, sub: t.t4sub }, { name: t.t5, sub: t.t5sub }];
   const agentFeatures = [
@@ -242,7 +243,13 @@ export function LandingPage() {
               <span style={{ color: c.ink, fontFamily: "system-ui, sans-serif", fontWeight: 700, fontSize: 22 }}>RIFFA Studio AI</span>
             </div>
             <div className="nav-links">
-              {[["#types","types","студия"],["#agent","agent","агент"],["#radio","radio","радио"],["#pricing","pricing","тарифы"]].map(([href, id, label]) => (
+              {[
+                ["#types",   "types",   "студия"],
+                ["#agent",   "agent",   "агент"],
+                ["#process", "process", "как пользоваться"],
+                ["#radio",   "radio",   "радио"],
+                ["#pricing", "pricing", "тарифы"],
+              ].map(([href, id, label]) => (
                 <a key={id} href={href} style={{ color: c.ink }} className={navToSection[activeSection] === label ? "active" : ""} onClick={scrollTo(id)}>{label}</a>
               ))}
             </div>
@@ -263,14 +270,20 @@ export function LandingPage() {
               <h1 className="hero-headline" data-edit="hero-title" style={{ color: "rgb(209, 98, 42)", fontSize: "95px", whiteSpace: "pre-line" }}>
                 Создай <span style={{ color: "#232323" }}>свой</span> <span style={{ fontSize: "107px", color: "rgb(15, 93, 71)" }}>Аудиохит!</span>
               </h1>
-              <p className="hero-sub" data-edit="hero-sub" style={{ color: c.ink, letterSpacing: "0.02em", fontWeight: 600, margin: "28px 0 22px", lineHeight: "1.6", fontSize: "17px", maxWidth: "540px" }}>{t.subheadline}</p>
-              <div className="hero-actions" style={{ margin: "20px 69px 0px 0px" }}>
+              <div className="hero-actions" style={{ marginTop: "36px" }}>
                 <button className="btn-primary" style={{ background: c.accent, color: "#E9E5DA", height: 52, padding: "0 32px", fontSize: "13px", letterSpacing: "1.5px" }} onClick={go("/studio")}>{t.ctaMain}</button>
                 <button className="btn-ghost" style={{ color: "#EC560B", borderColor: "#EC560B", padding: "0 28px", fontSize: "13px", letterSpacing: "1px", height: 52 }} onClick={scrollTo("radio")}>{t.ctaSecond}</button>
               </div>
             </div>
             <SchematicSVG />
           </div>
+          {/* Subheadline — full width below both columns */}
+          <p data-edit="hero-sub" style={{
+            color: c.ink, letterSpacing: "0.02em", fontWeight: 500,
+            margin: "32px 0 0", lineHeight: "1.65", fontSize: "16px",
+            maxWidth: "100%", borderTop: `1px solid ${c.rule}`, paddingTop: "24px",
+            opacity: 0.75,
+          }}>{t.subheadline}</p>
         </div>
       </section>
 
@@ -451,14 +464,15 @@ export function LandingPage() {
 
 /* ═══════════ TRACK INTERACTIONS SECTION ═══════════ */
 function TrackInteractionsSection() {
-  const actions = [
-    { n: "1", label: "↓ MP3", desc: "Скачать трек", variant: "emr" as const },
-    { n: "2", label: "↓ WAV", desc: "Конвертировать в WAV", variant: "default" as const },
-    { n: "3", label: "⟳ похожий", desc: "Создать похожий трек", variant: "default" as const },
-    { n: "4", label: "◎ радио", desc: "Отправить на радио", variant: "accent" as const },
-    { n: "5", label: "♥ / ✕", desc: "Лайк / Дизлайк", variant: "default" as const },
-    { n: "6", label: "✎ имя", desc: "Переименовать трек", variant: "default" as const },
-    { n: "7", label: "⛓ ссылка", desc: "Поделиться треком", variant: "default" as const },
+  type ActionVariant = "emr" | "accent" | "hi" | "default";
+  const actions: { n: string; label: string; desc: string; variant: ActionVariant }[] = [
+    { n: "1", label: "↓ MP3",      desc: "Скачать трек",          variant: "emr" },
+    { n: "2", label: "↓ WAV",      desc: "Конвертировать в WAV",   variant: "hi" },
+    { n: "3", label: "⟳ похожий",  desc: "Создать похожий трек",   variant: "hi" },
+    { n: "4", label: "◎ радио",    desc: "Отправить на радио",     variant: "accent" },
+    { n: "5", label: "♥ / ✕",      desc: "Лайк / Дизлайк",        variant: "default" },
+    { n: "6", label: "✎ имя",      desc: "Переименовать трек",     variant: "hi" },
+    { n: "7", label: "⛓ ссылка",   desc: "Поделиться треком",      variant: "hi" },
   ];
 
   return (
@@ -486,10 +500,15 @@ function TrackInteractionsSection() {
               {actions.map((a) => (
                 <div key={a.n} className="track-action-card" style={{ borderColor: c.rule }}>
                   <div className="tac-badge" style={{
-                    background: a.variant === "accent" ? c.accent : a.variant === "emr" ? "#0F5D47" : c.ink,
+                    background: a.variant === "accent" ? c.accent
+                      : a.variant === "emr" ? "#0F5D47"
+                      : a.variant === "hi" ? "#FF3B1F"
+                      : c.ink,
                   }}>{a.n}</div>
                   <div className="tac-label" style={{
-                    color: a.variant === "emr" ? "#0F5D47" : c.ink,
+                    color: a.variant === "emr" ? "#0F5D47"
+                      : a.variant === "hi" ? "#FF3B1F"
+                      : c.ink,
                   }}>{a.label}</div>
                   <div className="tac-desc" style={{ color: c.ink }}>{a.desc}</div>
                 </div>
@@ -515,12 +534,13 @@ function TrackCardSVG() {
 
   // Helper: render a single action button with an in-button numbered badge.
   // Numbers are placed INSIDE the button left-side — no elements overlap.
-  type V = "default" | "emr" | "accent";
+  type V = "default" | "emr" | "accent" | "hi";
   const actionBtn = (bx: number, by: number, bw: number, num: string, label: string, v: V) => {
     const bh = 32, br = 16;
     let fill = "transparent", stroke = ink, sw = 0.8, tf = ink;
     let bf = ink, bfOp = 0.12, btf = ink;
-    if (v === "emr") { stroke = emr; tf = emr; bf = emr; btf = emr; }
+    if (v === "emr")    { stroke = emr; tf = emr; bf = emr; btf = emr; }
+    if (v === "hi")     { stroke = hi;  tf = hi;  bf = hi;  btf = hi;  }
     if (v === "accent") { fill = accent; sw = 0; tf = paper; bf = paper; bfOp = 0.22; btf = paper; }
     const cy = by + bh / 2;
     return (
@@ -596,16 +616,15 @@ function TrackCardSVG() {
 
         {/* Row 1 — 4 buttons at y=142, h=32, gap=10 */}
         {/* Available width: x=32 to x=508 = 476. Four buttons + 3 gaps(10) = 30 → 446/4 = 111 each */}
-        {actionBtn(32,  142, 111, "1", "↓  MP3",    "emr")}
-        {actionBtn(153, 142, 111, "2", "↓  WAV",    "default")}
-        {actionBtn(274, 142, 111, "3", "⟳  похожий","default")}
-        {actionBtn(395, 142, 113, "4", "◎  радио",  "accent")}
+        {actionBtn(32,  142, 111, "1", "↓  MP3",     "emr")}
+        {actionBtn(153, 142, 111, "2", "↓  WAV",     "hi")}
+        {actionBtn(274, 142, 111, "3", "⟳  похожий", "hi")}
+        {actionBtn(395, 142, 113, "4", "◎  радио",   "accent")}
 
         {/* Row 2 — 3 buttons at y=182, h=32, gap=10 */}
-        {/* Three buttons + 2 gaps(10) = 20 → 456/3 = 152 each */}
         {actionBtn(32,  182, 152, "5", "♥  /  ✕  оценить",   "default")}
-        {actionBtn(194, 182, 152, "6", "✎  переименовать",    "default")}
-        {actionBtn(356, 182, 152, "7", "⛓  поделиться",       "default")}
+        {actionBtn(194, 182, 152, "6", "✎  переименовать",    "hi")}
+        {actionBtn(356, 182, 152, "7", "⛓  поделиться",       "hi")}
 
         {/* ── Info strip (y 226–280) ── */}
         <line x1="20" y1="226" x2="520" y2="226" stroke={rule} strokeWidth="0.8" />
