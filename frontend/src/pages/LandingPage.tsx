@@ -146,7 +146,26 @@ export function LandingPage() {
     return () => window.removeEventListener("scroll", fn);
   }, []);
 
-  // Scroll-reveal + active-nav (skipped in edit mode so blocks stay visible).
+  // Active section tracking for nav highlight
+  const [activeSection, setActiveSection] = useState("hero");
+  useEffect(() => {
+    if (!("IntersectionObserver" in window)) return;
+    const ids = ["hero", "types", "agent", "process", "radio", "interactions", "pricing"];
+    const ios: IntersectionObserver[] = [];
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const io = new IntersectionObserver(
+        (entries) => { entries.forEach((e) => { if (e.isIntersecting) setActiveSection(id); }); },
+        { threshold: 0.35 },
+      );
+      io.observe(el);
+      ios.push(io);
+    });
+    return () => ios.forEach((io) => io.disconnect());
+  }, []);
+
+  // Scroll-reveal (skipped in edit mode so blocks stay visible).
   useEffect(() => {
     if (EDIT_MODE) return;
     const root = rootRef.current;
@@ -156,7 +175,7 @@ export function LandingPage() {
     const io = new IntersectionObserver((entries) => {
       entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("visible"); io.unobserve(e.target); } });
     }, { threshold: 0.1 });
-    root.querySelectorAll<HTMLElement>(".type-card, .process-step, .price-card, .agent-feature, .section-head").forEach((el, i) => {
+    root.querySelectorAll<HTMLElement>(".type-card, .process-step, .price-card, .agent-feature, .section-head, .track-action-card").forEach((el, i) => {
       el.classList.add("reveal");
       const d = i % 6;
       if (d) el.classList.add(`reveal-delay-${d}`);
@@ -177,19 +196,20 @@ export function LandingPage() {
   const go = (href: string) => () => { if (/^https?:\/\//.test(href)) window.open(href, "_blank", "noopener"); else navigate(href); };
   const scrollTo = (id: string) => (e: React.MouseEvent) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }); };
 
-  const glassBg = scrolled ? "rgba(233,229,218,0.88)" : "transparent";
+  const glassBg = scrolled ? "rgba(233,229,218,0.95)" : "rgba(233,229,218,0.6)";
+  const navToSection: Record<string, string> = { types: "студия", agent: "агент", radio: "радио", pricing: "тарифы", interactions: "радио" };
 
   const types = [{ name: t.t1, sub: t.t1sub }, { name: t.t2, sub: t.t2sub }, { name: t.t3, sub: t.t3sub }, { name: t.t4, sub: t.t4sub }, { name: t.t5, sub: t.t5sub }];
   const agentFeatures = [
     { n: "01", title: "Понимает", desc: "Русский и английский — пишите как удобно" },
     { n: "02", title: "Уточняет", desc: "Задаёт вопросы, чтобы трек вышел точнее" },
     { n: "03", title: "Помнит", desc: "История заказов сохраняется в профиле" },
-    { n: "04", title: "Отправляет", desc: "MP3 и WAV прямо в Telegram-чат" },
+    { n: "04", title: "Отправляет", desc: "уведомление о готовности генерации" },
   ];
   const steps = [
     { h: "Опишите идею.\nИли спросите агента.", p: "Напишите в свободной форме — жанр, настроение, повод. Агент задаст уточняющие вопросы и сам соберёт параметры.", tip: "Или вставьте готовый текст песни — модель использует его как лирику" },
-    { h: "Ждите около 2–4 минут.", p: "Нейросеть обрабатывает промт, пишет структуру, лирику и рендерит аудио. Прогресс виден в карточке задачи.", tip: "≈ 60 сек для треков\n· ≈ 20 сек для обложки" },
-    { h: "Скачайте MP3 или WAV. Используйте где угодно.", p: "Без копирайта — заливайте в YouTube, TikTok, Reels, на стриминги. Все треки хранятся в профиле.", tip: "mp3 320 кб/с · wav без сжатия" },
+    { h: "Ждите около 2–4 минут.", p: "Нейросеть обрабатывает промт, пишет структуру, лирику и рендерит аудио. Прогресс виден в карточке задачи.", tip: "≈ от 30 сек для треков\n≈ 20 сек для обложки" },
+    { h: "Скачайте MP3 или WAV. Используйте где угодно.", p: "Без копирайта — заливайте в YouTube, TikTok, Reels, на стриминги. Все треки хранятся в профиле.", tip: "mp3 · конвертация в wav без сжатия" },
   ];
   const tracks = [
     { rank: "01", title: "Монолог в дождь", genre: "Ло-фай", mood: "меланхолия", dur: "2:48" },
@@ -213,8 +233,8 @@ export function LandingPage() {
 
   return (
     <div className="rl-root page" ref={rootRef} style={{ background: c.bg, color: c.ink }}>
-      {/* NAV */}
-      <nav className={`nav${scrolled ? " glass" : ""}`} data-edit="nav" style={{ background: glassBg, borderColor: scrolled ? c.rule : "transparent", color: c.ink, fontSize: "23px", lineHeight: "2.65", padding: "14px 0px 18px", margin: "-14px", borderRadius: "0px", opacity: 0.98 }}>
+      {/* NAV — position:sticky top:0, 95% backdrop, active-link per section */}
+      <nav className={`nav${scrolled ? " glass" : ""}`} data-edit="nav" style={{ background: glassBg, borderColor: c.rule, color: c.ink }}>
         <div className="wrap">
           <div className="nav-inner">
             <div className="nav-brand">
@@ -222,10 +242,9 @@ export function LandingPage() {
               <span style={{ color: c.ink, fontFamily: "system-ui, sans-serif", fontWeight: 700, fontSize: 22 }}>RIFFA Studio AI</span>
             </div>
             <div className="nav-links">
-              <a href="#types" style={{ color: c.ink }} onClick={scrollTo("types")}>студия</a>
-              <a href="#agent" style={{ color: c.ink }} onClick={scrollTo("agent")}>агент</a>
-              <a href="#radio" style={{ color: c.ink }} onClick={scrollTo("radio")}>радио</a>
-              <a href="#pricing" style={{ color: c.ink }} onClick={scrollTo("pricing")}>тарифы</a>
+              {[["#types","types","студия"],["#agent","agent","агент"],["#radio","radio","радио"],["#pricing","pricing","тарифы"]].map(([href, id, label]) => (
+                <a key={id} href={href} style={{ color: c.ink }} className={navToSection[activeSection] === label ? "active" : ""} onClick={scrollTo(id)}>{label}</a>
+              ))}
             </div>
             <button className="nav-cta" style={{ background: c.accent, color: "#E9E5DA", fontSize: "13px" }} onClick={go("/studio")}>{t.ctaMain}</button>
           </div>
@@ -244,7 +263,7 @@ export function LandingPage() {
               <h1 className="hero-headline" data-edit="hero-title" style={{ color: "rgb(209, 98, 42)", fontSize: "95px", whiteSpace: "pre-line" }}>
                 Создай <span style={{ color: "#232323" }}>свой</span> <span style={{ fontSize: "107px", color: "rgb(15, 93, 71)" }}>Аудиохит!</span>
               </h1>
-              <p className="hero-sub" data-edit="hero-sub" style={{ color: c.ink, borderStyle: "solid", borderRadius: "0px", letterSpacing: "1.4px", fontWeight: 900, height: "141px", width: "645px", padding: "0px 0px 0px 39px", borderWidth: "0px", margin: "29px -57px 22px 215px", lineHeight: "1.55", fontSize: "17px" }}>{t.subheadline}</p>
+              <p className="hero-sub" data-edit="hero-sub" style={{ color: c.ink, letterSpacing: "0.02em", fontWeight: 600, margin: "28px 0 22px", lineHeight: "1.6", fontSize: "17px", maxWidth: "540px" }}>{t.subheadline}</p>
               <div className="hero-actions" style={{ margin: "20px 69px 0px 0px" }}>
                 <button className="btn-primary" style={{ background: c.accent, color: "#E9E5DA", height: 46, letterSpacing: "2.6px", fontSize: "34px" }} onClick={go("/studio")}>{t.ctaMain}</button>
                 <button className="btn-ghost" style={{ color: "#EC560B", borderColor: "#EC560B", padding: "0 25px 0 22px", fontSize: "24px" }} onClick={scrollTo("radio")}>{t.ctaSecond}</button>
@@ -258,10 +277,10 @@ export function LandingPage() {
       {/* TYPES */}
       <section id="types" className="types-section" data-edit="types" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
         <div className="wrap">
-          <div className="section-head" style={{ borderColor: "rgba(255,255,255,0.18)", color: c.ink, borderWidth: "0px 0px 109px", padding: 0, width: "1174px", height: "83px" }}>
-            <div className="section-tag" style={{ color: c.ink, fontSize: "19px", padding: "38px 82px 24px" }}><span className="num">01</span> · что можно создать</div>
-            <h2 style={{ color: "rgb(220, 99, 40)", padding: "26px 67px 30px 70px" }}>Создавай - что хочешь!</h2>
-            <div className="right" style={{ fontSize: "15px" }}>на одном экране</div>
+          <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
+            <div className="section-tag" style={{ color: c.ink, fontSize: "11px" }}><span className="num">01</span> · что можно создать</div>
+            <h2 style={{ color: "rgb(220, 99, 40)" }}>Создавай — что хочешь!</h2>
+            <div className="right">на одном экране</div>
           </div>
           <div className="types-grid" style={{ borderColor: c.rule }}>
             {types.map((tp, i) => (
@@ -392,6 +411,9 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* TRACK INTERACTIONS */}
+      <TrackInteractionsSection />
+
       {/* FOOTER */}
       <footer className="footer" data-edit="footer" style={{ background: c.bg, color: c.ink }}>
         <div className="wrap">
@@ -423,6 +445,194 @@ export function LandingPage() {
       </footer>
 
       {EDIT_MODE && <EditMode />}
+    </div>
+  );
+}
+
+/* ═══════════ TRACK INTERACTIONS SECTION ═══════════ */
+function TrackInteractionsSection() {
+  const actions = [
+    { n: "1", label: "↓ MP3", desc: "Скачать трек", variant: "emr" as const },
+    { n: "2", label: "↓ WAV", desc: "Конвертировать в WAV", variant: "default" as const },
+    { n: "3", label: "⟳ похожий", desc: "Создать похожий трек", variant: "default" as const },
+    { n: "4", label: "◎ радио", desc: "Отправить на радио", variant: "accent" as const },
+    { n: "5", label: "♥ / ✕", desc: "Лайк / Дизлайк", variant: "default" as const },
+    { n: "6", label: "✎ имя", desc: "Переименовать трек", variant: "default" as const },
+    { n: "7", label: "⛓ ссылка", desc: "Поделиться треком", variant: "default" as const },
+  ];
+
+  return (
+    <section id="interactions" className="interactions-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
+      <div className="wrap">
+        <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
+          <div className="section-tag" style={{ color: c.ink, fontSize: "11px" }}><span className="num">05</span> · библиотека</div>
+          <h2 style={{ color: "rgb(220, 99, 40)" }}>Управляй треками — 7 действий.</h2>
+          <div className="right">всё на одном экране</div>
+        </div>
+
+        <div className="interactions-grid">
+          {/* LEFT — schematic SVG illustration */}
+          <div className="interactions-svg-col">
+            <TrackCardSVG />
+          </div>
+
+          {/* RIGHT — action cards list */}
+          <div className="interactions-list-col">
+            <p className="interactions-intro">
+              У каждого трека в библиотеке есть меню действий —<br />
+              нажми кнопку <strong>⚡</strong> на карточке трека.
+            </p>
+            <div className="interactions-actions">
+              {actions.map((a) => (
+                <div key={a.n} className="track-action-card" style={{ borderColor: c.rule }}>
+                  <div className="tac-badge" style={{
+                    background: a.variant === "accent" ? c.accent : a.variant === "emr" ? "#0F5D47" : c.ink,
+                  }}>{a.n}</div>
+                  <div className="tac-label" style={{
+                    color: a.variant === "emr" ? "#0F5D47" : c.ink,
+                  }}>{a.label}</div>
+                  <div className="tac-desc" style={{ color: c.ink }}>{a.desc}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* Schematic SVG of a track card with the bolt-menu expanded */
+function TrackCardSVG() {
+  const ink = c.ink;
+  const bg = c.bg;
+  const bg2 = c.bg2;
+  const rule = c.rule;
+  const accent = c.accent;
+  const emr = "#0F5D47";
+  const hi = "#FF3B1F";
+  const paper = "#E9E5DA";
+
+  const waveHeights = [4, 8, 13, 6, 15, 7, 5, 11, 7, 12, 9, 5, 8, 10, 6, 4, 9, 12, 7, 5];
+  const btnRow1 = [
+    { x: 24, w: 108, label: "↓  MP3", stroke: emr, fill: "transparent", textFill: emr },
+    { x: 140, w: 108, label: "↓  WAV", stroke: ink, fill: "transparent", textFill: ink },
+    { x: 256, w: 130, label: "⟳  похожий", stroke: ink, fill: "transparent", textFill: ink },
+    { x: 394, w: 108, label: "◎  радио", stroke: accent, fill: accent, textFill: paper },
+  ];
+  const btnRow2 = [
+    { x: 24, w: 136, label: "♥  лайк  ·  ✕  дизлайк", stroke: ink, fill: "transparent", textFill: ink },
+    { x: 168, w: 148, label: "✎  переименовать", stroke: ink, fill: "transparent", textFill: ink },
+    { x: 324, w: 178, label: "⛓  поделиться ссылкой", stroke: ink, fill: "transparent", textFill: ink },
+  ];
+
+  return (
+    <div className="schematic-wrap" style={{ border: `1px solid ${rule}` }}>
+      <svg viewBox="0 0 528 370" xmlns="http://www.w3.org/2000/svg">
+        {/* BG */}
+        <defs>
+          <pattern id="int-dots" width="12" height="12" patternUnits="userSpaceOnUse">
+            <circle cx="0.6" cy="0.6" r="0.6" fill={ink} opacity="0.15" />
+          </pattern>
+        </defs>
+        <rect width="528" height="370" fill={bg2} />
+        <rect width="528" height="370" fill="url(#int-dots)" />
+
+        {/* Outer frame */}
+        <rect x="12" y="12" width="504" height="346" rx="14" fill={bg} stroke={ink} strokeWidth="1" />
+
+        {/* Corner labels */}
+        <text x="26" y="32" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.4">ВАША БИБЛИОТЕКА</text>
+        <text x="502" y="32" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.4" textAnchor="end">КАРТОЧКА ТРЕКА</text>
+
+        {/* ── Track row ── */}
+        <rect x="20" y="42" width="488" height="64" rx="8" fill="transparent" stroke={rule} strokeWidth="0.8" />
+
+        {/* Cover art */}
+        <rect x="30" y="50" width="48" height="48" rx="6" fill={bg2} stroke={ink} strokeWidth="0.8" />
+        {/* Music note in cover */}
+        <text x="54" y="80" fontFamily="Inter" fontSize="22" fill={ink} opacity="0.35" textAnchor="middle">♪</text>
+
+        {/* Title + meta */}
+        <text x="90" y="68" fontFamily="Inter" fontSize="13" fontWeight="600" fill={ink}>Закат над городом</text>
+        <text x="90" y="84" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">ПОП · МЕЛАНХОЛИЯ · 84 BPM · 3:24</text>
+
+        {/* Waveform */}
+        {waveHeights.map((h, i) => (
+          <rect key={i} x={340 + i * 6} y={66 + (16 - h) / 2} width="4" height={h} rx="2" fill={ink} opacity={i < 13 ? 0.7 : 0.25} />
+        ))}
+
+        {/* Play button */}
+        <circle cx="462" cy="74" r="16" fill="transparent" stroke={ink} strokeWidth="0.8" />
+        <polygon points="456,68 456,80 468,74" fill={ink} />
+
+        {/* Bolt button (highlighted) */}
+        <rect x="482" y="62" width="22" height="24" rx="12" fill={`rgba(255,59,31,0.1)`} stroke={hi} strokeWidth="1.2" />
+        <text x="493" y="79" fontFamily="Inter" fontSize="13" fill={hi} textAnchor="middle">⚡</text>
+
+        {/* Dashed connector from bolt to menu */}
+        <line x1="493" y1="88" x2="493" y2="116" stroke={hi} strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+
+        {/* ── Bolt menu panel ── */}
+        <rect x="20" y="116" width="488" height="124" rx="8" fill="transparent" stroke={ink} strokeWidth="0.8" />
+        <text x="32" y="132" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.45">МЕНЮ ДЕЙСТВИЙ</text>
+
+        {/* Row 1 buttons */}
+        {btnRow1.map((btn, i) => (
+          <g key={i}>
+            <rect x={btn.x + 20} y="138" width={btn.w} height="26" rx="13" fill={btn.fill} stroke={btn.stroke} strokeWidth={btn.fill !== "transparent" ? "0" : "0.8"} />
+            <text x={btn.x + 20 + btn.w / 2} y="155" fontFamily="JetBrains Mono" fontSize="9" fill={btn.textFill} textAnchor="middle">{btn.label}</text>
+            {/* Callout number */}
+            <circle cx={btn.x + 20 + 10} cy="133" r="9" fill={btn.fill === accent ? accent : ink} />
+            <text x={btn.x + 20 + 10} y="137" fontFamily="JetBrains Mono" fontSize="8" fill={paper} fontWeight="600" textAnchor="middle">{i + 1}</text>
+          </g>
+        ))}
+
+        {/* Row 2 buttons */}
+        {btnRow2.map((btn, i) => (
+          <g key={i}>
+            <rect x={btn.x + 20} y="174" width={btn.w} height="26" rx="13" fill={btn.fill} stroke={btn.stroke} strokeWidth="0.8" />
+            <text x={btn.x + 20 + btn.w / 2} y="191" fontFamily="JetBrains Mono" fontSize="9" fill={btn.textFill} textAnchor="middle">{btn.label}</text>
+            {/* Callout number */}
+            <circle cx={btn.x + 20 + 10} cy="169" r="9" fill={ink} />
+            <text x={btn.x + 20 + 10} y="173" fontFamily="JetBrains Mono" fontSize="8" fill={paper} fontWeight="600" textAnchor="middle">{i + 5}</text>
+          </g>
+        ))}
+
+        {/* ── Bottom info strip ── */}
+        <line x1="20" y1="248" x2="508" y2="248" stroke={rule} strokeWidth="0.8" />
+        <text x="26" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">СТАТУС</text>
+        <text x="80" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={emr} fontWeight="600">● ГОТОВО</text>
+
+        <text x="160" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">ЖАНР</text>
+        <text x="200" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>ПОП</text>
+
+        <text x="250" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">НАСТРОЕНИЕ</text>
+        <text x="325" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>МЕЛАНХОЛИЯ</text>
+
+        <text x="420" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">BPM</text>
+        <text x="448" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>84</text>
+
+        {/* Genre/mood tags row */}
+        <rect x="26" y="274" width="34" height="18" rx="9" fill="transparent" stroke={emr} strokeWidth="0.8" />
+        <text x="43" y="287" fontFamily="JetBrains Mono" fontSize="8" fill={emr} textAnchor="middle">ПОП</text>
+        <rect x="66" y="274" width="70" height="18" rx="9" fill="transparent" stroke={rule} strokeWidth="0.8" />
+        <text x="101" y="287" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.7" textAnchor="middle">МЕЛАНХОЛИЯ</text>
+        <rect x="142" y="274" width="40" height="18" rx="9" fill="transparent" stroke={rule} strokeWidth="0.8" />
+        <text x="162" y="287" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.7" textAnchor="middle">84 BPM</text>
+
+        {/* WAV badge */}
+        <rect x="420" y="274" width="36" height="18" rx="4" fill={emr} />
+        <text x="438" y="287" fontFamily="JetBrains Mono" fontSize="8" fill={paper} fontWeight="600" textAnchor="middle">WAV</text>
+
+        {/* Like / dislike */}
+        <text x="466" y="287" fontFamily="Inter" fontSize="12" fill={hi}>♥</text>
+        <text x="488" y="287" fontFamily="Inter" fontSize="12" fill={ink} opacity="0.3">✕</text>
+
+        {/* Bottom corner labels */}
+        <text x="26" y="350" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.35">7 ДЕЙСТВИЙ В ОДНОМ МЕНЮ</text>
+        <text x="502" y="350" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.35" textAnchor="end">НАЖМИ ⚡ НА КАРТОЧКЕ</text>
+      </svg>
     </div>
   );
 }
