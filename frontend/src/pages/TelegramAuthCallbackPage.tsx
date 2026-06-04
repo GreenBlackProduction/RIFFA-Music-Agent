@@ -13,7 +13,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { loginWithTelegramWidget } from "@/lib/api/client";
+import { loginWithTelegramWidget, pollBotLinkLogin } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth";
 
 function parseParams(search: string): Record<string, string> {
@@ -35,6 +35,32 @@ export function TelegramAuthCallbackPage() {
       const fromQuery = parseParams(window.location.search);
       const fromHash  = parseParams(window.location.hash);
       const p = { ...fromQuery, ...fromHash };
+
+      // Bot-link return: the bot's "Открыть RIFFA →" button lands here with a
+      // nonce the bot has already approved. Poll once to claim the session
+      // cookie, then go to the studio. (This is the return-URL after success.)
+      const nonce = p["nonce"];
+      if (nonce) {
+        for (let i = 0; i < 6; i++) {
+          try {
+            const r = await pollBotLinkLogin(nonce);
+            if (r.approved) {
+              await refresh();
+              navigate("/studio", { replace: true });
+              return;
+            }
+          } catch {
+            // 410/nonce gone — likely already claimed by the original tab. The
+            // session cookie is shared across tabs, so try the studio anyway.
+            await refresh();
+            navigate("/studio", { replace: true });
+            return;
+          }
+          await new Promise((res) => setTimeout(res, 1000));
+        }
+        navigate("/login", { replace: true });
+        return;
+      }
 
       const id       = p["id"]        ? Number(p["id"])        : undefined;
       const authDate = p["auth_date"] ? Number(p["auth_date"]) : undefined;

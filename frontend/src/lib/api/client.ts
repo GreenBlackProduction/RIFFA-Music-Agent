@@ -168,9 +168,13 @@ export function loginWithTelegramInitData(
   });
 }
 
-/** Start a bot-link login session — returns a nonce + bot deep-link URL. */
+/** Start a bot-link login session — returns a nonce + bot deep-link URL.
+ *  Sends our origin so the bot's post-login return button points back here. */
 export function startBotLinkLogin(): Promise<{ nonce: string; bot_url: string }> {
-  return apiFetch("/api/v1/auth/telegram/bot-link/start", { method: "POST" });
+  return apiFetch("/api/v1/auth/telegram/bot-link/start", {
+    method: "POST",
+    body: JSON.stringify({ origin: window.location.origin }),
+  });
 }
 
 /** Poll the backend with the nonce until the bot approves the login. */
