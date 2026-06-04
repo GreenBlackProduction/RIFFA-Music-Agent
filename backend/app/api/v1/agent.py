@@ -15,8 +15,6 @@ turn. We don't persist anything: the chat state is only useful for the duration 
 song-prompt-building session.
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
 import re
