@@ -79,6 +79,9 @@ class AgentChatRequest(BaseModel):
     selected_mood: str = Field(default="", max_length=32)
     selected_tempo: str = Field(default="", max_length=32)
     selected_vocal: str = Field(default="", max_length=32)
+    # UI language forwarded from the frontend so the agent can lock its reply
+    # language without relying solely on message content detection.
+    lang: str = Field(default="ru", max_length=8)
 
 
 class AgentIntentParams(BaseModel):
@@ -1622,8 +1625,8 @@ async def _stream_agent_completion(
 @router.post("/chat", response_model=AgentChatResponse)
 @limiter.limit("30/minute")
 async def agent_chat(
-    request: Request,
     body: AgentChatRequest,
+    request: Request,
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(db_session),
@@ -1839,8 +1842,8 @@ def _postprocess_agent_reply(
 @router.post("/chat/stream")
 @limiter.limit("30/minute")
 async def agent_chat_stream(
-    request: Request,
     body: AgentChatRequest,
+    request: Request,
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(db_session),
@@ -2013,8 +2016,8 @@ class AgentClassifyResponse(BaseModel):
 @router.post("/classify", response_model=AgentClassifyResponse)
 @limiter.limit("30/minute")
 async def agent_classify(
-    request: Request,
     body: AgentClassifyRequest,
+    request: Request,
     user: User = Depends(current_user),
     settings: Settings = Depends(get_settings),
 ) -> AgentClassifyResponse:
