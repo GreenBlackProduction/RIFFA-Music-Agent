@@ -15,9 +15,13 @@
   align-items: center;
   padding: 12px 18px;
   border-radius: 14px;
-  border: none;
-  background: #000;
-  box-shadow: none;
+  /* Frosted glass: translucent dark tint + heavy blur/saturate, light edge,
+     soft drop shadow so the bar reads as a floating pane of glass. */
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(14, 14, 16, 0.85);
+  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  backdrop-filter: blur(26px) saturate(160%);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   max-width: calc(100vw - 24px);
   width: min(780px, calc(100vw - 24px));
   overflow: hidden;
