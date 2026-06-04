@@ -6,7 +6,7 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Archivo+Black&display=swap');
 
-html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 
 .rl-root { min-height: 100vh; font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 .rl-root * { box-sizing: border-box; }
@@ -24,7 +24,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 64px; }
 .rl-root .wrap { max-width: 1240px; margin: 0 auto; padding: 0 32px; }
 
 /* NAV */
-.rl-root .nav { position: sticky; top: 0; z-index: 100; border-bottom: 1px solid; padding: 14px 0; transition: background 0.3s, backdrop-filter 0.3s, border-color 0.3s, box-shadow 0.3s; }
+.rl-root .nav { position: fixed; top: 0; left: 0; right: 0; width: 100%; z-index: 100; border-bottom: 1px solid; padding: 14px 0; transition: background 0.3s, backdrop-filter 0.3s, border-color 0.3s, box-shadow 0.3s; }
 .rl-root .nav.glass { backdrop-filter: blur(24px) saturate(1.5); -webkit-backdrop-filter: blur(24px) saturate(1.5); box-shadow: 0 1px 0 rgba(22,20,19,0.06); }
 .rl-root .nav-inner { display: grid; grid-template-columns: auto auto auto; align-items: center; gap: 24px; }
 .rl-root .nav-brand { display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; }
@@ -37,7 +37,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 64px; }
 .rl-root .nav-cta:active { transform: scale(0.96); }
 
 /* HERO */
-.rl-root .hero { padding: 64px 0 72px; border-bottom: 1px solid; }
+.rl-root .hero { padding: 64px 0 72px; border-bottom: 1px solid; margin-top: 62px; }
 .rl-root .hero-split { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
 .rl-root .hero-center { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 32px; }
 .rl-root .meta-ruler { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.5; margin-bottom: 28px; }

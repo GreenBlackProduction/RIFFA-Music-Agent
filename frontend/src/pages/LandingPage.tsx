@@ -265,8 +265,8 @@ export function LandingPage() {
               </h1>
               <p className="hero-sub" data-edit="hero-sub" style={{ color: c.ink, letterSpacing: "0.02em", fontWeight: 600, margin: "28px 0 22px", lineHeight: "1.6", fontSize: "17px", maxWidth: "540px" }}>{t.subheadline}</p>
               <div className="hero-actions" style={{ margin: "20px 69px 0px 0px" }}>
-                <button className="btn-primary" style={{ background: c.accent, color: "#E9E5DA", height: 46, letterSpacing: "2.6px", fontSize: "34px" }} onClick={go("/studio")}>{t.ctaMain}</button>
-                <button className="btn-ghost" style={{ color: "#EC560B", borderColor: "#EC560B", padding: "0 25px 0 22px", fontSize: "24px" }} onClick={scrollTo("radio")}>{t.ctaSecond}</button>
+                <button className="btn-primary" style={{ background: c.accent, color: "#E9E5DA", height: 52, padding: "0 32px", fontSize: "13px", letterSpacing: "1.5px" }} onClick={go("/studio")}>{t.ctaMain}</button>
+                <button className="btn-ghost" style={{ color: "#EC560B", borderColor: "#EC560B", padding: "0 28px", fontSize: "13px", letterSpacing: "1px", height: 52 }} onClick={scrollTo("radio")}>{t.ctaSecond}</button>
               </div>
             </div>
             <SchematicSVG />
@@ -278,7 +278,7 @@ export function LandingPage() {
       <section id="types" className="types-section" data-edit="types" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ color: c.ink, fontSize: "11px" }}><span className="num">01</span> · что можно создать</div>
+            <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">01</span> · что можно создать</div>
             <h2 style={{ color: "rgb(220, 99, 40)" }}>Создавай — что хочешь!</h2>
             <div className="right">на одном экране</div>
           </div>
@@ -383,6 +383,9 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* TRACK INTERACTIONS — between radio and pricing */}
+      <TrackInteractionsSection />
+
       {/* PRICING */}
       <section id="pricing" className="pricing-section" data-edit="pricing" style={{ background: c.bg, color: c.ink, borderColor: "rgba(255,255,255,0.18)" }}>
         <div className="wrap">
@@ -410,9 +413,6 @@ export function LandingPage() {
           </div>
         </div>
       </section>
-
-      {/* TRACK INTERACTIONS */}
-      <TrackInteractionsSection />
 
       {/* FOOTER */}
       <footer className="footer" data-edit="footer" style={{ background: c.bg, color: c.ink }}>
@@ -465,7 +465,7 @@ function TrackInteractionsSection() {
     <section id="interactions" className="interactions-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
       <div className="wrap">
         <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-          <div className="section-tag" style={{ color: c.ink, fontSize: "11px" }}><span className="num">05</span> · библиотека</div>
+          <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">05</span> · библиотека</div>
           <h2 style={{ color: "rgb(220, 99, 40)" }}>Управляй треками — 7 действий.</h2>
           <div className="right">всё на одном экране</div>
         </div>
@@ -513,125 +513,138 @@ function TrackCardSVG() {
   const hi = "#FF3B1F";
   const paper = "#E9E5DA";
 
-  const waveHeights = [4, 8, 13, 6, 15, 7, 5, 11, 7, 12, 9, 5, 8, 10, 6, 4, 9, 12, 7, 5];
-  const btnRow1 = [
-    { x: 24, w: 108, label: "↓  MP3", stroke: emr, fill: "transparent", textFill: emr },
-    { x: 140, w: 108, label: "↓  WAV", stroke: ink, fill: "transparent", textFill: ink },
-    { x: 256, w: 130, label: "⟳  похожий", stroke: ink, fill: "transparent", textFill: ink },
-    { x: 394, w: 108, label: "◎  радио", stroke: accent, fill: accent, textFill: paper },
-  ];
-  const btnRow2 = [
-    { x: 24, w: 136, label: "♥  лайк  ·  ✕  дизлайк", stroke: ink, fill: "transparent", textFill: ink },
-    { x: 168, w: 148, label: "✎  переименовать", stroke: ink, fill: "transparent", textFill: ink },
-    { x: 324, w: 178, label: "⛓  поделиться ссылкой", stroke: ink, fill: "transparent", textFill: ink },
-  ];
+  // Helper: render a single action button with an in-button numbered badge.
+  // Numbers are placed INSIDE the button left-side — no elements overlap.
+  type V = "default" | "emr" | "accent";
+  const actionBtn = (bx: number, by: number, bw: number, num: string, label: string, v: V) => {
+    const bh = 32, br = 16;
+    let fill = "transparent", stroke = ink, sw = 0.8, tf = ink;
+    let bf = ink, bfOp = 0.12, btf = ink;
+    if (v === "emr") { stroke = emr; tf = emr; bf = emr; btf = emr; }
+    if (v === "accent") { fill = accent; sw = 0; tf = paper; bf = paper; bfOp = 0.22; btf = paper; }
+    const cy = by + bh / 2;
+    return (
+      <g key={`ab-${num}`}>
+        <rect x={bx} y={by} width={bw} height={bh} rx={br} fill={fill} stroke={stroke} strokeWidth={sw} />
+        <circle cx={bx + 17} cy={cy} r={10} fill={bf} fillOpacity={bfOp} />
+        <text x={bx + 17} y={cy + 3.5} fontFamily="JetBrains Mono" fontSize="9" fill={btf} textAnchor="middle" fontWeight="700">{num}</text>
+        <text x={bx + 34} y={cy + 3.5} fontFamily="JetBrains Mono" fontSize="9" fill={tf}>{label}</text>
+      </g>
+    );
+  };
+
+  const wH = [4, 8, 12, 6, 14, 8, 5, 10, 7, 11, 8, 5, 8, 9, 6, 4, 9, 11, 6, 5];
 
   return (
     <div className="schematic-wrap" style={{ border: `1px solid ${rule}` }}>
-      <svg viewBox="0 0 528 370" xmlns="http://www.w3.org/2000/svg">
-        {/* BG */}
+      <svg viewBox="0 0 540 360" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <pattern id="int-dots" width="12" height="12" patternUnits="userSpaceOnUse">
-            <circle cx="0.6" cy="0.6" r="0.6" fill={ink} opacity="0.15" />
+          <pattern id="int-dots2" width="12" height="12" patternUnits="userSpaceOnUse">
+            <circle cx="0.6" cy="0.6" r="0.6" fill={ink} opacity="0.14" />
           </pattern>
         </defs>
-        <rect width="528" height="370" fill={bg2} />
-        <rect width="528" height="370" fill="url(#int-dots)" />
+
+        {/* Background */}
+        <rect width="540" height="360" fill={bg2} />
+        <rect width="540" height="360" fill="url(#int-dots2)" />
 
         {/* Outer frame */}
-        <rect x="12" y="12" width="504" height="346" rx="14" fill={bg} stroke={ink} strokeWidth="1" />
+        <rect x="12" y="12" width="516" height="336" rx="14" fill={bg} stroke={ink} strokeWidth="1" />
 
         {/* Corner labels */}
-        <text x="26" y="32" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.4">ВАША БИБЛИОТЕКА</text>
-        <text x="502" y="32" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.4" textAnchor="end">КАРТОЧКА ТРЕКА</text>
+        <text x="26" y="30" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.38">ВАША БИБЛИОТЕКА</text>
+        <text x="514" y="30" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.38" textAnchor="end">КАРТОЧКА ТРЕКА</text>
 
-        {/* ── Track row ── */}
-        <rect x="20" y="42" width="488" height="64" rx="8" fill="transparent" stroke={rule} strokeWidth="0.8" />
+        {/* ── Track row (y 40–104) ── */}
+        <rect x="20" y="40" width="500" height="62" rx="7" fill="transparent" stroke={rule} strokeWidth="0.8" />
 
-        {/* Cover art */}
-        <rect x="30" y="50" width="48" height="48" rx="6" fill={bg2} stroke={ink} strokeWidth="0.8" />
-        {/* Music note in cover */}
-        <text x="54" y="80" fontFamily="Inter" fontSize="22" fill={ink} opacity="0.35" textAnchor="middle">♪</text>
+        {/* Cover */}
+        <rect x="30" y="48" width="48" height="46" rx="6" fill={bg2} stroke={ink} strokeWidth="0.8" />
+        <text x="54" y="78" fontFamily="Inter" fontSize="20" fill={ink} opacity="0.28" textAnchor="middle">♪</text>
 
         {/* Title + meta */}
-        <text x="90" y="68" fontFamily="Inter" fontSize="13" fontWeight="600" fill={ink}>Закат над городом</text>
-        <text x="90" y="84" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">ПОП · МЕЛАНХОЛИЯ · 84 BPM · 3:24</text>
+        <text x="90" y="66" fontFamily="Inter" fontSize="13" fontWeight="600" fill={ink}>Закат над городом</text>
+        <text x="90" y="82" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">ПОП · МЕЛАНХОЛИЯ · 84 BPM</text>
+
+        {/* Duration */}
+        <text x="448" y="67" fontFamily="JetBrains Mono" fontSize="9" fill={ink} opacity="0.45" textAnchor="end">3:24</text>
 
         {/* Waveform */}
-        {waveHeights.map((h, i) => (
-          <rect key={i} x={340 + i * 6} y={66 + (16 - h) / 2} width="4" height={h} rx="2" fill={ink} opacity={i < 13 ? 0.7 : 0.25} />
+        {wH.map((h, i) => (
+          <rect key={i} x={330 + i * 5.5} y={62 + (14 - h) / 2} width="3.5" height={h} rx="1.5"
+            fill={ink} opacity={i < 13 ? 0.55 : 0.18} />
         ))}
 
-        {/* Play button */}
-        <circle cx="462" cy="74" r="16" fill="transparent" stroke={ink} strokeWidth="0.8" />
-        <polygon points="456,68 456,80 468,74" fill={ink} />
+        {/* Play circle */}
+        <circle cx="462" cy="71" r="15" fill="transparent" stroke={ink} strokeWidth="0.8" />
+        <polygon points="457,65 457,77 469,71" fill={ink} />
 
-        {/* Bolt button (highlighted) */}
-        <rect x="482" y="62" width="22" height="24" rx="12" fill={`rgba(255,59,31,0.1)`} stroke={hi} strokeWidth="1.2" />
-        <text x="493" y="79" fontFamily="Inter" fontSize="13" fill={hi} textAnchor="middle">⚡</text>
+        {/* Bolt button — highlighted */}
+        <rect x="484" y="59" width="26" height="24" rx="12" fill="rgba(255,59,31,0.10)" stroke={hi} strokeWidth="1.2" />
+        <text x="497" y="75" fontFamily="Inter" fontSize="13" fill={hi} textAnchor="middle">⚡</text>
 
-        {/* Dashed connector from bolt to menu */}
-        <line x1="493" y1="88" x2="493" y2="116" stroke={hi} strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+        {/* Dashed arrow from bolt to menu */}
+        <line x1="497" y1="84" x2="497" y2="112" stroke={hi} strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+        <polygon points="493,110 497,117 501,110" fill={hi} opacity="0.5" />
 
-        {/* ── Bolt menu panel ── */}
-        <rect x="20" y="116" width="488" height="124" rx="8" fill="transparent" stroke={ink} strokeWidth="0.8" />
-        <text x="32" y="132" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.45">МЕНЮ ДЕЙСТВИЙ</text>
+        {/* ── Bolt menu panel (y 116–218) ── */}
+        <rect x="20" y="116" width="500" height="100" rx="7" fill="transparent" stroke={rule} strokeWidth="0.8" />
 
-        {/* Row 1 buttons */}
-        {btnRow1.map((btn, i) => (
-          <g key={i}>
-            <rect x={btn.x + 20} y="138" width={btn.w} height="26" rx="13" fill={btn.fill} stroke={btn.stroke} strokeWidth={btn.fill !== "transparent" ? "0" : "0.8"} />
-            <text x={btn.x + 20 + btn.w / 2} y="155" fontFamily="JetBrains Mono" fontSize="9" fill={btn.textFill} textAnchor="middle">{btn.label}</text>
-            {/* Callout number */}
-            <circle cx={btn.x + 20 + 10} cy="133" r="9" fill={btn.fill === accent ? accent : ink} />
-            <text x={btn.x + 20 + 10} y="137" fontFamily="JetBrains Mono" fontSize="8" fill={paper} fontWeight="600" textAnchor="middle">{i + 1}</text>
-          </g>
-        ))}
+        {/* Panel header */}
+        <text x="32" y="131" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.4">МЕНЮ ДЕЙСТВИЙ</text>
+        <line x1="32" y1="136" x2="508" y2="136" stroke={rule} strokeWidth="0.5" />
 
-        {/* Row 2 buttons */}
-        {btnRow2.map((btn, i) => (
-          <g key={i}>
-            <rect x={btn.x + 20} y="174" width={btn.w} height="26" rx="13" fill={btn.fill} stroke={btn.stroke} strokeWidth="0.8" />
-            <text x={btn.x + 20 + btn.w / 2} y="191" fontFamily="JetBrains Mono" fontSize="9" fill={btn.textFill} textAnchor="middle">{btn.label}</text>
-            {/* Callout number */}
-            <circle cx={btn.x + 20 + 10} cy="169" r="9" fill={ink} />
-            <text x={btn.x + 20 + 10} y="173" fontFamily="JetBrains Mono" fontSize="8" fill={paper} fontWeight="600" textAnchor="middle">{i + 5}</text>
-          </g>
-        ))}
+        {/* Row 1 — 4 buttons at y=142, h=32, gap=10 */}
+        {/* Available width: x=32 to x=508 = 476. Four buttons + 3 gaps(10) = 30 → 446/4 = 111 each */}
+        {actionBtn(32,  142, 111, "1", "↓  MP3",    "emr")}
+        {actionBtn(153, 142, 111, "2", "↓  WAV",    "default")}
+        {actionBtn(274, 142, 111, "3", "⟳  похожий","default")}
+        {actionBtn(395, 142, 113, "4", "◎  радио",  "accent")}
 
-        {/* ── Bottom info strip ── */}
-        <line x1="20" y1="248" x2="508" y2="248" stroke={rule} strokeWidth="0.8" />
-        <text x="26" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">СТАТУС</text>
-        <text x="80" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={emr} fontWeight="600">● ГОТОВО</text>
+        {/* Row 2 — 3 buttons at y=182, h=32, gap=10 */}
+        {/* Three buttons + 2 gaps(10) = 20 → 456/3 = 152 each */}
+        {actionBtn(32,  182, 152, "5", "♥  /  ✕  оценить",   "default")}
+        {actionBtn(194, 182, 152, "6", "✎  переименовать",    "default")}
+        {actionBtn(356, 182, 152, "7", "⛓  поделиться",       "default")}
 
-        <text x="160" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">ЖАНР</text>
-        <text x="200" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>ПОП</text>
+        {/* ── Info strip (y 226–280) ── */}
+        <line x1="20" y1="226" x2="520" y2="226" stroke={rule} strokeWidth="0.8" />
 
-        <text x="250" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">НАСТРОЕНИЕ</text>
-        <text x="325" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>МЕЛАНХОЛИЯ</text>
+        <text x="28" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.42">СТАТУС</text>
+        <circle cx="78" cy="238" r="3.5" fill={emr} />
+        <text x="86" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={emr} fontWeight="600">ГОТОВО</text>
 
-        <text x="420" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">BPM</text>
-        <text x="448" y="265" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>84</text>
+        <text x="158" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.42">ЖАНР</text>
+        <text x="192" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>ПОП</text>
 
-        {/* Genre/mood tags row */}
-        <rect x="26" y="274" width="34" height="18" rx="9" fill="transparent" stroke={emr} strokeWidth="0.8" />
-        <text x="43" y="287" fontFamily="JetBrains Mono" fontSize="8" fill={emr} textAnchor="middle">ПОП</text>
-        <rect x="66" y="274" width="70" height="18" rx="9" fill="transparent" stroke={rule} strokeWidth="0.8" />
-        <text x="101" y="287" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.7" textAnchor="middle">МЕЛАНХОЛИЯ</text>
-        <rect x="142" y="274" width="40" height="18" rx="9" fill="transparent" stroke={rule} strokeWidth="0.8" />
-        <text x="162" y="287" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.7" textAnchor="middle">84 BPM</text>
+        <text x="248" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.42">НАСТР.</text>
+        <text x="287" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>МЕЛАНХОЛИЯ</text>
+
+        <text x="392" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.42">BPM</text>
+        <text x="416" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>84</text>
+
+        {/* Tags row */}
+        <rect x="28" y="250" width="36" height="16" rx="8" fill="transparent" stroke={emr} strokeWidth="0.8" />
+        <text x="46" y="262" fontFamily="JetBrains Mono" fontSize="7" fill={emr} textAnchor="middle">ПОП</text>
+
+        <rect x="70" y="250" width="76" height="16" rx="8" fill="transparent" stroke={rule} strokeWidth="0.8" />
+        <text x="108" y="262" fontFamily="JetBrains Mono" fontSize="7" fill={ink} opacity="0.6" textAnchor="middle">МЕЛАНХОЛИЯ</text>
+
+        <rect x="152" y="250" width="44" height="16" rx="8" fill="transparent" stroke={rule} strokeWidth="0.8" />
+        <text x="174" y="262" fontFamily="JetBrains Mono" fontSize="7" fill={ink} opacity="0.6" textAnchor="middle">84 BPM</text>
 
         {/* WAV badge */}
-        <rect x="420" y="274" width="36" height="18" rx="4" fill={emr} />
-        <text x="438" y="287" fontFamily="JetBrains Mono" fontSize="8" fill={paper} fontWeight="600" textAnchor="middle">WAV</text>
+        <rect x="440" y="250" width="36" height="16" rx="4" fill={emr} />
+        <text x="458" y="262" fontFamily="JetBrains Mono" fontSize="7" fill={paper} fontWeight="600" textAnchor="middle">WAV</text>
 
         {/* Like / dislike */}
-        <text x="466" y="287" fontFamily="Inter" fontSize="12" fill={hi}>♥</text>
-        <text x="488" y="287" fontFamily="Inter" fontSize="12" fill={ink} opacity="0.3">✕</text>
+        <text x="486" y="263" fontFamily="Inter" fontSize="13" fill={hi}>♥</text>
+        <text x="506" y="263" fontFamily="Inter" fontSize="13" fill={ink} opacity="0.22">✕</text>
 
-        {/* Bottom corner labels */}
-        <text x="26" y="350" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.35">7 ДЕЙСТВИЙ В ОДНОМ МЕНЮ</text>
-        <text x="502" y="350" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.35" textAnchor="end">НАЖМИ ⚡ НА КАРТОЧКЕ</text>
+        {/* Bottom divider + labels */}
+        <line x1="20" y1="284" x2="520" y2="284" stroke={rule} strokeWidth="0.5" />
+        <text x="26" y="302" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.32">7 ДЕЙСТВИЙ В ОДНОМ МЕНЮ</text>
+        <text x="514" y="302" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.32" textAnchor="end">НАЖМИ ⚡ НА КАРТОЧКЕ</text>
       </svg>
     </div>
   );
