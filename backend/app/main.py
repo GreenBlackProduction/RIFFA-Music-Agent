@@ -89,7 +89,14 @@ def create_app() -> FastAPI:
             exc.errors(),
             body_preview,
         )
-        return JSONResponse(status_code=422, content={"detail": exc.errors()})
+        # Format as a human-readable string so the frontend can display the
+        # actual reason — `exc.errors()` is a list that apiFetch rejects
+        # because it expects `detail` to be a string.
+        readable = "; ".join(
+            f"{'.'.join(str(p) for p in e.get('loc', []))}: {e.get('msg', 'invalid')}"
+            for e in exc.errors()
+        )
+        return JSONResponse(status_code=422, content={"detail": readable})
 
     if settings.cors_origins:
         app.add_middleware(
