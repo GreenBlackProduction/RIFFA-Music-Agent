@@ -52,7 +52,28 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 # `/bot-link/poll` until it sees the nonce flipped from pending → approved.
 # TTL: 5 minutes — matches the LoginPage poll loop budget.
 _BOT_LINK_NONCE_KEY = "auth:bot_link:{}"
+_BOT_LINK_ORIGIN_KEY = "auth:bot_link_origin:{}"
 _BOT_LINK_TTL = 60 * 5
+
+# Origins we will hand back as a post-login return URL. Whitelisted so the bot
+# can never be tricked into returning users to an attacker's site.
+_ALLOWED_RETURN_ORIGINS = {
+    "https://riffastudio.site",
+    "https://beta.riffastudio.site",
+}
+
+
+def _safe_return_origin(raw: str | None, settings: Settings) -> str:
+    """Resolve the site origin to return to after a bot-link login.
+
+    Defaults to production; only echoes back a caller-supplied origin if it's on
+    the whitelist (prevents open-redirect via the bot's return button)."""
+    origin = (raw or "").strip().rstrip("/")
+    if origin in _ALLOWED_RETURN_ORIGINS:
+        return origin
+    if settings.app_env != "production" and origin.startswith("http://localhost"):
+        return origin
+    return "https://riffastudio.site"
 
 
 def _set_session_cookie(response: Response, settings: Settings, token: str) -> None:
@@ -157,14 +178,30 @@ async def bot_link_start(
             detail="telegram bot is not configured",
         )
 
+    # Remember which site the user started from so the bot's post-login return
+    # button can bring them back to *that* site (beta vs prod). Origin comes from
+    # the request body (frontend sends window.location.origin) or the Referer.
+    origin_in = ""
+    try:
+        body = await request.json()
+        if isinstance(body, dict):
+            origin_in = str(body.get("origin") or "")
+    except Exception:
+        origin_in = ""
+    if not origin_in:
+        ref = request.headers.get("referer") or ""
+        if ref:
+            from urllib.parse import urlparse
+            u = urlparse(ref)
+            if u.scheme and u.netloc:
+                origin_in = f"{u.scheme}://{u.netloc}"
+    origin = _safe_return_origin(origin_in, settings)
+
     nonce = secrets.token_urlsafe(24)
     redis = Redis.from_url(settings.redis_url, decode_responses=True)
     try:
-        await redis.set(
-            _BOT_LINK_NONCE_KEY.format(nonce),
-            "pending",
-            ex=_BOT_LINK_TTL,
-        )
+        await redis.set(_BOT_LINK_NONCE_KEY.format(nonce), "pending", ex=_BOT_LINK_TTL)
+        await redis.set(_BOT_LINK_ORIGIN_KEY.format(nonce), origin, ex=_BOT_LINK_TTL)
     finally:
         await redis.aclose()  # type: ignore[attr-defined]
 
@@ -243,7 +280,7 @@ async def bot_link_approve(
     x_bot_secret: str | None = Header(default=None, alias="X-Bot-Secret"),
     settings: Settings = Depends(get_settings),
     session: AsyncSession = Depends(db_session),
-) -> dict[str, bool]:
+) -> dict[str, bool | str]:
     """Called by the bot when the user taps "Войти на сайт".
 
     Authenticated via the ``X-Bot-Secret`` header which must equal the bot's
@@ -289,10 +326,13 @@ async def bot_link_approve(
             str(tg_user_id),
             ex=_BOT_LINK_TTL,
         )
+        origin = await redis.get(_BOT_LINK_ORIGIN_KEY.format(nonce)) or "https://riffastudio.site"
     finally:
         await redis.aclose()  # type: ignore[attr-defined]
 
-    return {"ok": True}
+    # The bot shows this as a one-tap "вернуться на сайт" button — completing
+    # login even when the original tab is gone (mobile / same-tab open).
+    return {"ok": True, "return_url": f"{origin}/tg-auth?nonce={nonce}"}
 
 
 @router.post("/email/request", status_code=status.HTTP_202_ACCEPTED)
