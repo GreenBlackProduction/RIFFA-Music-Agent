@@ -24,7 +24,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .wrap { max-width: 1240px; margin: 0 auto; padding: 0 32px; }
 
 /* NAV */
-.rl-root .nav { position: fixed; top: 0; left: 0; right: 0; width: 100%; z-index: 100; border-bottom: 1px solid; padding: 14px 0; transition: background 0.3s, backdrop-filter 0.3s, border-color 0.3s, box-shadow 0.3s; }
+.rl-root .nav { position: fixed; top: 0; left: 0; right: 0; width: 100%; z-index: 100; border-bottom: 1px solid; padding: 14px 0; backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4); transition: background 0.3s, border-color 0.3s, box-shadow 0.3s; }
 .rl-root .nav.glass { backdrop-filter: blur(24px) saturate(1.5); -webkit-backdrop-filter: blur(24px) saturate(1.5); box-shadow: 0 1px 0 rgba(22,20,19,0.06); }
 .rl-root .nav-inner { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 24px; }
 .rl-root .nav-brand { display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; }

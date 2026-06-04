@@ -196,13 +196,13 @@ export function LandingPage() {
   const go = (href: string) => () => { if (/^https?:\/\//.test(href)) window.open(href, "_blank", "noopener"); else navigate(href); };
   const scrollTo = (id: string) => (e: React.MouseEvent) => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }); };
 
-  // Nav is always 95% opaque so it reads well on any scroll position.
-  const glassBg = "rgba(233,229,218,0.95)";
+  // 85% opacity + backdrop blur → frosted-glass effect over page content.
+  const glassBg = "rgba(233,229,218,0.85)";
   const navToSection: Record<string, string> = { types: "студия", agent: "агент", process: "как пользоваться", radio: "радио", pricing: "тарифы", interactions: "радио" };
 
   const types = [{ name: t.t1, sub: t.t1sub }, { name: t.t2, sub: t.t2sub }, { name: t.t3, sub: t.t3sub }, { name: t.t4, sub: t.t4sub }, { name: t.t5, sub: t.t5sub }];
   const agentFeatures = [
-    { n: "01", title: "Понимает", desc: "Русский и английский — пишите как удобно" },
+    { n: "01", title: "Понимает", desc: "Понимает контекст, анализирует исполнителей, специалист в музыке" },
     { n: "02", title: "Уточняет", desc: "Задаёт вопросы, чтобы трек вышел точнее" },
     { n: "03", title: "Помнит", desc: "История заказов сохраняется в профиле" },
     { n: "04", title: "Отправляет", desc: "уведомление о готовности генерации" },
@@ -314,7 +314,7 @@ export function LandingPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">02</span> · агент</div>
-            <h2 style={{ color: "rgb(220, 99, 40)" }}>Умный помощник прямо в Telegram.</h2>
+            <h2 style={{ color: "rgb(220, 99, 40)" }}>Умный ИИ агент собирает промт на лету.</h2>
             <div className="right" style={{ fontSize: "15px" }}>@the_riffa_bot</div>
           </div>
           <div className="agent-grid">
@@ -354,8 +354,8 @@ export function LandingPage() {
               <div key={i} className="process-step" data-edit="process-step" style={{ borderColor: c.rule }}>
                 <div className="step-num" style={{ color: c.accent, opacity: 1 }}>{"0" + (i + 1)}</div>
                 <h3 style={{ color: c.ink }}>{s.h}</h3>
-                <p style={{ color: c.ink, fontWeight: 900, fontSize: "22px" }}>{s.p}</p>
-                <div className="tip" style={{ borderColor: c.rule, color: c.ink, fontFamily: "'JetBrains Mono', monospace", letterSpacing: i === 0 ? "-0.9px" : "0.02em", fontWeight: 900, fontSize: "22px", height: i === 0 ? "131px" : undefined }}>{s.tip}</div>
+                <p style={{ color: c.ink }}>{s.p}</p>
+                <div className="tip" style={{ borderColor: c.rule, color: c.ink, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.02em" }}>{s.tip}</div>
               </div>
             ))}
           </div>
