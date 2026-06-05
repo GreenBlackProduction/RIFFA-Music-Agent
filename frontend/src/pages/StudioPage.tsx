@@ -675,7 +675,8 @@ function RecentTracks() {
       isPlaying: s.isPlaying,
     })),
   );
-  const recent = items.slice(0, 8);
+  // Covers (cover_art) are images, not tracks — keep them out of "recent tracks".
+  const recent = items.filter((i) => i.type !== "cover_art").slice(0, 8);
 
   if (isLoading) return <p className="tracks-empty">Загружаем…</p>;
   if (!recent.length) return <p className="tracks-empty">Треков ещё нет — создай первый выше.</p>;
