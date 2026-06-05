@@ -13,11 +13,11 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 
 /* grain texture */
 .rl-root::before {
-  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 300;
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
   background-image:
-    radial-gradient(rgba(22,20,19,0.04) 1px, transparent 1px),
-    radial-gradient(rgba(22,20,19,0.03) 1px, transparent 1px);
-  background-size: 3px 3px, 7px 7px; background-position: 0 0, 1px 2px; mix-blend-mode: multiply;
+    radial-gradient(rgba(22,20,19,0.02) 1px, transparent 1px),
+    radial-gradient(rgba(22,20,19,0.013) 1px, transparent 1px);
+  background-size: 4px 4px, 8px 8px; background-position: 0 0, 1px 2px; mix-blend-mode: multiply;
 }
 
 .rl-root .page { min-height: 100vh; transition: background 0.25s, color 0.25s; }
@@ -35,7 +35,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .nav-cta { justify-self: end; }
 .rl-root .nav-brand { display: flex; align-items: center; gap: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 600; font-size: 13px; }
 .rl-root .nav-links { display: flex; gap: 22px; justify-self: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
-.rl-root .nav-links a { text-decoration: none; opacity: 0.55; transition: opacity 0.15s, color 0.2s; cursor: pointer; }
+.rl-root .nav-links a { text-decoration: none; opacity: 0.8; transition: opacity 0.15s, color 0.2s; cursor: pointer; }
 .rl-root .nav-links a:hover { opacity: 1; }
 .rl-root .nav-links a.active { opacity: 1; font-weight: 600; }
 .rl-root .nav-cta { height: 34px; padding: 0 18px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; border: none; cursor: pointer; font-weight: 600; transition: opacity 0.15s, transform 0.12s; }
@@ -46,7 +46,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .hero { padding: 64px 0 72px; border-bottom: 1px solid; margin-top: 62px; }
 .rl-root .hero-split { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
 .rl-root .hero-center { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 32px; }
-.rl-root .meta-ruler { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.5; margin-bottom: 28px; }
+.rl-root .meta-ruler { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.78; margin-bottom: 28px; }
 .rl-root .hero-headline { font-family: 'Archivo Black', sans-serif; font-weight: 900; font-size: clamp(60px, 8.5vw, 120px); letter-spacing: -0.04em; line-height: 0.92; white-space: pre-line; }
 .rl-root .hero-sub { margin-top: 28px; max-width: 480px; font-size: 17px; line-height: 1.6; opacity: 0.7; }
 .rl-root .hero-center .hero-sub { max-width: 680px; margin-top: 56px; }
@@ -64,10 +64,10 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 
 /* SECTION HEAD */
 .rl-root .section-head { display: grid; grid-template-columns: 220px 1fr auto; gap: 24px; padding: 20px 0; border-top: 1px solid; border-bottom: 1px solid; align-items: baseline; }
-.rl-root .section-tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; }
+.rl-root .section-tag { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.8; }
 .rl-root .section-tag .num { opacity: 1; font-weight: 600; }
 .rl-root .section-head h2 { margin: 0; font-size: 46px; font-weight: 500; letter-spacing: -0.03em; }
-.rl-root .section-head .right { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.45; text-align: right; }
+.rl-root .section-head .right { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.74; text-align: right; }
 
 /* TYPES */
 .rl-root .types-section { padding: 56px 0; border-bottom: 1px solid; }
@@ -75,12 +75,12 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .type-card { padding: 24px 20px; border-right: 1px solid; display: flex; flex-direction: column; gap: 14px; transition: background 0.2s, transform 0.15s, box-shadow 0.2s; }
 .rl-root .type-card:last-child { border-right: none; }
 .rl-root .type-card:hover { transform: translateY(-3px); }
-.rl-root .type-card .type-num { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.45; }
+.rl-root .type-card .type-num { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.74; }
 .rl-root .type-card .type-icon { height: 72px; display: grid; place-items: center; }
 .rl-root .type-card .type-icon svg { display: block; }
 .rl-root .type-card h3 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
 .rl-root .type-card p { font-size: 12.5px; line-height: 1.45; opacity: 0.6; }
-.rl-root .type-card .type-meta { margin-top: auto; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding-top: 12px; border-top: 1px solid; opacity: 0.5; }
+.rl-root .type-card .type-meta { margin-top: auto; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; padding-top: 12px; border-top: 1px solid; opacity: 0.78; }
 
 /* PROCESS */
 .rl-root .process-section { padding: 56px 0; border-bottom: 1px solid; }
@@ -98,7 +98,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .stat-item { padding: 28px 24px; border-right: 1px solid; }
 .rl-root .stat-item:last-child { border-right: none; }
 .rl-root .stat-num { font-family: 'Archivo Black', sans-serif; font-size: 42px; font-weight: 900; letter-spacing: -0.04em; line-height: 1; }
-.rl-root .stat-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 8px; opacity: 0.55; }
+.rl-root .stat-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin-top: 8px; opacity: 0.8; }
 
 /* PRICING */
 .rl-root .pricing-section { padding: 56px 0; border-bottom: 1px solid; }
@@ -111,12 +111,12 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .price-card:nth-child(2):hover { border-color: #161413 !important; }
 .rl-root .price-card:nth-child(3):hover { border-color: #0F5D47 !important; background: rgba(15,93,71,0.04) !important; }
 .rl-root .price-card:nth-child(4).featured:hover { transform: translateY(-3px); box-shadow: 0 8px 32px rgba(220,99,40,0.25); }
-.rl-root .price-tier { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.55; }
+.rl-root .price-tier { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.8; }
 .rl-root .price-amount { font-family: 'Archivo Black', sans-serif; font-size: 52px; font-weight: 900; letter-spacing: -0.04em; line-height: 1; margin: 4px 0; }
 .rl-root .price-tokens { font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.04em; opacity: 0.7; padding: 6px 0; border-top: 1px solid; border-bottom: 1px solid; }
 .rl-root .price-features { display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .rl-root .price-features li { font-size: 13.5px; line-height: 1.4; opacity: 0.75; list-style: none; padding-left: 16px; position: relative; }
-.rl-root .price-features li::before { content: "—"; position: absolute; left: 0; opacity: 0.4; }
+.rl-root .price-features li::before { content: "—"; position: absolute; left: 0; opacity: 0.72; }
 .rl-root .price-cta { margin-top: 16px; height: 44px; width: 100%; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; cursor: pointer; border: 1px solid; transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.12s; }
 .rl-root .price-cta:hover { background: #0F5D47 !important; color: #E9E5DA !important; border-color: #0F5D47 !important; transform: translateY(-2px); opacity: 1; }
 .rl-root .price-card.featured .price-cta:hover { background: rgb(220,99,40) !important; border-color: rgb(220,99,40) !important; }
@@ -132,7 +132,7 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .agent-feature:hover { transform: translateY(-2px); }
 .rl-root .agent-headline { font-family: 'Archivo Black', sans-serif; font-size: 48px; font-weight: 900; letter-spacing: -0.04em; line-height: 0.97; }
 .rl-root .agent-sub { font-size: 15px; line-height: 1.65; opacity: 0.7; max-width: 440px; }
-.rl-root .agent-feature-num { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.4; }
+.rl-root .agent-feature-num { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.72; }
 .rl-root .agent-feature-title { font-size: 14px; font-weight: 600; }
 .rl-root .agent-feature-desc { font-size: 12.5px; line-height: 1.45; opacity: 0.6; }
 
@@ -162,16 +162,16 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 
 .rl-root .radio-meta { min-width: 0; }
 .rl-root .radio-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rl-root .radio-genre { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.5; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rl-root .radio-genre { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.78; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* waveform — animates into an equaliser while playing */
 .rl-root .radio-wave { opacity: 0.28; transition: opacity 0.2s; }
-.rl-root .radio-track:hover .radio-wave { opacity: 0.5; }
+.rl-root .radio-track:hover .radio-wave { opacity: 0.78; }
 .rl-root .radio-track.active .radio-wave { opacity: 1; }
 .rl-root .radio-wave.playing rect { transform-box: fill-box; transform-origin: center; animation: rl-eq 0.75s ease-in-out infinite alternate; }
 @keyframes rl-eq { from { transform: scaleY(0.45); } to { transform: scaleY(1.18); } }
 
-.rl-root .radio-dur { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; opacity: 0.55; text-align: right; }
+.rl-root .radio-dur { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; opacity: 0.8; text-align: right; }
 .rl-root .radio-play-btn { width: 34px; height: 34px; border-radius: 50%; border: 1px solid; display: grid; place-items: center; cursor: pointer; transition: background 0.18s, border-color 0.18s, transform 0.16s cubic-bezier(0.34,1.56,0.64,1); background: transparent; }
 .rl-root .radio-track:hover .radio-play-btn { transform: scale(1.14); border-color: var(--radio-hi, #FF3B1F); }
 .rl-root .radio-track.active .radio-play-btn { transform: scale(1.06); }
@@ -181,10 +181,10 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 .rl-root .footer { padding: 40px 0 56px; }
 .rl-root .footer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 32px; border-top: 1px solid; padding-top: 24px; }
 .rl-root .footer-col { display: flex; flex-direction: column; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
-.rl-root .footer-col .title { opacity: 0.4; margin-bottom: 4px; }
+.rl-root .footer-col .title { opacity: 0.72; margin-bottom: 4px; }
 .rl-root .footer-col a { text-decoration: none; opacity: 0.65; transition: opacity 0.15s; cursor: pointer; }
 .rl-root .footer-col a:hover { opacity: 1; }
-.rl-root .footer-bottom { margin-top: 48px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.4; border-top: 1px solid; padding-top: 18px; }
+.rl-root .footer-bottom { margin-top: 48px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.72; border-top: 1px solid; padding-top: 18px; }
 
 /* SCROLL REVEAL — classes added by JS, so default (no-JS) stays visible */
 .rl-root .reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.75s cubic-bezier(0.22,1,0.36,1), transform 0.75s cubic-bezier(0.22,1,0.36,1); }
