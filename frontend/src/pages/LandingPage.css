@@ -276,11 +276,14 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
 @media (max-width: 768px) {
   .rl-root .nav-inner { grid-template-columns: auto 1fr auto; }
   .rl-root .nav-links { display: none; }
+  /* smaller wordmark on phones so "RIFFA Studio AI" stays on one line */
+  .rl-root .nav-brand span { font-size: 15px !important; }
   .rl-root .hero-split { grid-template-columns: 1fr; gap: 40px; }
   .rl-root .section-head { grid-template-columns: 1fr; gap: 8px; }
   .rl-root .section-head h2 { font-size: 32px; }
-  .rl-root .types-grid { grid-template-columns: 1fr 1fr; }
-  .rl-root .type-card:nth-child(2n) { border-right: none; }
+  .rl-root .types-grid { grid-template-columns: 1fr; }
+  .rl-root .type-card { border-right: none; border-bottom: 1px solid rgba(22, 20, 19, 0.18); }
+  .rl-root .type-card:last-child { border-bottom: none; }
   .rl-root .process-grid { grid-template-columns: 1fr; }
   .rl-root .process-step { border-right: none; border-bottom: 1px solid; }
   .rl-root .stats-grid { grid-template-columns: 1fr 1fr; }
@@ -317,6 +320,30 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
   /* safety net: never allow a sideways scroll on the landing */
   .rl-root .page { overflow-x: hidden; }
 }
+
+/* ── Scroll-to-top button (all viewports) ─────────────────────────────── */
+.rl-root .rl-scrolltop {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 90;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: none;
+  background: #161413;
+  color: #E9E5DA;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgba(22, 20, 19, 0.28);
+  transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), background 0.2s;
+}
+.rl-root .rl-scrolltop.show { opacity: 1; transform: none; pointer-events: auto; }
+.rl-root .rl-scrolltop:hover { background: #0F5D47; }
 
 /* ════════════════════════════════════════════════
    EDIT MODE (?edit=1) — visual tweak panel (beta only)

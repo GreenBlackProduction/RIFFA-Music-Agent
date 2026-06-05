@@ -139,6 +139,7 @@ export function LandingPage() {
   const navigate = useNavigate();
   const rootRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [showTop, setShowTop] = useState(false);
   const [activeTrack, setActiveTrack] = useState<number | null>(null);
   const [hoverTrack, setHoverTrack] = useState<number | null>(null);
   const [realRadioTracks, setRealRadioTracks] = useState<RadioTrackOut[]>([]);
@@ -154,7 +155,7 @@ export function LandingPage() {
   }, []);
 
   useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 10);
+    const fn = () => { setScrolled(window.scrollY > 10); setShowTop(window.scrollY > 500); };
     window.addEventListener("scroll", fn, { passive: true });
     return () => window.removeEventListener("scroll", fn);
   }, []);
@@ -274,9 +275,9 @@ export function LandingPage() {
       <nav className={`nav${scrolled ? " glass" : ""}`} data-edit="nav" style={{ background: glassBg, borderColor: c.rule, color: c.ink }}>
         <div className="wrap">
           <div className="nav-inner">
-            <div className="nav-brand">
+            <div className="nav-brand" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} style={{ cursor: "pointer" }}>
               <Mark size={22} />
-              <span style={{ color: c.ink, fontFamily: "system-ui, sans-serif", fontWeight: 700, fontSize: 22 }}>RIFFA Studio AI</span>
+              <span style={{ color: c.ink, fontFamily: "system-ui, sans-serif", fontWeight: 700, fontSize: 22, whiteSpace: "nowrap" }}>RIFFA Studio AI</span>
             </div>
             <div className="nav-links">
               {[
@@ -399,7 +400,7 @@ export function LandingPage() {
       </section>
 
       {/* RADIO */}
-      <section id="radio" className="radio-section" data-edit="radio" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+      <section id="radio" className="radio-section" data-edit="radio" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">04</span> · радио</div>
@@ -524,6 +525,14 @@ export function LandingPage() {
           </div>
         </div>
       </footer>
+
+      <button
+        className={`rl-scrolltop${showTop ? " show" : ""}`}
+        aria-label="Наверх"
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+      </button>
 
       {EDIT_MODE && <EditMode />}
     </div>
