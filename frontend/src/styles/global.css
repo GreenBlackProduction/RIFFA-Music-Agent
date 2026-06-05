@@ -220,8 +220,6 @@ body::before {
 @media (max-width: 768px), (pointer: coarse) {
   .panel,
   .sidebar,
-  .global-player,
-  .gp-queue,
   .notice-banner,
   .user-menu__pop,
   .image-viewer-backdrop,
