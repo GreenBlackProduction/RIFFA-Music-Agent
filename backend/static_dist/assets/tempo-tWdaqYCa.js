@@ -1,0 +1,1 @@
+function n(t){if(!t)return"";const e=t.trim().toLowerCase(),s={very_slow:"60–80 BPM",slow:"80–100 BPM",medium:"100–120 BPM",mid:"100–120 BPM",fast:"120–140 BPM",very_fast:"140–180 BPM"};if(s[e])return s[e];const r=e.replace(/bpm/g,"").trim();return/^\d+\s*[-–]\s*\d+$/.test(r)?r.replace(/\s*-\s*/,"–")+" BPM":/^\d+$/.test(r)?r+" BPM":t}export{n as f};

@@ -11,6 +11,7 @@ import { Coin } from "@/components/ui/Coin";
 import { AgentChat, type AgentResult } from "@/components/studio/AgentChat";
 import { ModuleIcon } from "@/components/studio/ModuleIcon";
 import { VoiceRecorder } from "@/components/studio/VoiceRecorder";
+import { formatBpm } from "@/lib/tempo";
 import {
   createLyricsDraft,
   fetchLyricsDraft,
@@ -853,7 +854,7 @@ export function StudioPage() {
         const firstTrack = gen.tracks?.[0];
         const audioUrl = firstTrack?.audio_url;
         if (!audioUrl) return;
-        const meta = [gen.genre, gen.mood, gen.tempo].filter(Boolean).join(" · ");
+        const meta = [gen.genre, gen.mood, formatBpm(gen.tempo)].filter(Boolean).join(" · ");
         playerPlay(
           {
             id: `${gen.id}#0`,
