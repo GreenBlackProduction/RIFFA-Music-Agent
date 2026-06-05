@@ -178,6 +178,21 @@
 .chart-row .likes-mini:hover { opacity: 0.75; }
 .chart-row .likes-mini.liked { color: var(--hi); }
 
+/* ── Track row: landing-style hover ───────────────────────────────────
+   Faithful port of the landing .radio-track / .radio-cover treatment —
+   the row stands out with a left accent + title highlight, and the cover
+   art gently scales, tilts and lifts with a soft shadow. No row translateX
+   here because the chart list can be scrollable (would add a h-scrollbar);
+   an inset accent gives the same "stand out" read without overflow. */
+@media (prefers-reduced-motion: no-preference) {
+  .chart-row { transition: background 160ms ease, box-shadow 200ms ease, color 160ms ease; }
+  .chart-row:hover { box-shadow: inset 3px 0 0 var(--hi); }
+  .chart-row:hover .title-mini { color: var(--hi); }
+
+  .chart-row .cover-mini { transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 240ms ease; }
+  .chart-row:hover .cover-mini { transform: scale(1.08) rotate(-2deg); box-shadow: 0 5px 16px rgba(22, 20, 19, 0.22); }
+}
+
 /* Admin inline tools */
 .admin-row {
   display: flex;
