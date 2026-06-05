@@ -1683,7 +1683,7 @@
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 0;
   border: 1px solid var(--ink);
-  border-radius: 14px;
+  border-radius: 0;
   background: var(--paper-3);
   overflow: hidden;
   margin-bottom: 40px;
@@ -1703,7 +1703,7 @@
 
 .track-cover {
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: 0;
   background: linear-gradient(135deg, #c8c2b1 0%, #8E887F 100%);
   position: relative;
   overflow: hidden;
