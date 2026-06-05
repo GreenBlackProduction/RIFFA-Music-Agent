@@ -1620,6 +1620,78 @@ async def _stream_agent_completion(
     )
 
 
+# Always-on rule telling the model how to treat the grounded-reference notes
+# that _reference_facts() may inject below.
+_REF_GROUNDING_RULE = (
+    "REFERENCE GROUNDING: if a system note labelled 'REFERENCE DATA' is present, treat it as "
+    "authoritative — base genre / era / tempo / key_instruments / research_notes on those facts "
+    "and never invent a different style. If a note labelled 'REFERENCE LOOKUP: no reliable data' "
+    "is present, do NOT fabricate that artist's sound — keep done=false and ask the user to "
+    "describe the style or name a specific track. Never confabulate a niche or ambiguous artist "
+    "from memory."
+)
+
+# Heuristic gate: only spend a lookup when the latest message actually contains
+# a latin word or a Capitalised Cyrillic word (artist/song names usually do).
+_REF_HINT_RE = re.compile(r"[A-Za-z]{2,}|[А-ЯЁ][а-яё]+")
+
+
+async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: Settings) -> str:
+    """Ground a user-named artist/song reference with real catalogue data
+    (Deezer + optional Last.fm). Returns a system note for the model, or "".
+    Fails safe — any error/timeout returns "" so the turn proceeds unchanged.
+    """
+    last_user = next((m.content for m in reversed(windowed) if getattr(m, "role", "") == "user"), "")
+    text = (last_user or "").strip()
+    if len(text) < 4 or not _REF_HINT_RE.search(text):
+        return ""
+
+    query = (detect_reference_url(text) or "").strip()
+    if not query:
+        # Cheap extraction of a plain artist/song name from free text.
+        try:
+            ex = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": (
+                        "Extract the ONE real music artist, band, producer or song the user names "
+                        'as a style reference. Respond JSON {"q":"<name>"}, or {"q":""} if they '
+                        "name no real artist/song.")},
+                    {"role": "user", "content": text[:500]},
+                ],
+                temperature=0,
+                max_tokens=40,
+                response_format={"type": "json_object"},
+            )
+            query = (json.loads(ex.choices[0].message.content or "{}").get("q") or "").strip()
+        except Exception:
+            return ""
+
+    if not query:
+        return ""
+
+    try:
+        data = await asyncio.wait_for(
+            resolve_reference(query, lastfm_api_key=settings.lastfm_api_key), timeout=8.0
+        )
+    except Exception:
+        data = None
+
+    if not data:
+        return f"REFERENCE LOOKUP: no reliable catalogue data found for «{query}»."
+
+    bits = [f"{k}: {data[k]}" for k in ("artist", "genre", "era", "tempo") if data.get(k)]
+    tags = ", ".join(data.get("tags") or [])
+    if tags:
+        bits.append(f"tags: {tags}")
+    return (
+        "REFERENCE DATA (looked up via Deezer/Last.fm — GROUND research_notes and music_params "
+        "in THESE facts, do not invent a different style): "
+        + "; ".join(bits)
+        + f". (matched: {data.get('artist')} — {data.get('title')})"
+    )
+
+
 @router.post("/chat", response_model=AgentChatResponse)
 @limiter.limit("30/minute")
 async def agent_chat(
@@ -1687,6 +1759,14 @@ async def agent_chat(
                 "content": m.content,
             }
         )
+
+    chat_messages.append({"role": "system", "content": _REF_GROUNDING_RULE})
+    try:
+        ref_note = await _reference_facts(windowed, client, settings)
+        if ref_note:
+            chat_messages.append({"role": "system", "content": ref_note})
+    except Exception as exc:
+        logger.warning("agent_chat: reference grounding failed: {}", exc)
 
     chosen_model = _pick_model(body.messages)
     try:
@@ -1913,6 +1993,14 @@ async def agent_chat_stream(
                 "content": m.content,
             }
         )
+
+    chat_messages.append({"role": "system", "content": _REF_GROUNDING_RULE})
+    try:
+        ref_note = await _reference_facts(windowed, client, settings)
+        if ref_note:
+            chat_messages.append({"role": "system", "content": ref_note})
+    except Exception as exc:
+        logger.warning("agent_chat_stream: reference grounding failed: {}", exc)
 
     chosen_model = _pick_model(body.messages)
     return StreamingResponse(
