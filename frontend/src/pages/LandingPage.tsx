@@ -78,7 +78,7 @@ function SchematicSVG({ prompt, submit }: { prompt: string; submit: boolean }) {
         <rect width="560" height="420" fill={c.bg2} />
         <rect width="560" height="420" fill="url(#sch-dots)" />
         <rect x="36" y="28" width="488" height="364" rx="18" fill={c.bg} stroke={c.ink} strokeWidth="1.2" />
-        <rect x="46" y="38" width="468" height="344" rx="12" stroke={c.ink} strokeWidth="0.5" fill="none" opacity="0.25" />
+        <rect x="46" y="38" width="468" height="344" rx="12" stroke={c.ink} strokeWidth="0.5" fill="none" opacity="0.5" />
         <line x1="46" y1="78" x2="514" y2="78" stroke={c.ink} strokeWidth="0.8" />
         <rect x="60" y="44" width="80" height="24" rx="12" fill={c.ink} />
         <text x="100" y="61" fontFamily="JetBrains Mono" fontSize="9" fill={c.bg} textAnchor="middle" fontWeight="600">ПЕСНЯ</text>
@@ -87,9 +87,9 @@ function SchematicSVG({ prompt, submit }: { prompt: string; submit: boolean }) {
         <rect x="262" y="44" width="90" height="24" rx="12" stroke={c.ink} strokeWidth="0.8" fill="none" />
         <text x="307" y="61" fontFamily="JetBrains Mono" fontSize="9" fill={c.ink} textAnchor="middle">ОБЛОЖКА</text>
         <rect x="60" y="92" width="440" height="88" rx="10" stroke={c.ink} strokeWidth="0.8" fill="none" />
-        <text x="74" y="114" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink} opacity="0.5">ОПИШИТЕ ИДЕЮ</text>
+        <text x="74" y="114" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink}>ОПИШИТЕ ИДЕЮ</text>
         <text x="74" y="140" fontFamily="Inter" fontSize="14" fontWeight="500" fill={c.ink}>{prompt}<tspan className="rl-type-caret" fill={accent}> ▏</tspan></text>
-        <text x="490" y="114" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink} opacity="0.45" textAnchor="end">{prompt.length} / 500</text>
+        <text x="490" y="114" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink} textAnchor="end">{prompt.length} / 500</text>
         <rect x="60" y="192" width="64" height="26" rx="13" stroke={c.ink} strokeWidth="0.8" fill="none" />
         <text x="92" y="209" fontFamily="JetBrains Mono" fontSize="9" fill={c.ink} textAnchor="middle">ЛО-ФАЙ</text>
         <rect x="130" y="192" width="72" height="26" rx="13" stroke={c.ink} strokeWidth="0.8" fill="none" />
@@ -99,16 +99,16 @@ function SchematicSVG({ prompt, submit }: { prompt: string; submit: boolean }) {
         <rect x="362" y="188" width="138" height="34" rx="17" className="rl-create-btn" fill={submit ? "#FF3B1F" : accent} />
         <text x="431" y="210" fontFamily="Inter" fontWeight="600" fontSize="12" fill="#E9E5DA" textAnchor="middle">СОЗДАТЬ →</text>
         <rect x="60" y="232" width="440" height="60" rx="10" fill={c.bg2} stroke={c.ink} strokeWidth="0.5" />
-        <text x="74" y="254" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink} opacity="0.5">ЗАДАЧА #4A91</text>
+        <text x="74" y="254" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink}>ЗАДАЧА #4A91</text>
         <text x="490" y="254" fontFamily="JetBrains Mono" fontSize="8" fill="#0F5D47" fontWeight="600" textAnchor="end">63%</text>
         <rect x="74" y="262" width="412" height="3" fill={c.ink} opacity="0.1" />
         <rect x="74" y="262" width="260" height="3" fill={accent} />
-        <text x="74" y="282" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink} opacity="0.55">РЕНДЕР АУДИО · ОСТАЛОСЬ ≈12 СЕК</text>
+        <text x="74" y="282" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink}>РЕНДЕР АУДИО · ОСТАЛОСЬ ≈12 СЕК</text>
         <rect x="60" y="306" width="440" height="56" rx="10" stroke={c.ink} strokeWidth="0.8" fill="none" />
         <rect x="78" y="320" width="32" height="28" rx="4" fill={c.ink} />
         <polygon points="86,326 86,342 100,334" fill={c.bg} />
         <text x="124" y="334" fontFamily="Inter" fontSize="13" fontWeight="600" fill={c.ink}>монолог в дождь</text>
-        <text x="124" y="350" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink} opacity="0.6">2:14 / 2:48 · ЛО-ФАЙ</text>
+        <text x="124" y="350" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink}>2:14 / 2:48 · ЛО-ФАЙ</text>
         {[0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72, 78].map((x, i) => {
           const h = [6, 12, 8, 16, 8, 12, 14, 8, 10, 14, 8, 8, 6, 6][i];
           const op = i > 9 ? 1 - (i - 9) * 0.25 : 1;
