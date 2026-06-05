@@ -102,9 +102,9 @@ function SchematicSVG({ prompt, submit }: { prompt: string; submit: boolean }) {
         <text x="74" y="254" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink}>ЗАДАЧА #4A91</text>
         <text x="490" y="254" fontFamily="JetBrains Mono" fontSize="8" fill="#0F5D47" fontWeight="600" textAnchor="end">63%</text>
         <rect x="74" y="262" width="412" height="3" fill={c.ink} opacity="0.1" />
-        <rect x="74" y="262" width="260" height="3" fill={accent} />
+        <rect x="74" y="262" width="260" height="3" fill={accent} className="rl-gen-progress" />
         <text x="74" y="282" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink}>РЕНДЕР АУДИО · ОСТАЛОСЬ ≈12 СЕК</text>
-        <rect x="60" y="306" width="440" height="56" rx="10" stroke={c.ink} strokeWidth="0.8" fill="none" />
+        <rect x="60" y="306" width="440" height="56" rx="10" stroke={c.ink} strokeWidth="0.8" fill="none" className="rl-gen-cell" />
         <rect x="78" y="320" width="32" height="28" rx="4" fill={c.ink} />
         <polygon points="86,326 86,342 100,334" fill={c.bg} />
         <text x="124" y="334" fontFamily="Inter" fontSize="13" fontWeight="600" fill={c.ink}>монолог в дождь</text>
@@ -112,7 +112,7 @@ function SchematicSVG({ prompt, submit }: { prompt: string; submit: boolean }) {
         {[0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72, 78].map((x, i) => {
           const h = [6, 12, 8, 16, 8, 12, 14, 8, 10, 14, 8, 8, 6, 6][i];
           const op = i > 9 ? 1 - (i - 9) * 0.25 : 1;
-          return <line key={x} x1={280 + x} y1={334 - h / 2} x2={280 + x} y2={334 + h / 2} stroke={c.ink} strokeWidth="1.6" strokeLinecap="round" opacity={op} />;
+          return <line key={x} className="rl-wave-bar" style={{ animationDelay: `${i * 0.07}s` }} x1={280 + x} y1={334 - h / 2} x2={280 + x} y2={334 + h / 2} stroke={c.ink} strokeWidth="1.6" strokeLinecap="round" opacity={op} />;
         })}
         <rect x="376" y="322" width="58" height="24" rx="12" fill="#0F5D47" />
         <text x="405" y="338" fontFamily="JetBrains Mono" fontSize="8" fill="#E9E5DA" fontWeight="600" textAnchor="middle">↓ MP3</text>
@@ -121,7 +121,7 @@ function SchematicSVG({ prompt, submit }: { prompt: string; submit: boolean }) {
         {[{ n: "1", x: 22, y: 66 }, { n: "2", x: 22, y: 136 }, { n: "3", x: 22, y: 205 }, { n: "4", x: 22, y: 262 }].map(({ n, x, y }) => (
           <g key={n}>
             <line x1={x + 14} y1={y} x2={58} y2={y} stroke={c.ink} strokeWidth="0.7" />
-            <circle cx={x} cy={y} r={11} fill={n === "3" ? "#0F5D47" : accent} />
+            <circle cx={x} cy={y} r={11} className={`rl-step rl-step-${n}`} fill={n === "3" ? "#0F5D47" : accent} />
             <text x={x} y={y + 4} fontFamily="JetBrains Mono" fontSize="10" fontWeight="600" fill="#E9E5DA" textAnchor="middle">{n}</text>
           </g>
         ))}
@@ -698,22 +698,22 @@ function TrackCardSVG() {
         <rect x="12" y="12" width="516" height="336" rx="14" fill={bg} stroke={ink} strokeWidth="1" />
 
         {/* Corner labels */}
-        <text x="26" y="30" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.38">ВАША БИБЛИОТЕКА</text>
-        <text x="514" y="30" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.38" textAnchor="end">КАРТОЧКА ТРЕКА</text>
+        <text x="26" y="30" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">ВАША БИБЛИОТЕКА</text>
+        <text x="514" y="30" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82" textAnchor="end">КАРТОЧКА ТРЕКА</text>
 
         {/* ── Track row (y 40–104) ── */}
         <rect x="20" y="40" width="500" height="62" rx="7" fill="transparent" stroke={rule} strokeWidth="0.8" />
 
         {/* Cover */}
         <rect x="30" y="48" width="48" height="46" rx="6" fill={bg2} stroke={ink} strokeWidth="0.8" />
-        <text x="54" y="78" fontFamily="Inter" fontSize="20" fill={ink} opacity="0.28" textAnchor="middle">♪</text>
+        <text x="54" y="78" fontFamily="Inter" fontSize="20" fill={ink} opacity="0.55" textAnchor="middle">♪</text>
 
         {/* Title + meta */}
         <text x="90" y="66" fontFamily="Inter" fontSize="13" fontWeight="600" fill={ink}>Закат над городом</text>
-        <text x="90" y="82" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.5">ПОП · МЕЛАНХОЛИЯ · 84 BPM</text>
+        <text x="90" y="82" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">ПОП · МЕЛАНХОЛИЯ · 84 BPM</text>
 
         {/* Duration */}
-        <text x="448" y="67" fontFamily="JetBrains Mono" fontSize="9" fill={ink} opacity="0.45" textAnchor="end">3:24</text>
+        <text x="448" y="67" fontFamily="JetBrains Mono" fontSize="9" fill={ink} opacity="0.82" textAnchor="end">3:24</text>
 
         {/* Waveform */}
         {wH.map((h, i) => (
@@ -737,7 +737,7 @@ function TrackCardSVG() {
         <rect x="20" y="116" width="500" height="100" rx="7" fill="transparent" stroke={rule} strokeWidth="0.8" />
 
         {/* Panel header */}
-        <text x="32" y="131" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.4">МЕНЮ ДЕЙСТВИЙ</text>
+        <text x="32" y="131" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">МЕНЮ ДЕЙСТВИЙ</text>
         <line x1="32" y1="136" x2="508" y2="136" stroke={rule} strokeWidth="0.5" />
 
         {/* Row 1 — 4 buttons at y=142, h=32, gap=10 */}
@@ -755,17 +755,17 @@ function TrackCardSVG() {
         {/* ── Info strip (y 226–280) ── */}
         <line x1="20" y1="226" x2="520" y2="226" stroke={rule} strokeWidth="0.8" />
 
-        <text x="28" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.42">СТАТУС</text>
+        <text x="28" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">СТАТУС</text>
         <circle cx="78" cy="238" r="3.5" fill={emr} />
         <text x="86" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={emr} fontWeight="600">ГОТОВО</text>
 
-        <text x="158" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.42">ЖАНР</text>
+        <text x="158" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">ЖАНР</text>
         <text x="192" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>ПОП</text>
 
-        <text x="248" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.42">НАСТР.</text>
+        <text x="248" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">НАСТР.</text>
         <text x="287" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>МЕЛАНХОЛИЯ</text>
 
-        <text x="392" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.42">BPM</text>
+        <text x="392" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">BPM</text>
         <text x="416" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>84</text>
 
         {/* Tags row */}
@@ -773,10 +773,10 @@ function TrackCardSVG() {
         <text x="46" y="262" fontFamily="JetBrains Mono" fontSize="7" fill={emr} textAnchor="middle">ПОП</text>
 
         <rect x="70" y="250" width="76" height="16" rx="8" fill="transparent" stroke={rule} strokeWidth="0.8" />
-        <text x="108" y="262" fontFamily="JetBrains Mono" fontSize="7" fill={ink} opacity="0.6" textAnchor="middle">МЕЛАНХОЛИЯ</text>
+        <text x="108" y="262" fontFamily="JetBrains Mono" fontSize="7" fill={ink} opacity="0.85" textAnchor="middle">МЕЛАНХОЛИЯ</text>
 
         <rect x="152" y="250" width="44" height="16" rx="8" fill="transparent" stroke={rule} strokeWidth="0.8" />
-        <text x="174" y="262" fontFamily="JetBrains Mono" fontSize="7" fill={ink} opacity="0.6" textAnchor="middle">84 BPM</text>
+        <text x="174" y="262" fontFamily="JetBrains Mono" fontSize="7" fill={ink} opacity="0.85" textAnchor="middle">84 BPM</text>
 
         {/* WAV badge */}
         <rect x="440" y="250" width="36" height="16" rx="4" fill={emr} />
@@ -788,8 +788,8 @@ function TrackCardSVG() {
 
         {/* Bottom divider + labels */}
         <line x1="20" y1="284" x2="520" y2="284" stroke={rule} strokeWidth="0.5" />
-        <text x="26" y="302" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.32">7 ДЕЙСТВИЙ В ОДНОМ МЕНЮ</text>
-        <text x="514" y="302" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.32" textAnchor="end">НАЖМИ ⚡ НА КАРТОЧКЕ</text>
+        <text x="26" y="302" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.78">7 ДЕЙСТВИЙ В ОДНОМ МЕНЮ</text>
+        <text x="514" y="302" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.78" textAnchor="end">НАЖМИ ⚡ НА КАРТОЧКЕ</text>
       </svg>
     </div>
   );
