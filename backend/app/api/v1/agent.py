@@ -1637,17 +1637,26 @@ _REF_HINT_RE = re.compile(r"[A-Za-z]{2,}|[А-ЯЁ][а-яё]+")
 
 
 async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: Settings) -> str:
-    """Ground a user-named artist/song reference with real catalogue data
-    (Deezer + optional Last.fm). Returns a system note for the model, or "".
+    """Ground a user-named artist/song reference with real catalogue data.
+
+    • URL (Spotify/YT/Deezer) → Deezer (exact BPM/genre/era/Last.fm tags).
+    • Plain artist name       → Perplexity web-search (handles niche / non-English
+      artists; falls back to relevance-gated Deezer if no OpenRouter key).
+
+    Returns a system note for the model, or "".
     Fails safe — any error/timeout returns "" so the turn proceeds unchanged.
     """
+    from app.services.artist_research import research_reference
+
     last_user = next((m.content for m in reversed(windowed) if getattr(m, "role", "") == "user"), "")
     text = (last_user or "").strip()
     if len(text) < 4 or not _REF_HINT_RE.search(text):
         return ""
 
-    query = (detect_reference_url(text) or "").strip()
-    if not query:
+    url_query = (detect_reference_url(text) or "").strip()
+    name_query = ""
+
+    if not url_query:
         # Cheap extraction of a plain artist/song name from free text.
         try:
             ex = await client.chat.completions.create(
@@ -1663,29 +1672,105 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
                 max_tokens=40,
                 response_format={"type": "json_object"},
             )
-            query = (json.loads(ex.choices[0].message.content or "{}").get("q") or "").strip()
+            name_query = (json.loads(ex.choices[0].message.content or "{}").get("q") or "").strip()
         except Exception:
             return ""
 
-    if not query:
+    if not url_query and not name_query:
         return ""
 
+    # ── URL path: Deezer (exact BPM) ────────────────────────────────────────
+    if url_query:
+        try:
+            data = await asyncio.wait_for(
+                resolve_reference(url_query, lastfm_api_key=settings.lastfm_api_key), timeout=8.0
+            )
+        except Exception:
+            data = None
+        if not data:
+            return f"REFERENCE LOOKUP: no reliable catalogue data found for «{url_query}»."
+        bits = [f"{k}: {data[k]}" for k in ("artist", "genre", "era", "tempo") if data.get(k)]
+        tags = ", ".join(data.get("tags") or [])
+        if tags:
+            bits.append(f"tags: {tags}")
+        logger.info("AGENT ref-ground (deezer): «{}» → {} genre={} era={} tags=[{}]",
+                    url_query, data.get("artist"), data.get("genre"), data.get("era"), tags)
+        return (
+            "REFERENCE DATA (looked up via Deezer — GROUND research_notes and music_params "
+            "in THESE facts, do not invent a different style): "
+            + "; ".join(bits)
+            + f". (matched: {data.get('artist')} — {data.get('title')})"
+        )
+
+    # ── Name path: Perplexity web-search ────────────────────────────────────
+    pdata = None
+    if settings.openrouter_api_key:
+        try:
+            pdata = await asyncio.wait_for(
+                research_reference(name_query, settings=settings), timeout=12.0
+            )
+        except Exception:
+            pdata = None
+
+    if pdata:
+        confidence = float(pdata.get("confidence") or 0)
+        ambiguous = bool(pdata.get("ambiguous", False))
+
+        if confidence < 0.8 or ambiguous:
+            note = pdata.get("note") or pdata.get("artist") or name_query
+            logger.info("AGENT ref-ground (perplexity): «{}» low confidence={:.2f} ambiguous={} → ask user",
+                        name_query, confidence, ambiguous)
+            return (
+                f"REFERENCE LOOKUP: web search found a candidate for «{name_query}» but confidence "
+                f"is low ({confidence:.0%}) or the name is ambiguous. Candidate: {note}. "
+                "DO NOT invent a style. Ask the user to confirm or provide a direct link."
+            )
+
+        bits: list[str] = []
+        if pdata.get("genre"):
+            bits.append(f"genre: {pdata['genre']}")
+        if pdata.get("era"):
+            bits.append(f"era: {pdata['era']}")
+        if pdata.get("tempo"):
+            bits.append(f"tempo: {pdata['tempo']}")
+        if pdata.get("bpm"):
+            bits.append(f"BPM: ~{int(pdata['bpm'])}")
+        tags_list = pdata.get("tags") or []
+        if tags_list:
+            bits.append(f"tags: {', '.join(tags_list[:6])}")
+        if pdata.get("similar"):
+            bits.append(f"similar artists: {', '.join(pdata['similar'][:4])}")
+        if pdata.get("production"):
+            bits.append(f"production: {pdata['production']}")
+        logger.info("AGENT ref-ground (perplexity): «{}» → confidence={:.2f} genre={!r} era={!r} tags={}",
+                    name_query, confidence, pdata.get("genre"), pdata.get("era"), tags_list[:4])
+        return (
+            "REFERENCE DATA (looked up via Perplexity web-search — GROUND research_notes and "
+            "music_params in THESE facts, do not invent a different style): "
+            + "; ".join(bits)
+            + f". (matched artist: {pdata.get('artist')})"
+        )
+
+    # ── Fallback: relevance-gated Deezer ────────────────────────────────────
     try:
         data = await asyncio.wait_for(
-            resolve_reference(query, lastfm_api_key=settings.lastfm_api_key), timeout=8.0
+            resolve_reference(name_query, lastfm_api_key=settings.lastfm_api_key), timeout=8.0
         )
     except Exception:
         data = None
 
     if not data:
-        return f"REFERENCE LOOKUP: no reliable catalogue data found for «{query}»."
+        logger.info("AGENT ref-ground: «{}» → NO DATA (model will be told to ask)", name_query)
+        return f"REFERENCE LOOKUP: no reliable catalogue data found for «{name_query}». Ask the user to confirm or provide a direct link."
 
     bits = [f"{k}: {data[k]}" for k in ("artist", "genre", "era", "tempo") if data.get(k)]
     tags = ", ".join(data.get("tags") or [])
     if tags:
         bits.append(f"tags: {tags}")
+    logger.info("AGENT ref-ground (deezer-fallback): «{}» → {} genre={} era={} tags=[{}]",
+                name_query, data.get("artist"), data.get("genre"), data.get("era"), tags)
     return (
-        "REFERENCE DATA (looked up via Deezer/Last.fm — GROUND research_notes and music_params "
+        "REFERENCE DATA (looked up via Deezer — GROUND research_notes and music_params "
         "in THESE facts, do not invent a different style): "
         + "; ".join(bits)
         + f". (matched: {data.get('artist')} — {data.get('title')})"
@@ -2081,7 +2166,10 @@ class AgentReference(BaseModel):
     year: int = 0
     genre: str = ""
     tempo: str = ""
-    tags: list[str] = []          # Last.fm scene tags (post-rock, krautrock, …)
+    tags: list[str] = []          # Last.fm / Perplexity subgenre+mood tags
+    similar: list[str] = []       # similar artists (from Perplexity)
+    production: str = ""          # production_style (from Perplexity)
+    source: str = ""              # "deezer" | "perplexity"
 
 
 class AgentClassifyResponse(BaseModel):
@@ -2091,11 +2179,14 @@ class AgentClassifyResponse(BaseModel):
     artist_ref: bool = False
     obscure_genre: bool = False
     too_vague: bool = False
-    # Reference-track enrichment (Deezer) — real BPM/genre/era when the user
-    # points at an existing track ("сделай как X" / a Deezer/Spotify/YT link).
+    # Reference-track enrichment — real BPM/genre/era/mood from Deezer or Perplexity.
     era: str = ""
     suggested_bpm: str = ""
     reference: AgentReference | None = None
+    # Perplexity confidence / disambiguation signal for the frontend:
+    # reference_uncertain=True → show "Found X — is that right?" chip before committing.
+    reference_uncertain: bool = False
+    reference_note: str = ""      # human-readable candidate hint for the confirmation chip
     model: str = "gpt-4o-mini"
 
 
@@ -2158,16 +2249,28 @@ async def agent_classify(
         topic=str(parsed.get("topic", "")).strip()[:500],
     )
 
-    # Reference-track enrichment (best-effort, capped at 8s so a slow/down
-    # Deezer never stalls /classify). Real BPM/genre/era beat the model's guess.
+    # ── Reference-track enrichment ──────────────────────────────────────────
+    # URL (Spotify / YouTube / Deezer link) → Deezer (exact BPM, fast, free).
+    # Plain artist name                     → Perplexity web-search (handles
+    #   niche / non-English artists that Deezer top-1 gets wrong).
+    # Confidence gate: if Perplexity is unsure (confidence < 0.8 or ambiguous)
+    #   we DON'T auto-fill slots — instead we signal the frontend to show a
+    #   "Found X — is that right?" confirmation chip before committing.
     era = ""
     suggested_bpm = ""
     reference: AgentReference | None = None
-    ref_raw = detect_reference_url(body.message) or str(parsed.get("reference_query", "")).strip()
-    if ref_raw:
+    reference_uncertain = False
+    reference_note = ""
+
+    url_ref = detect_reference_url(body.message)
+    name_ref = str(parsed.get("reference_query", "")).strip()
+
+    if url_ref:
+        # Exact URL → Deezer (capped at 8s)
         try:
             ref = await asyncio.wait_for(
-                resolve_reference(ref_raw, lastfm_api_key=settings.lastfm_api_key), timeout=8.0
+                resolve_reference(url_ref, lastfm_api_key=settings.lastfm_api_key),
+                timeout=8.0,
             )
         except Exception:
             ref = None
@@ -2187,7 +2290,77 @@ async def agent_classify(
                 genre=ref.get("genre", ""),
                 tempo=ref.get("tempo", ""),
                 tags=ref.get("tags", []) or [],
+                source="deezer",
             )
+
+    elif name_ref:
+        # Plain artist/song name → Perplexity web-search (capped at 12s)
+        from app.services.artist_research import research_reference
+        try:
+            pref = await asyncio.wait_for(
+                research_reference(name_ref, settings=settings),
+                timeout=12.0,
+            )
+        except Exception:
+            pref = None
+
+        if pref:
+            confidence = float(pref.get("confidence") or 0)
+            ambiguous = bool(pref.get("ambiguous", False))
+
+            if confidence >= 0.8 and not ambiguous:
+                # High confidence — fill slots and commit the reference.
+                if pref.get("genre"):
+                    slots.genre = pref["genre"]
+                if pref.get("tempo"):
+                    slots.tempo = pref["tempo"]
+                era = pref.get("era", "") or ""
+                bpm = float(pref.get("bpm") or 0)
+                if bpm > 0:
+                    suggested_bpm = str(int(bpm))
+                reference = AgentReference(
+                    artist=pref.get("artist", ""),
+                    title="",
+                    bpm=bpm,
+                    year=0,
+                    genre=pref.get("genre", ""),
+                    tempo=pref.get("tempo", ""),
+                    tags=pref.get("tags", []) or [],
+                    similar=pref.get("similar", []) or [],
+                    production=pref.get("production", "") or "",
+                    source="perplexity",
+                )
+            else:
+                # Low confidence or ambiguous — signal frontend to ask the user.
+                reference_uncertain = True
+                reference_note = pref.get("note") or pref.get("artist") or name_ref
+        else:
+            # Perplexity failed / no key — fallback to relevance-gated Deezer.
+            try:
+                ref = await asyncio.wait_for(
+                    resolve_reference(name_ref, lastfm_api_key=settings.lastfm_api_key),
+                    timeout=8.0,
+                )
+            except Exception:
+                ref = None
+            if ref and (ref.get("artist") or ref.get("title")):
+                if ref.get("genre"):
+                    slots.genre = ref["genre"]
+                if ref.get("tempo"):
+                    slots.tempo = ref["tempo"]
+                era = ref.get("era", "") or ""
+                if (ref.get("bpm") or 0) > 0:
+                    suggested_bpm = str(int(ref["bpm"]))
+                reference = AgentReference(
+                    artist=ref.get("artist", ""),
+                    title=ref.get("title", ""),
+                    bpm=ref.get("bpm", 0) or 0,
+                    year=ref.get("year", 0) or 0,
+                    genre=ref.get("genre", ""),
+                    tempo=ref.get("tempo", ""),
+                    tags=ref.get("tags", []) or [],
+                    source="deezer",
+                )
 
     return AgentClassifyResponse(
         module=module,  # type: ignore[arg-type]
@@ -2199,4 +2372,6 @@ async def agent_classify(
         era=era,
         suggested_bpm=suggested_bpm,
         reference=reference,
+        reference_uncertain=reference_uncertain,
+        reference_note=reference_note,
     )
