@@ -1147,7 +1147,7 @@ a {
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 0;
   border: 1px solid var(--ink);
-  border-radius: 14px;
+  border-radius: 0;
   background: var(--paper-3);
   /* visible so a hovered card can float out with its drop shadow */
   overflow: visible;
@@ -1309,7 +1309,7 @@ a {
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 0;
   border: 1px solid var(--ink);
-  border-radius: 14px;
+  border-radius: 0;
   background: var(--paper-3);
   overflow: hidden;
 }

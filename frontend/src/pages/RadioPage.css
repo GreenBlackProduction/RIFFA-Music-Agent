@@ -18,7 +18,7 @@
   padding: 24px;
   background: var(--ink);
   color: var(--paper);
-  border-radius: 14px;
+  border-radius: 0;
   margin-bottom: 32px;
 }
 
@@ -101,7 +101,7 @@
 .chart-list--scrollable {
   max-height: calc(53px * 10);
   overflow-y: auto;
-  border-radius: 14px;
+  border-radius: 0;
   /* Тонкий скроллбар */
   scrollbar-width: thin;
   scrollbar-color: var(--ink-3) transparent;
@@ -119,8 +119,8 @@
   cursor: pointer;
 }
 
-.chart-row:first-child { border-top: 1px solid var(--ink); border-radius: 14px 14px 0 0; }
-.chart-row:last-child  { border-bottom: 1px solid var(--ink); border-radius: 0 0 14px 14px; }
+.chart-row:first-child { border-top: 1px solid var(--ink); }
+.chart-row:last-child  { border-bottom: 1px solid var(--ink); }
 .chart-row:hover { background: var(--paper-4); }
 
 .chart-row--active { background: var(--paper-4); }
