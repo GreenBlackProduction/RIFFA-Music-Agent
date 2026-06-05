@@ -296,8 +296,26 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
   .rl-root .radio-wave, .rl-root .radio-dur { display: none; }
   /* keep the owner's fixed-width hero tweaks from overflowing on phones */
   .rl-root .hero-sub { margin: 28px 0 !important; width: auto !important; max-width: 100% !important; padding: 0 !important; }
-  .rl-root .hero-headline { font-size: clamp(44px, 12vw, 72px) !important; }
+  .rl-root .hero-headline { font-size: clamp(32px, 10.5vw, 60px) !important; max-width: 100%; overflow-wrap: break-word; }
   .rl-root .hero-actions { margin: 24px 0 0 0 !important; }
+  /* The desktop schematic SVG renders at ~525px and was dragging the whole
+     hero column past the viewport (headline/buttons clipped). Let the SVG
+     shrink to the container and let the flex/grid columns drop below their
+     content min-width. */
+  .rl-root .hero-split, .rl-root .hero-center { min-width: 0; }
+  .rl-root .hero-split > *, .rl-root .hero-center > * { min-width: 0; max-width: 100%; }
+  .rl-root .schematic-wrap { width: 100%; max-width: 100%; }
+  .rl-root .schematic-wrap svg,
+  .rl-root .interactions-svg-col svg { width: 100%; height: auto; display: block; }
+  /* tighter vertical rhythm on phones */
+  .rl-root .hero { padding: 40px 0 44px; }
+  .rl-root .types-section, .rl-root .process-section, .rl-root .pricing-section,
+  .rl-root .agent-section, .rl-root .interactions-section { padding: 40px 0; }
+  .rl-root .types-grid, .rl-root .process-grid, .rl-root .pricing-grid,
+  .rl-root .agent-grid, .rl-root .interactions-grid, .rl-root .radio-chart { margin-top: 24px; }
+  .rl-root .agent-headline { font-size: 30px; }
+  /* safety net: never allow a sideways scroll on the landing */
+  .rl-root .page { overflow-x: hidden; }
 }
 
 /* ════════════════════════════════════════════════
