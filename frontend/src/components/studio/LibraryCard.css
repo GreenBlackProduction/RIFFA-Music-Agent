@@ -121,12 +121,12 @@
 .library-card__grid .file-item__icon {
   width: 56px;
   height: 56px;
-  border-radius: 10px;
+  border-radius: 0;
   font-size: 26px;
 }
 
 .library-card__grid .file-item__icon img {
-  border-radius: 10px;
+  border-radius: 0;
 }
 
 .library-card__grid .file-item__title {

@@ -432,7 +432,7 @@ a {
   gap: 10px;
   padding: 8px 14px;
   height: 52px;
-  border-radius: var(--radius-md);
+  border-radius: 0;
   border: 1px solid var(--rule);
   background: var(--paper-3);
   color: var(--ink);
@@ -473,7 +473,7 @@ a {
 .file-item__icon {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 0;
   background: var(--paper-2);
   display: inline-flex;
   align-items: center;
@@ -1331,7 +1331,7 @@ a {
 .track:hover { background: var(--paper-4); }
 .track-cover {
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: 0;
   background: linear-gradient(135deg, #c8c2b1 0%, #8E887F 100%);
   position: relative;
   overflow: hidden;
