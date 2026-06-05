@@ -777,13 +777,19 @@ export function GlobalPlayer() {
 
   function toggleQueueDropdown() {
     if (!trackBtnRef.current) return;
-    const r = trackBtnRef.current.getBoundingClientRect();
+    const trackR = trackBtnRef.current.getBoundingClientRect();
+    const player = trackBtnRef.current.closest(".global-player") as HTMLElement | null;
+    const playerR = player ? player.getBoundingClientRect() : trackR;
     const margin = 8;
-    const desired = Math.max(r.width, 240);
+    // Size the dropdown to the whole player (min 320px), not the narrow
+    // track-info button — so it reads wide in BOTH the collapsed and the
+    // expanded player whenever the viewport has room. Centre it on the
+    // player and clamp to the viewport so it never overflows.
+    const desired = Math.max(playerR.width, 320);
     const width = Math.min(desired, window.innerWidth - margin * 2);
-    // Clamp the left edge so the dropdown never overflows on the right.
-    const left = Math.max(margin, Math.min(r.left, window.innerWidth - width - margin));
-    setQueuePos({ bottom: window.innerHeight - r.top + 6, left, width });
+    const center = playerR.left + playerR.width / 2;
+    const left = Math.max(margin, Math.min(center - width / 2, window.innerWidth - width - margin));
+    setQueuePos({ bottom: window.innerHeight - playerR.top + 6, left, width });
     setQueueOpen((v) => !v);
   }
 
