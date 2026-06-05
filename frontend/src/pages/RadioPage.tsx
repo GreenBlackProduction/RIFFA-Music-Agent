@@ -59,6 +59,20 @@ const RADIO_QUERY_KEY = ["radio"] as const;
 export function RadioPage() {
   const { t, i18n: i18nClient } = useTranslation();
   const isEN = (i18nClient.resolvedLanguage || i18nClient.language || "ru").startsWith("en");
+  // Word-coded tempo → numeric BPM range; numeric tempos normalised; else as-is.
+  const formatBpm = (tempo?: string | null): string => {
+    if (!tempo) return "";
+    const t = tempo.trim().toLowerCase();
+    const map: Record<string, string> = {
+      very_slow: "60–80 BPM", slow: "80–100 BPM", medium: "100–120 BPM",
+      mid: "100–120 BPM", fast: "120–140 BPM", very_fast: "140–180 BPM",
+    };
+    if (map[t]) return map[t];
+    const num = t.replace(/bpm/g, "").trim();
+    if (/^\d+\s*[-–]\s*\d+$/.test(num)) return num.replace(/\s*-\s*/, "–") + " BPM";
+    if (/^\d+$/.test(num)) return num + " BPM";
+    return tempo;
+  };
   const moodTranslated = (key: string) => {
     const v = t(`radio.moods.${key}`, { defaultValue: "" });
     return typeof v === "string" && v ? v : key;
@@ -182,7 +196,7 @@ export function RadioPage() {
   /** Convert a RadioTrackOut to the PlayerTrack shape. */
   function toPlayerTrack(track: RadioTrackOut) {
     const moodLabel = moodTranslated(track.mood ?? "");
-    const meta = [track.genre, moodLabel, track.tempo].filter(Boolean).join(" · ");
+    const meta = [track.genre, moodLabel, formatBpm(track.tempo)].filter(Boolean).join(" · ");
     // Composite id so V1/V2 of the same generation are distinct in the queue.
     return {
       id: `${track.id}#${track.track_index}`,
@@ -415,8 +429,8 @@ export function RadioPage() {
                 )}
               </div>
               <div className="meta-mini">
-                <div className="title-mini">{track.title}</div>
-                <div className="artist-mini">{track.author} · {track.genre ?? "—"}</div>
+                <div className="title-mini">{track.author} - {track.title}</div>
+                <div className="artist-mini">{[track.genre, moodTranslated(track.mood ?? ""), formatBpm(track.tempo)].filter(Boolean).join(" · ") || "—"}</div>
                 {isAdmin && (
                   <div className="admin-row" onClick={(e) => e.stopPropagation()}>
                     <button type="button" className="admin-chip" onClick={() => setAdminClassifyFor(adminClassifyFor === track.id ? null : track.id)}>✏️</button>
@@ -487,8 +501,8 @@ export function RadioPage() {
                 )}
               </div>
               <div className="meta-mini">
-                <div className="title-mini">{ct.title}</div>
-                <div className="artist-mini">{ct.author} · {ct.genre ?? "—"}</div>
+                <div className="title-mini">{ct.author} - {ct.title}</div>
+                <div className="artist-mini">{[ct.genre, moodTranslated(ct.mood ?? ""), formatBpm(ct.tempo)].filter(Boolean).join(" · ") || "—"}</div>
                 {isAdmin && (
                   <div className="admin-row" onClick={(e) => e.stopPropagation()}>
                     <button type="button" className="admin-chip" onClick={() => setAdminClassifyFor(adminClassifyFor === ct.id ? null : ct.id)}>✏️</button>
