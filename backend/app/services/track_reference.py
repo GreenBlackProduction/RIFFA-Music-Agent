@@ -96,6 +96,25 @@ async def _search_track_id(client: httpx.AsyncClient, query: str) -> int | None:
     return int(tid) if tid else None
 
 
+def _name_matches_result(query: str, artist: str, title: str) -> bool:
+    """Guard against Deezer returning a confidently-wrong top hit for a plain
+    free-text name (it always returns *something*). Require at least half of the
+    query's words to appear in the matched "artist title". Link / track-id
+    lookups skip this — they are already exact."""
+    def _norm(s: str) -> str:
+        return re.sub(r"\W+", " ", s.lower()).strip()
+
+    q = _norm(query)
+    if not q:
+        return False
+    cand = _norm(f"{artist} {title}")
+    tokens = [t for t in q.split() if len(t) >= 2]
+    if not tokens:
+        return False
+    hits = sum(1 for t in tokens if t in cand)
+    return hits / len(tokens) >= 0.5
+
+
 _LASTFM_API = "https://ws.audioscrobbler.com/2.0/"
 
 # Last.fm community top-tags carry plenty of non-musical noise — drop these.
@@ -179,6 +198,7 @@ async def resolve_reference(raw: str, *, lastfm_api_key: str = "") -> dict | Non
 
     async with httpx.AsyncClient(timeout=_TIMEOUT, headers={"User-Agent": "RIFFA/1.0"}) as client:
         track_id: int | None = None
+        plain_query = ""  # set only for free-text name lookups (need a relevance check)
 
         m = _RE_DEEZER.search(raw)
         if m:
@@ -195,6 +215,7 @@ async def resolve_reference(raw: str, *, lastfm_api_key: str = "") -> dict | Non
                 track_id = await _search_track_id(client, title)
         else:
             # Plain text — "Daft Punk - Around the World", "Burial", etc.
+            plain_query = raw
             track_id = await _search_track_id(client, raw)
 
         if not track_id:
@@ -208,6 +229,16 @@ async def resolve_reference(raw: str, *, lastfm_api_key: str = "") -> dict | Non
         title = str(track.get("title") or "").strip()
         artist = str((track.get("artist") or {}).get("name") or "").strip()
         release = str(track.get("release_date") or "").strip()
+
+        # Reject a confidently-wrong top hit for a plain-name search — Deezer
+        # always returns *something* ("денис грязь" → "Марина Кацуба"). A link or
+        # track-id lookup is already exact, so this only gates free-text names.
+        if plain_query and not _name_matches_result(plain_query, artist, title):
+            logger.info(
+                "resolve_reference: irrelevant match for «{}» → {!r} — {!r}; rejecting",
+                plain_query, artist, title,
+            )
+            return None
 
         genre_raw = ""
         album = track.get("album") or {}
