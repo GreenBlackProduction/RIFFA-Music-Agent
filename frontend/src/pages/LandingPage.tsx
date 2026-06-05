@@ -65,7 +65,7 @@ const TYPE_PROMPTS = [
   "эпичный оркестровый саундтрек к фильму",
 ];
 
-function SchematicSVG({ prompt }: { prompt: string }) {
+function SchematicSVG({ prompt, submit }: { prompt: string; submit: boolean }) {
   const accent = c.accent;
   return (
     <div className="schematic-wrap" style={{ border: `1px solid ${c.rule}` }}>
@@ -80,12 +80,12 @@ function SchematicSVG({ prompt }: { prompt: string }) {
         <rect x="36" y="28" width="488" height="364" rx="18" fill={c.bg} stroke={c.ink} strokeWidth="1.2" />
         <rect x="46" y="38" width="468" height="344" rx="12" stroke={c.ink} strokeWidth="0.5" fill="none" opacity="0.25" />
         <line x1="46" y1="78" x2="514" y2="78" stroke={c.ink} strokeWidth="0.8" />
-        <rect x="60" y="54" width="80" height="24" rx="12" fill={c.ink} />
-        <text x="100" y="71" fontFamily="JetBrains Mono" fontSize="9" fill={c.bg} textAnchor="middle" fontWeight="600">ПЕСНЯ</text>
-        <rect x="146" y="54" width="110" height="24" rx="12" stroke={c.ink} strokeWidth="0.8" fill="none" />
-        <text x="201" y="71" fontFamily="JetBrains Mono" fontSize="9" fill={c.ink} textAnchor="middle">ИНСТРУМЕНТАЛ</text>
-        <rect x="262" y="54" width="90" height="24" rx="12" stroke={c.ink} strokeWidth="0.8" fill="none" />
-        <text x="307" y="71" fontFamily="JetBrains Mono" fontSize="9" fill={c.ink} textAnchor="middle">ОБЛОЖКА</text>
+        <rect x="60" y="44" width="80" height="24" rx="12" fill={c.ink} />
+        <text x="100" y="61" fontFamily="JetBrains Mono" fontSize="9" fill={c.bg} textAnchor="middle" fontWeight="600">ПЕСНЯ</text>
+        <rect x="146" y="44" width="110" height="24" rx="12" stroke={c.ink} strokeWidth="0.8" fill="none" />
+        <text x="201" y="61" fontFamily="JetBrains Mono" fontSize="9" fill={c.ink} textAnchor="middle">ИНСТРУМЕНТАЛ</text>
+        <rect x="262" y="44" width="90" height="24" rx="12" stroke={c.ink} strokeWidth="0.8" fill="none" />
+        <text x="307" y="61" fontFamily="JetBrains Mono" fontSize="9" fill={c.ink} textAnchor="middle">ОБЛОЖКА</text>
         <rect x="60" y="92" width="440" height="88" rx="10" stroke={c.ink} strokeWidth="0.8" fill="none" />
         <text x="74" y="114" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink} opacity="0.5">ОПИШИТЕ ИДЕЮ</text>
         <text x="74" y="140" fontFamily="Inter" fontSize="14" fontWeight="500" fill={c.ink}>{prompt}<tspan className="rl-type-caret" fill={accent}> ▏</tspan></text>
@@ -96,7 +96,7 @@ function SchematicSVG({ prompt }: { prompt: string }) {
         <text x="166" y="209" fontFamily="JetBrains Mono" fontSize="9" fill={c.ink} textAnchor="middle">82 BPM</text>
         <rect x="208" y="192" width="78" height="26" rx="13" stroke={c.ink} strokeWidth="0.8" fill="none" />
         <text x="247" y="209" fontFamily="JetBrains Mono" fontSize="9" fill={c.ink} textAnchor="middle">М. ГОЛОС</text>
-        <rect x="362" y="188" width="138" height="34" rx="17" fill={accent} />
+        <rect x="362" y="188" width="138" height="34" rx="17" className="rl-create-btn" fill={submit ? "#FF3B1F" : accent} />
         <text x="431" y="210" fontFamily="Inter" fontWeight="600" fontSize="12" fill="#E9E5DA" textAnchor="middle">СОЗДАТЬ →</text>
         <rect x="60" y="232" width="440" height="60" rx="10" fill={c.bg2} stroke={c.ink} strokeWidth="0.5" />
         <text x="74" y="254" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink} opacity="0.5">ЗАДАЧА #4A91</text>
@@ -114,10 +114,10 @@ function SchematicSVG({ prompt }: { prompt: string }) {
           const op = i > 9 ? 1 - (i - 9) * 0.25 : 1;
           return <line key={x} x1={280 + x} y1={334 - h / 2} x2={280 + x} y2={334 + h / 2} stroke={c.ink} strokeWidth="1.6" strokeLinecap="round" opacity={op} />;
         })}
-        <rect x="392" y="322" width="58" height="24" rx="12" fill="#0F5D47" />
-        <text x="421" y="338" fontFamily="JetBrains Mono" fontSize="8" fill="#E9E5DA" fontWeight="600" textAnchor="middle">↓ MP3</text>
-        <rect x="456" y="322" width="44" height="24" rx="12" stroke="#0F5D47" strokeWidth="0.8" fill="none" />
-        <text x="478" y="338" fontFamily="JetBrains Mono" fontSize="8" fill="#0F5D47" fontWeight="600" textAnchor="middle">WAV</text>
+        <rect x="376" y="322" width="58" height="24" rx="12" fill="#0F5D47" />
+        <text x="405" y="338" fontFamily="JetBrains Mono" fontSize="8" fill="#E9E5DA" fontWeight="600" textAnchor="middle">↓ MP3</text>
+        <rect x="440" y="322" width="44" height="24" rx="12" stroke="#0F5D47" strokeWidth="0.8" fill="none" />
+        <text x="462" y="338" fontFamily="JetBrains Mono" fontSize="8" fill="#0F5D47" fontWeight="600" textAnchor="middle">WAV</text>
         {[{ n: "1", x: 22, y: 66 }, { n: "2", x: 22, y: 136 }, { n: "3", x: 22, y: 205 }, { n: "4", x: 22, y: 262 }].map(({ n, x, y }) => (
           <g key={n}>
             <line x1={x + 14} y1={y} x2={58} y2={y} stroke={c.ink} strokeWidth="0.7" />
@@ -153,6 +153,7 @@ export function LandingPage() {
   const [realRadioTracks, setRealRadioTracks] = useState<RadioTrackOut[]>([]);
   const radioAudioRef = useRef<HTMLAudioElement | null>(null);
   const [typedPrompt, setTypedPrompt] = useState(TYPE_PROMPTS[0]);
+  const [submitPulse, setSubmitPulse] = useState(false);
 
   // Fetch real radio tracks for the landing chart
   useEffect(() => {
@@ -171,6 +172,7 @@ export function LandingPage() {
     let char = TYPE_PROMPTS[0].length;
     let deleting = true;
     let timer: ReturnType<typeof setTimeout>;
+    let pulseTimer: ReturnType<typeof setTimeout>;
     const tick = () => {
       const full = TYPE_PROMPTS[idx];
       if (deleting) {
@@ -181,12 +183,19 @@ export function LandingPage() {
       } else {
         char += 1;
         setTypedPrompt(full.slice(0, char));
-        if (char >= full.length) { deleting = true; timer = setTimeout(tick, 1800); return; }
+        if (char >= full.length) {
+          // text fully typed → "press" the Создать button (orange flash)
+          setSubmitPulse(true);
+          pulseTimer = setTimeout(() => setSubmitPulse(false), 460);
+          deleting = true;
+          timer = setTimeout(tick, 1800);
+          return;
+        }
         timer = setTimeout(tick, 58);
       }
     };
     timer = setTimeout(tick, 1800);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); clearTimeout(pulseTimer); };
   }, []);
 
   useEffect(() => {
@@ -347,7 +356,7 @@ export function LandingPage() {
                 <button className="btn-ghost" style={{ color: "#EC560B", borderColor: "#EC560B", padding: "0 28px", fontSize: "13px", letterSpacing: "1px", height: 52 }} onClick={scrollTo("radio")}>{t.ctaSecond}</button>
               </div>
             </div>
-            <SchematicSVG prompt={typedPrompt} />
+            <SchematicSVG prompt={typedPrompt} submit={submitPulse} />
           </div>
           {/* Subheadline — full width below both columns */}
           <p data-edit="hero-sub" style={{
