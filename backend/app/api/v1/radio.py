@@ -160,6 +160,8 @@ def _track_at(gen: Generation, idx: int) -> tuple[str, str | None, int]:
 def _author(user: User | None) -> str:
     if user is None:
         return "@anonymous"
+    if user.display_name and user.display_name != "RIFFA user":
+        return user.display_name
     if user.telegram_username:
         return f"@{user.telegram_username}"
     if user.display_name:

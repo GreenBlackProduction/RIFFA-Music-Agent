@@ -332,7 +332,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
 
             if not gen.title:
                 short_title = await lyrics_client.generate_title(description_for_lyrics)
-                gen.title = compose_track_title(track_artist, short_title)
+                gen.title = short_title.strip()
 
             # Agent-provided structured params override form fields
             agent_mp = params.get("agent_music_params") or {}
@@ -438,7 +438,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             )
             if not gen.title:
                 short_title = (params.get("description", "") or "Instrumental")[:60]
-                gen.title = compose_track_title(track_artist, short_title)
+                gen.title = short_title.strip()
             title = gen.title
 
             await _publish(ctx, gen_id, {"status": "processing", "step": "enriching_music"})
@@ -557,7 +557,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             final_style = ", ".join(style_parts)[:1000]  # Suno limit
 
             if not gen.title:
-                gen.title = compose_track_title(track_artist, "Cover")
+                gen.title = "Cover"
             cover_title = gen.title
             _dump_payload(gen_id, "cover_song", {
                 "upload_url": upload_url,
@@ -701,7 +701,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
 
             if not gen.title:
                 short_title = await lyrics_client.generate_title(description)
-                gen.title = compose_track_title(track_artist, short_title)
+                gen.title = short_title.strip()
 
             agent_mp = params.get("agent_music_params") or {}
             agent_research = params.get("agent_research_notes", "")
@@ -838,7 +838,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 if result.get("tracks"):
                     g.title = result["tracks"][0].get("title", "")
                 elif result.get("_wav_source_title"):
-                    g.title = f"{result['_wav_source_title']} (WAV)"
+                    g.title = result["_wav_source_title"]
 
         await session.commit()
 

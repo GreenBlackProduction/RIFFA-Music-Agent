@@ -52,10 +52,10 @@ def _resolve_artist(user: User, override: str = "") -> str:
     """Pick the artist label in priority order: explicit override > telegram_username > display_name > email-local."""
     if override.strip():
         return override.strip()[:60]
-    if user.telegram_username:
-        return user.telegram_username[:60]
     if user.display_name and user.display_name != "RIFFA user":
         return user.display_name[:60]
+    if user.telegram_username:
+        return user.telegram_username[:60]
     if user.email:
         return user.email.split("@", 1)[0][:60]
     return "RIFFA"
