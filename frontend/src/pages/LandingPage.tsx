@@ -56,7 +56,16 @@ function Mark({ size = 22 }: { size?: number }) {
 }
 
 /* ═══════════ SCHEMATIC HERO SVG (verbatim) ═══════════ */
-function SchematicSVG() {
+const TYPE_PROMPTS = [
+  "меланхоличная лофай-песня о ноябре",
+  "звук рёва мотора спорткара",
+  "трек в стиле фонк для танцпола",
+  "песня про моего рыжего кота",
+  "тёплая песня для любимой бабушки",
+  "эпичный оркестровый саундтрек к фильму",
+];
+
+function SchematicSVG({ prompt }: { prompt: string }) {
   const accent = c.accent;
   return (
     <div className="schematic-wrap" style={{ border: `1px solid ${c.rule}` }}>
@@ -79,9 +88,8 @@ function SchematicSVG() {
         <text x="307" y="71" fontFamily="JetBrains Mono" fontSize="9" fill={c.ink} textAnchor="middle">ОБЛОЖКА</text>
         <rect x="60" y="92" width="440" height="88" rx="10" stroke={c.ink} strokeWidth="0.8" fill="none" />
         <text x="74" y="114" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink} opacity="0.5">ОПИШИТЕ ИДЕЮ</text>
-        <text x="74" y="140" fontFamily="Inter" fontSize="14" fontWeight="500" fill={c.ink}>меланхоличная лофай-песня о ноябре</text>
-        <rect x="74" y="150" width="2.5" height="14" fill={accent} />
-        <text x="490" y="114" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink} opacity="0.45" textAnchor="end">142 / 500</text>
+        <text x="74" y="140" fontFamily="Inter" fontSize="14" fontWeight="500" fill={c.ink}>{prompt}<tspan className="rl-type-caret" fill={accent}> ▏</tspan></text>
+        <text x="490" y="114" fontFamily="JetBrains Mono" fontSize="8" fill={c.ink} opacity="0.45" textAnchor="end">{prompt.length} / 500</text>
         <rect x="60" y="192" width="64" height="26" rx="13" stroke={c.ink} strokeWidth="0.8" fill="none" />
         <text x="92" y="209" fontFamily="JetBrains Mono" fontSize="9" fill={c.ink} textAnchor="middle">ЛО-ФАЙ</text>
         <rect x="130" y="192" width="72" height="26" rx="13" stroke={c.ink} strokeWidth="0.8" fill="none" />
@@ -144,6 +152,7 @@ export function LandingPage() {
   const [hoverTrack, setHoverTrack] = useState<number | null>(null);
   const [realRadioTracks, setRealRadioTracks] = useState<RadioTrackOut[]>([]);
   const radioAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [typedPrompt, setTypedPrompt] = useState(TYPE_PROMPTS[0]);
 
   // Fetch real radio tracks for the landing chart
   useEffect(() => {
@@ -152,6 +161,32 @@ export function LandingPage() {
       .then((r) => { if (alive && r.items.length > 0) setRealRadioTracks(r.items); })
       .catch(() => {});
     return () => { alive = false; };
+  }, []);
+
+  // Typewriter loop for the hero schematic prompt: type → pause → delete →
+  // next, cycling. Static first prompt under reduced-motion.
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let idx = 0;
+    let char = TYPE_PROMPTS[0].length;
+    let deleting = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const full = TYPE_PROMPTS[idx];
+      if (deleting) {
+        char -= 1;
+        setTypedPrompt(full.slice(0, Math.max(0, char)));
+        if (char <= 0) { deleting = false; idx = (idx + 1) % TYPE_PROMPTS.length; char = 0; timer = setTimeout(tick, 400); return; }
+        timer = setTimeout(tick, 28);
+      } else {
+        char += 1;
+        setTypedPrompt(full.slice(0, char));
+        if (char >= full.length) { deleting = true; timer = setTimeout(tick, 1800); return; }
+        timer = setTimeout(tick, 58);
+      }
+    };
+    timer = setTimeout(tick, 1800);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -312,7 +347,7 @@ export function LandingPage() {
                 <button className="btn-ghost" style={{ color: "#EC560B", borderColor: "#EC560B", padding: "0 28px", fontSize: "13px", letterSpacing: "1px", height: 52 }} onClick={scrollTo("radio")}>{t.ctaSecond}</button>
               </div>
             </div>
-            <SchematicSVG />
+            <SchematicSVG prompt={typedPrompt} />
           </div>
           {/* Subheadline — full width below both columns */}
           <p data-edit="hero-sub" style={{

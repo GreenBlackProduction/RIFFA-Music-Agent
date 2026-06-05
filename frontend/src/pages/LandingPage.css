@@ -321,6 +321,10 @@ html { scroll-behavior: smooth; scroll-padding-top: 72px; }
   .rl-root .page { overflow-x: hidden; }
 }
 
+/* Hero schematic typewriter caret */
+@keyframes rl-caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+.rl-root .rl-type-caret { animation: rl-caret-blink 1s steps(1) infinite; }
+
 /* ── Scroll-to-top button (all viewports) ─────────────────────────────── */
 .rl-root .rl-scrolltop {
   position: fixed;
