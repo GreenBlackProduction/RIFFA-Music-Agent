@@ -812,6 +812,9 @@ export interface AgentReference {
   genre: string;
   tempo: string;
   tags: string[];
+  similar: string[];
+  production: string;
+  source: string; // "deezer" | "perplexity"
 }
 
 export interface AgentClassifyResponse {
@@ -821,11 +824,13 @@ export interface AgentClassifyResponse {
   artist_ref: boolean;
   obscure_genre: boolean;
   too_vague: boolean;
-  /** Reference-track enrichment (Deezer): real BPM/genre/era when the user
-   *  points at an existing track. `reference` is null when nothing matched. */
   era: string;
   suggested_bpm: string;
   reference: AgentReference | null;
+  /** Perplexity found a candidate but confidence is low / name is ambiguous.
+   *  Frontend should show a confirmation chip before committing. */
+  reference_uncertain: boolean;
+  reference_note: string;
   model: string;
 }
 

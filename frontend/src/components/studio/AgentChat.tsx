@@ -140,7 +140,7 @@ function useWizardChips(lang: string) {
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-type WizardPhase = "free" | "lyrics_review" | "lyrics_confirm" | "genre" | "mood" | "tempo" | "vocal" | "confirm";
+type WizardPhase = "free" | "lyrics_review" | "lyrics_confirm" | "genre" | "mood" | "tempo" | "vocal" | "confirm" | "ref_confirm";
 
 interface WizardParams {
   lyrics: string;
@@ -598,7 +598,19 @@ export function AgentChat({
     setEffectiveModule(cls.module);
     effectiveModuleRef.current = cls.module;
 
-    // A resolved reference track (Deezer) gives real BPM/genre/era — show it and
+    // Perplexity found a candidate but is not confident / name is ambiguous —
+    // ask the user to confirm before committing anything.
+    if (cls.reference_uncertain && cls.reference_note) {
+      pushAgentMessage(
+        isEn
+          ? `🔎 Found a candidate: ${cls.reference_note}\nIs that the right artist? Confirm or paste a direct link.`
+          : `🔎 Нашёл кандидата: ${cls.reference_note}\nЭто тот самый артист? Подтверди или скинь прямую ссылку.`,
+      );
+      setWizardPhase("ref_confirm");
+      return;
+    }
+
+    // A resolved reference track gives real BPM/genre/era — show it and
     // treat the request as scriptable even if the user named an artist.
     const hasReference = !!cls.reference && !!(cls.reference.artist || cls.reference.title);
     if (hasReference && cls.reference) {
@@ -609,9 +621,10 @@ export function AgentChat({
         r.year > 0 ? String(r.year) : "",
       ].filter(Boolean).join(" · ");
       const tagLine = r.tags?.length ? `\n${isEn ? "Tags" : "Теги"}: ${r.tags.join(", ")}` : "";
+      const sourceLabel = r.source === "perplexity" ? " · web" : "";
       pushAgentMessage(
         `${isEn ? "🎯 Reference" : "🎯 Референс"}: ${[r.artist, r.title].filter(Boolean).join(" — ")}` +
-        (bits ? ` · ${bits}` : "") +
+        (bits ? ` · ${bits}` : "") + sourceLabel +
         `. ${isEn ? "Tuned the parameters to it." : "Подобрал параметры под него."}` +
         tagLine,
       );
@@ -619,12 +632,6 @@ export function AgentChat({
 
     const scriptable =
       cls.module === "song" || cls.module === "instrumental" || cls.module === "sound_effect";
-    // Songs with lyrics stay in the scripted wizard — Suno writes the text
-    // (approved in-chat), so `needs_lyrics` no longer forces the GPT path.
-    // `obscure_genre` no longer forces GPT either: multiple/niche genres stay
-    // in the fast wizard and route via custom_genre, which the worker's
-    // build_suno_style + enrich step turns into a rich style description. This
-    // stops the "had to name my genres twice" stall.
     const needsGpt =
       cls.too_vague || (cls.artist_ref && !hasReference);
 
@@ -1079,6 +1086,17 @@ export function AgentChat({
       return;
     }
 
+    // Perplexity found a candidate but is not confident — ask before committing.
+    if (cls.reference_uncertain && cls.reference_note) {
+      pushAgentMessage(
+        isEn
+          ? `🔎 Found a candidate: ${cls.reference_note}\nIs that the right artist? Confirm or paste a direct link.`
+          : `🔎 Нашёл кандидата: ${cls.reference_note}\nЭто тот самый артист? Подтверди или скинь ссылку.`,
+      );
+      setWizardPhase("ref_confirm");
+      return;
+    }
+
     const p = wizardParams.current;
     const ref = cls.reference && (cls.reference.artist || cls.reference.title) ? cls.reference : null;
     let changed = false;
@@ -1317,6 +1335,14 @@ export function AgentChat({
     if (wizardPhase === "genre" && scriptedRef.current) {
       appendUserMessage(text);
       handleGenreText(text);
+      return;
+    }
+
+    // ref_confirm: user typed a correction or pasted a link — re-classify it.
+    if (wizardPhase === "ref_confirm") {
+      setWizardPhase("free");
+      appendUserMessage(text);
+      await classifyAndRoute(text);
       return;
     }
 
@@ -1573,6 +1599,53 @@ export function AgentChat({
           </button>
           <button type="button" className="agent-suggestion-chip" onClick={handleLyricsInstrumental}>
             {isEn ? "🎹 Instrumental (no words)" : "🎹 Инструментал без слов"}
+          </button>
+        </div>
+      );
+    }
+    if (wizardPhase === "ref_confirm") {
+      return (
+        <div className="agent-suggestions">
+          <button
+            type="button"
+            className="agent-suggestion-chip agent-suggestion-chip--build"
+            onClick={() => {
+              setWizardPhase("free");
+              // "Yes" — re-run the original first message so classify commits the reference.
+              const orig = firstUserMsgRef.current;
+              if (orig) void classifyAndRoute(orig);
+              else enterScriptedWizard();
+            }}
+          >
+            {isEn ? "✅ Yes, that's right" : "✅ Да, всё верно"}
+          </button>
+          <button
+            type="button"
+            className="agent-suggestion-chip"
+            onClick={() => {
+              pushAgentMessage(
+                isEn
+                  ? "Paste a Spotify / Deezer / YouTube link and I'll look it up precisely."
+                  : "Скинь ссылку на Spotify / Deezer / YouTube — определю точно.",
+              );
+              setWizardPhase("free");
+            }}
+          >
+            {isEn ? "🔗 Give a link" : "🔗 Дать ссылку"}
+          </button>
+          <button
+            type="button"
+            className="agent-suggestion-chip"
+            onClick={() => {
+              pushAgentMessage(
+                isEn
+                  ? "Sure — who should the reference be? Name the artist or paste a link."
+                  : "Хорошо — кто должен быть референсом? Напиши имя или скинь ссылку.",
+              );
+              setWizardPhase("free");
+            }}
+          >
+            {isEn ? "🔄 Different artist" : "🔄 Другой артист"}
           </button>
         </div>
       );
