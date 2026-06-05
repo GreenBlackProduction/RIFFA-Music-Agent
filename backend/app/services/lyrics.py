@@ -349,6 +349,11 @@ class LyricsClient:
             logger.warning("enrich_music_prompt failed: {} - falling back to raw inputs", exc)
             enriched = ", ".join(p for p in (preset_style_hint, mood, tempo) if p)
 
+        # Hard-guarantee the no-vocals directive for instrumental mode — the
+        # Suno `instrumental=True` flag alone occasionally lets a vocal variant
+        # slip through, so we also state it explicitly at the front of the style.
+        if instrumental and "no vocal" not in enriched.lower():
+            enriched = "Instrumental, no vocals, no singing. " + enriched
         if len(enriched) > max_length:
             enriched = enriched[:max_length].rsplit(" ", 1)[0]
         # Final guard: strip any trailing reference clause that survived.
