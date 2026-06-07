@@ -440,16 +440,32 @@ export function GlobalPlayer() {
       // with the prefetch warming HTTP cache, this gives Spotify-style
       // instant track-to-track transitions.
       el.src = nxt.track.url;
+      // Android can flip the media session to "paused"/"none" across the src
+      // swap, which drops our background-playback privilege and the lock-screen
+      // widget. Re-assert "playing" right after play() so the OS keeps us.
+      const reassertPlaying = () => {
+        if ("mediaSession" in navigator) {
+          try { navigator.mediaSession.playbackState = "playing"; } catch { /* ignore */ }
+        }
+      };
       const playAttempt = el.play();
-      if (playAttempt && typeof playAttempt.catch === "function") {
-        playAttempt.catch(() => {
+      if (playAttempt && typeof playAttempt.then === "function") {
+        playAttempt.then(reassertPlaying).catch((err: unknown) => {
+          // Most likely Android rejecting a backgrounded play() of the fresh
+          // src. Retry once the new source buffers — listen for both events,
+          // Android fires them inconsistently after a src swap.
+          console.info("[player] auto-advance play() rejected:", (err as Error)?.name || err);
           if (!el) return;
-          const onCanPlay = () => {
-            el.removeEventListener("canplay", onCanPlay);
-            el.play().catch(() => undefined);
+          const retry = () => {
+            el.removeEventListener("canplay", retry);
+            el.removeEventListener("loadeddata", retry);
+            el.play().then(reassertPlaying).catch(() => undefined);
           };
-          el.addEventListener("canplay", onCanPlay, { once: true });
+          el.addEventListener("canplay", retry, { once: true });
+          el.addEventListener("loadeddata", retry, { once: true });
         });
+      } else {
+        reassertPlaying();
       }
       tearDownPrefetch();
       plannedNextRef.current = null;
