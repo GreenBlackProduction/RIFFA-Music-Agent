@@ -21,6 +21,8 @@ from app.core.deps import current_user, db_session
 from app.core.limiter import limiter
 from app.db.models import Generation, GenerationStatus, GenerationType, User
 from app.services.mood_canonical import canonical_mood
+from app.services.genre_canonical import canonical_genre
+from app.services.brief_normalize import normalize_freeform_genre
 from app.api.v1.tracks import _RIFFA_SUFFIX as _TRK_SUFFIX, _resolve_artist, format_track_name
 
 router = APIRouter(prefix="/generate", tags=["generate"])
@@ -283,6 +285,48 @@ async def _create_generation(
 # ---------------------------------------------------------------------------
 
 
+async def _normalize_freeform_brief(body: Any, settings: Settings) -> None:
+    """Turn a free-typed genre (``custom_genre``) into a clean brief, in place.
+
+    The agent's scripted wizard stores free-typed genres verbatim (e.g.
+    «Мне нужен mahtrock»), which then poisons the Suno style and the library
+    genre column. Preset genres (``body.genre``) and an empty ``custom_genre``
+    are left untouched. Known genres with typos are mapped locally for free;
+    truly freeform text goes through a cheap gpt-4o-mini call. Fail-safe: on a
+    miss the raw input is kept and generation still proceeds.
+    """
+    raw = (getattr(body, "custom_genre", "") or "").strip()
+    if not raw:
+        return
+
+    # 1. Local canonical match first — instant, no GPT (typos of known genres).
+    canon = canonical_genre(raw)
+    if canon:
+        body.genre = canon
+        body.custom_genre = ""
+        return
+
+    # 2. Truly freeform / unknown → cheap GPT normalization.
+    description = (getattr(body, "description", "") or getattr(body, "style", "") or "")
+    brief = await normalize_freeform_genre(raw, description, settings=settings)
+    if not brief:
+        return  # couldn't improve — keep the raw input
+
+    body.genre = brief["genre"]
+    body.custom_genre = ""
+    if brief["mood"] and not (getattr(body, "mood", "") or "").strip():
+        body.mood = brief["mood"]
+    if brief["tempo"] and not (getattr(body, "tempo", "") or "").strip():
+        body.tempo = brief["tempo"]
+    # Fold the subgenre into the free-text description so the prompt engineer
+    # keeps the nuance (e.g. "Japanese Math Rock").
+    sub = brief["subgenre"]
+    if sub and hasattr(body, "description"):
+        desc = (getattr(body, "description", "") or "").strip()
+        if sub.lower() not in desc.lower():
+            body.description = f"{desc} · {sub}".strip(" ·")
+
+
 @router.post("/song", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED)
 @limiter.limit("20/minute")
 async def generate_song(
@@ -292,6 +336,7 @@ async def generate_song(
     session: AsyncSession = Depends(db_session),
     settings: Settings = Depends(get_settings),
 ) -> GenerateResponse:
+    await _normalize_freeform_brief(body, settings)
     gen, created = await _create_generation(
         session,
         user,
@@ -321,6 +366,7 @@ async def generate_instrumental(
     session: AsyncSession = Depends(db_session),
     settings: Settings = Depends(get_settings),
 ) -> GenerateResponse:
+    await _normalize_freeform_brief(body, settings)
     gen, created = await _create_generation(
         session,
         user,
@@ -450,6 +496,7 @@ async def generate_cover_song(
     )
     cover_title = format_track_name(artist, f"{base} Cover V{version}")
 
+    await _normalize_freeform_brief(body, settings)
     gen, created = await _create_generation(
         session,
         user,
