@@ -6,6 +6,7 @@ import {
   createRobokassaLink,
   createStarsInvoice,
   fetchReviews,
+  getReferralStats,
   postReview,
   type ReviewItem,
   fetchTrash,
@@ -311,6 +312,15 @@ export function ProfilePage() {
 
   const queryClient = useQueryClient();
   const { items: libraryItems } = useLibraryItems();
+
+  // Referral panel data — invited count, tokens earned, last 5 invitees.
+  const referralQuery = useQuery({
+    queryKey: ["referrals"],
+    queryFn: getReferralStats,
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+  const referral = referralQuery.data;
 
   // Restore from trash → moves item back to library.
   const restoreFileMutation = useMutation({
@@ -784,13 +794,41 @@ export function ProfilePage() {
             <div className="stats" style={{ border: "none", background: "transparent", marginBottom: 16 }}>
               <div className="stat" style={{ background: "var(--paper-3)" }}>
                 <div className="label">{isEN ? "invited" : "приглашено"}</div>
-                <div className="val">0<small>{isEN ? "fr." : "др."}</small></div>
+                <div className="val">{referral?.invited_count ?? 0}<small>{isEN ? "fr." : "др."}</small></div>
               </div>
               <div className="stat" style={{ background: "var(--paper-3)" }}>
-                <div className="label">{isEN ? "bonus per purchase" : "бонус за покупку"}</div>
-                <div className="val">10<Coin size={13} style={{ marginLeft: 2 }} /></div>
+                <div className="label">{isEN ? "per purchase" : "за покупку"}</div>
+                <div className="val">{referral?.bonus_per_referral ?? 10}<Coin size={13} style={{ marginLeft: 2 }} /></div>
+              </div>
+              <div className="stat" style={{ background: "var(--paper-3)" }}>
+                <div className="label">{isEN ? "earned" : "заработано"}</div>
+                <div className="val">{referral?.earned_tokens ?? 0}<Coin size={13} style={{ marginLeft: 2 }} /></div>
               </div>
             </div>
+
+            {referral && referral.recent.length > 0 && (
+              <div className="referral-recent">
+                <div className="referral-recent__title">
+                  {isEN ? "Last invited" : "Последние приглашённые"}
+                </div>
+                {referral.recent.map((r, i) => (
+                  <div key={i} className="referral-recent__row">
+                    <span className="referral-recent__name" title={r.name}>{r.name}</span>
+                    {r.joined_at && (
+                      <span className="referral-recent__date">
+                        {new Date(r.joined_at).toLocaleDateString(isEN ? "en" : "ru", { day: "2-digit", month: "short" })}
+                      </span>
+                    )}
+                    <span className={`referral-recent__badge${r.purchased ? " referral-recent__badge--paid" : ""}`}>
+                      {r.purchased
+                        ? (isEN ? "bought · +10" : "купил · +10")
+                        : (isEN ? "registered" : "регистрация")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
               <div style={{ flex: 1, minWidth: 0, padding: "10px 14px", background: "var(--paper)", border: "1px solid var(--rule)", borderRadius: 999, fontFamily: "var(--font-mono)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {referralLink}

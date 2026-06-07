@@ -8,14 +8,16 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.email import hash_password, verify_password
 from app.core.config import Settings, get_settings
 from app.core.deps import current_user, current_user_loose, db_session
-from app.db.models import User
+from app.db.models import Referral, User
 from app.schemas.auth import CurrentUser
 from app.services.promo import PromoError, redeem_promo
+from app.services.users import _REFERRAL_BONUS_REFERRER
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -62,6 +64,73 @@ def read_current_user(user: User = Depends(current_user_loose)) -> CurrentUser:
         legal_version=settings.legal_terms_version,
         generation_notifications_enabled=user.generation_notifications_enabled,
         morning_messages_enabled=user.morning_messages_enabled,
+    )
+
+
+class ReferralInvitee(BaseModel):
+    name: str
+    joined_at: str | None
+    purchased: bool  # True once they bought a pack and the bonus was paid
+
+
+class ReferralStats(BaseModel):
+    invited_count: int
+    bonus_per_referral: int
+    earned_tokens: int
+    recent: list[ReferralInvitee]
+
+
+@router.get("/referrals", response_model=ReferralStats)
+async def referral_stats(
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+) -> ReferralStats:
+    """Referral panel data: total invited, tokens earned, and the last 5 invitees."""
+    invited_count = (
+        await session.execute(
+            select(func.count(Referral.id)).where(Referral.referrer_id == user.id)
+        )
+    ).scalar_one()
+
+    # Earned = sum of bonuses already paid out to this referrer.
+    earned = (
+        await session.execute(
+            select(func.coalesce(func.sum(Referral.bonus_tokens), 0)).where(
+                Referral.referrer_id == user.id,
+                Referral.bonus_paid.is_(True),
+            )
+        )
+    ).scalar_one()
+
+    rows = (
+        await session.execute(
+            select(
+                User.display_name,
+                User.telegram_username,
+                Referral.created_at,
+                Referral.bonus_paid,
+            )
+            .join(User, User.id == Referral.referred_id)
+            .where(Referral.referrer_id == user.id)
+            .order_by(Referral.created_at.desc())
+            .limit(5)
+        )
+    ).all()
+
+    recent = [
+        ReferralInvitee(
+            name=(r.display_name or r.telegram_username or "Пользователь"),
+            joined_at=r.created_at.isoformat() if r.created_at else None,
+            purchased=bool(r.bonus_paid),
+        )
+        for r in rows
+    ]
+
+    return ReferralStats(
+        invited_count=int(invited_count or 0),
+        bonus_per_referral=_REFERRAL_BONUS_REFERRER,
+        earned_tokens=int(earned or 0),
+        recent=recent,
     )
 
 

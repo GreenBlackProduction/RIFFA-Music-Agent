@@ -466,6 +466,59 @@
   .gen-stats-pill strong { font-size: 12px; }
 }
 
+/* ── Referral: last invited list ── */
+.referral-recent {
+  margin-bottom: 16px;
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+}
+.referral-recent__title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-4);
+  margin-bottom: 8px;
+}
+.referral-recent__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.referral-recent__row:last-child { border-bottom: none; }
+.referral-recent__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--ink);
+}
+.referral-recent__date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-4);
+  flex-shrink: 0;
+}
+.referral-recent__badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--paper-3);
+  color: var(--ink-3);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.referral-recent__badge--paid {
+  background: var(--emr-soft);
+  color: var(--emr);
+  font-weight: 600;
+}
+
 /* ── Doc list ── */
 .doc-list { display: grid; gap: 0; border: 1px solid var(--ink); border-radius: 0; background: var(--paper-3); overflow: hidden; }
 .doc-row {

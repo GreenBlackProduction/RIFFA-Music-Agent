@@ -247,6 +247,23 @@ export function createRobokassaLink(package_code: PackageCode): Promise<Robokass
   });
 }
 
+export interface ReferralInvitee {
+  name: string;
+  joined_at: string | null;
+  purchased: boolean;
+}
+
+export interface ReferralStats {
+  invited_count: number;
+  bonus_per_referral: number;
+  earned_tokens: number;
+  recent: ReferralInvitee[];
+}
+
+export function getReferralStats(): Promise<ReferralStats> {
+  return apiFetch("/api/v1/users/referrals");
+}
+
 export function retryGeneration(genId: string): Promise<GenerateResponse> {
   return apiFetch(`/api/v1/history/${genId}/retry`, { method: "POST" });
 }
