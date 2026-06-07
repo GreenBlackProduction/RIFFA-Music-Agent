@@ -378,8 +378,14 @@ export function GlobalPlayer() {
       if (seekingRef.current || draggingRef.current) return;
       if (!el || !el.duration || !isFinite(el.duration)) return;
       const remaining = el.duration - el.currentTime;
-      // 15s window — enough for DNS+TLS+first chunk even on slow LTE.
-      if (remaining > 15 || remaining <= 0) return;
+      if (remaining <= 0) return;
+      // Warm the next track EARLY — ~3s after this one starts — NOT in the final
+      // 15s. A locked screen / backgrounded tab throttles `timeupdate` near the
+      // end, so a late warm-up never completes and `ended` hits a cold track
+      // (~2s silent gap). Warming at the start runs while we're still active,
+      // and the HTTP cache (max-age 1h) keeps it hot for the whole track →
+      // near-gapless transition even when the screen is locked.
+      if (el.currentTime < 3) return;
       // Commit to ONE next track for the whole window. Without a stable plan,
       // shuffle re-picks a random track on every timeupdate (~4 Hz) and never
       // finishes warming any single one — so `ended` always hits a cold track.
