@@ -13,7 +13,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { loginWithTelegramWidget } from "@/lib/api/client";
+import { loginWithTelegramWidget, pollBotLinkLogin } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth";
 
 function parseParams(search: string): Record<string, string> {
@@ -35,6 +35,31 @@ export function TelegramAuthCallbackPage() {
       const fromQuery = parseParams(window.location.search);
       const fromHash  = parseParams(window.location.hash);
       const p = { ...fromQuery, ...fromHash };
+
+      // ── Bot-link return flow ──────────────────────────────────────────────
+      // The bot's "Открыть RIFFA →" button sends the user here with a one-shot
+      // nonce (return_url = /tg-auth?nonce=…). The bot already approved it, so
+      // poll once to exchange the nonce for a session cookie, then continue.
+      // Without this the page only understood the Login Widget (id/hash) and
+      // bounced every bot-link login to /login?tg_error=1.
+      const nonce = p["nonce"];
+      if (nonce) {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const r = await pollBotLinkLogin(nonce);
+            if (r.approved) {
+              await refresh();
+              navigate("/studio", { replace: true });
+              return;
+            }
+          } catch {
+            break; // expired / network — show the error screen
+          }
+          await new Promise((res) => setTimeout(res, 800));
+        }
+        navigate("/login?tg_error=1", { replace: true });
+        return;
+      }
 
       const id       = p["id"]        ? Number(p["id"])        : undefined;
       const authDate = p["auth_date"] ? Number(p["auth_date"]) : undefined;
