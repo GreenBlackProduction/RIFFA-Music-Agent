@@ -201,6 +201,7 @@
   line-height: 1;
   letter-spacing: -0.03em;
   margin: 14px 0 4px;
+  transition: color 160ms ease;
 }
 .price-tile .price small {
   font-family: var(--font-mono);
@@ -250,6 +251,13 @@
 .price-tile.is-featured .perks { color: rgba(233,229,218,0.85); }
 .price-tile .perks li::before { content: "→ "; font-family: var(--font-mono); color: var(--emr); font-weight: 600; }
 .price-tile.is-featured .perks li::before { color: var(--hi); }
+
+/* Token icon stays visible on the black premium card (it inherits a dimmed
+   paper colour otherwise and washes out). */
+.price-tile.is-featured .riffa-coin { color: #fff; }
+
+/* Premium price (999) lights up in the brand orange on hover. */
+.price-tile.is-featured:hover .price { color: var(--hi); }
 
 /* ── Stars price in featured tile ── */
 .price-stars {
@@ -435,6 +443,27 @@
   color: var(--ink);
   font-weight: 600;
   font-size: 10px;
+}
+
+/* Collapse/expand toggle for the genre chips (shows on mobile when chips
+   would fill too much space). */
+.gen-stats-pill--toggle {
+  cursor: pointer;
+  color: var(--hi);
+  border-color: var(--hi-soft);
+  background: var(--hi-soft);
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.gen-stats-pill--toggle:hover { border-color: var(--hi); }
+
+/* Stats field reads larger on desktop — more room, bigger chips. */
+@media (min-width: 861px) {
+  .inline-gen-stats { gap: 9px; margin-top: 18px; }
+  .inline-gen-stats__row { gap: 6px 8px; }
+  .gen-stats-label { font-size: 10px; }
+  .gen-stats-pill { font-size: 12px; padding: 4px 11px; border-radius: 6px; }
+  .gen-stats-pill strong { font-size: 12px; }
 }
 
 /* ── Doc list ── */

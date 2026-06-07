@@ -23,6 +23,7 @@ import {
   type LibraryItem,
   type LibraryItemType,
   MUSIC_TYPES,
+  primaryGenre,
   RADIO_TYPES,
   useLibraryItems,
 } from "@/lib/library";
@@ -58,13 +59,18 @@ export function LibraryCard() {
 
   const { items, isLoading, authError } = useLibraryItems();
 
-  // Unique genres and moods extracted from actual items (non-empty, sorted)
+  // Unique genres and moods extracted from actual items (non-empty, sorted).
+  // Genre is reduced to its PRIMARY style and de-duplicated case-insensitively
+  // so the dropdown isn't polluted by multi-genre strings or "Pop"/"pop" twins.
   const uniqueGenres = useMemo(() => {
-    const set = new Set<string>();
+    const byKey = new Map<string, string>(); // lowercase key → display label
     for (const it of items) {
-      if (it.genre && it.genre.trim()) set.add(it.genre.trim());
+      const g = primaryGenre(it.genre);
+      if (!g) continue;
+      const key = g.toLowerCase();
+      if (!byKey.has(key)) byKey.set(key, g);
     }
-    return Array.from(set).sort();
+    return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
   }, [items]);
 
   const uniqueMoods = useMemo(() => {
@@ -78,7 +84,7 @@ export function LibraryCard() {
   const visibleItems = useMemo(() => {
     if (filter === "trash") return [];
     let list = filter === "all" ? items : items.filter((i) => i.type === filter);
-    if (genreFilter) list = list.filter((i) => i.genre === genreFilter);
+    if (genreFilter) list = list.filter((i) => primaryGenre(i.genre).toLowerCase() === genreFilter.toLowerCase());
     if (moodFilter)  list = list.filter((i) => i.mood  === moodFilter);
     if (sortOrder === "oldest") list = [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     return list;

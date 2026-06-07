@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import {
   HISTORY_QUERY_KEY,
+  primaryGenre,
   TYPE_LABELS,
   useLibraryItems,
 } from "@/lib/library";
@@ -410,15 +411,30 @@ export function ProfilePage() {
   const totalGens = genStats.reduce((acc, s) => acc + s.count, 0);
 
   const uniqueGenreCount = useMemo(() => {
-    return new Set(libraryItems.map((f) => f.genre).filter(Boolean)).size;
+    const keys = new Set<string>();
+    for (const it of libraryItems) {
+      const g = primaryGenre(it.genre);
+      if (g) keys.add(g.toLowerCase());
+    }
+    return keys.size;
   }, [libraryItems]);
 
+  // Aggregate by PRIMARY style (case-insensitive) so one chip = one real genre
+  // the user generates in, with its track count — not a multi-genre permutation.
   const topGenres = useMemo(() => {
-    const counts: Record<string, number> = {};
+    const counts = new Map<string, { label: string; count: number }>();
     for (const it of libraryItems) {
-      if (it.genre) counts[it.genre] = (counts[it.genre] ?? 0) + 1;
+      const g = primaryGenre(it.genre);
+      if (!g) continue;
+      const key = g.toLowerCase();
+      const cur = counts.get(key);
+      if (cur) cur.count += 1;
+      else counts.set(key, { label: g, count: 1 });
     }
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    return Array.from(counts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12)
+      .map((e) => [e.label, e.count] as [string, number]);
   }, [libraryItems]);
 
   const topMoods = useMemo(() => {
@@ -428,6 +444,14 @@ export function ProfilePage() {
     }
     return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
   }, [libraryItems]);
+
+  // Genre chips collapse on mobile when they'd fill too much space. Show a
+  // capped set by default + a toggle; desktop has room so the cap is higher
+  // (CSS enlarges the field there). 5 collapsed is one tidy row on a phone.
+  const [genresExpanded, setGenresExpanded] = useState(false);
+  const GENRES_COLLAPSED = 5;
+  const visibleGenres = genresExpanded ? topGenres : topGenres.slice(0, GENRES_COLLAPSED);
+  const hiddenGenreCount = topGenres.length - visibleGenres.length;
 
   return (
     <div className="profile">
@@ -583,11 +607,23 @@ export function ProfilePage() {
               {topGenres.length > 0 && (
                 <div className="inline-gen-stats__row">
                   <span className="gen-stats-label">{isEN ? "genres" : "жанры"}</span>
-                  {topGenres.slice(0, 4).map(([genre, count]) => (
+                  {visibleGenres.map(([genre, count]) => (
                     <span key={genre} className="gen-stats-pill">
                       {genre}&nbsp;<strong>{count}</strong>
                     </span>
                   ))}
+                  {(hiddenGenreCount > 0 || genresExpanded) && topGenres.length > GENRES_COLLAPSED && (
+                    <button
+                      type="button"
+                      className="gen-stats-pill gen-stats-pill--toggle"
+                      onClick={() => setGenresExpanded((v) => !v)}
+                      aria-expanded={genresExpanded}
+                    >
+                      {genresExpanded
+                        ? (isEN ? "− less" : "− свернуть")
+                        : `+${hiddenGenreCount}`}
+                    </button>
+                  )}
                 </div>
               )}
               {topMoods.length > 0 && (
@@ -630,8 +666,8 @@ export function ProfilePage() {
         {localPackages.map((p) => {
           const isFeatured = p.id === "premium";
           const tokensLine = isEN
-            ? <>{p.tokens} <Coin size={12} /> to balance</>
-            : <><Coin size={12} /> {p.tokens} на баланс</>;
+            ? <>{p.tokens} <Coin size={14} /> to balance</>
+            : <><Coin size={14} /> {p.tokens} на баланс</>;
           const songGens = Math.floor(p.tokens / 2);
           const sfxGens = p.tokens * 2;
           const coverGens = p.tokens;
@@ -655,7 +691,7 @@ export function ProfilePage() {
               {p.starsPrice !== undefined && (
                 <div className="price-stars">{isEN ? `or ${p.starsPrice} ★` : `или ${p.starsPrice} ★`}</div>
               )}
-              <div className="tokens-meta">{p.tokens} <Coin size={11} /> · ~{Math.floor(p.tokens / 2)} {isEN ? "gens" : "генераций"}</div>
+              <div className="tokens-meta">{p.tokens} <Coin size={13} /> · ~{Math.floor(p.tokens / 2)} {isEN ? "gens" : "генераций"}</div>
               {p.discount !== undefined && (
                 <div className="discount">{isEN ? `save ${p.discount}%` : `выгода ${p.discount}%`}</div>
               )}

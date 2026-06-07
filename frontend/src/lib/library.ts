@@ -52,6 +52,21 @@ export interface LibraryItem {
   isPublic: boolean;
 }
 
+/**
+ * A track's ``genre`` field can hold several genres ("pop, rock, electronic")
+ * when the user listed many as a reference. For the library filter dropdown and
+ * the profile stats chips we want a single PRIMARY style — the first one — so
+ * the list stays clean and doesn't fill up with multi-genre permutations.
+ *
+ * Splits only on real multi-value separators (comma / semicolon / slash / pipe
+ * / middle-dot) so compound single genres like "Drum and Bass", "R&B",
+ * "Hip-Hop" stay intact.
+ */
+export function primaryGenre(raw: string | null | undefined): string {
+  if (!raw) return "";
+  return raw.split(/[,;/|·]/)[0]?.trim() ?? "";
+}
+
 export const TYPE_ICONS: Record<LibraryItemType, string> = {
   song: "🎵",
   instrumental: "🎹",
