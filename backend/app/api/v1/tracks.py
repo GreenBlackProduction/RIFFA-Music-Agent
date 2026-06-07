@@ -17,7 +17,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -335,19 +335,29 @@ async def _proxy_audio(audio_url: str, request: Request, cache_control: str) -> 
     if range_header:
         upstream_headers["Range"] = range_header
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
-        try:
-            resp = await client.get(audio_url, headers=upstream_headers)
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 416:
-                # Range not satisfiable — pass through to browser
-                return Response(status_code=416, headers={"Accept-Ranges": "bytes"})
-            logger.error("stream fetch failed for {}: {}", audio_url, exc)
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream fetch failed") from exc
-        except Exception as exc:
-            logger.error("stream fetch failed for {}: {}", audio_url, exc)
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream fetch failed") from exc
+    # Stream the upstream response through instead of buffering the whole MP3
+    # into memory first. Buffering made time-to-first-byte = full-file download
+    # time from Suno (slow track start) and pinned a whole file in RAM per
+    # listener. With stream=True the browser gets the first chunk as soon as
+    # Suno sends it, and memory stays flat.
+    client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=10.0))
+    try:
+        req = client.build_request("GET", audio_url, headers=upstream_headers)
+        resp = await client.send(req, stream=True)
+    except Exception as exc:
+        await client.aclose()
+        logger.error("stream fetch failed for {}: {}", audio_url, exc)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream fetch failed") from exc
+
+    if resp.status_code == 416:
+        await resp.aclose()
+        await client.aclose()
+        return Response(status_code=416, headers={"Accept-Ranges": "bytes"})
+    if resp.status_code >= 400:
+        await resp.aclose()
+        await client.aclose()
+        logger.error("stream fetch failed for {}: HTTP {}", audio_url, resp.status_code)
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "upstream fetch failed")
 
     response_headers: dict[str, str] = {
         "Accept-Ranges": "bytes",
@@ -360,8 +370,17 @@ async def _proxy_audio(audio_url: str, request: Request, cache_control: str) -> 
         response_headers["Content-Length"] = resp.headers["content-length"]
 
     status_code = 206 if resp.status_code == 206 else 200
-    return Response(
-        content=resp.content,
+
+    async def _body() -> Any:
+        try:
+            async for chunk in resp.aiter_bytes(65536):
+                yield chunk
+        finally:
+            await resp.aclose()
+            await client.aclose()
+
+    return StreamingResponse(
+        _body(),
         status_code=status_code,
         media_type="audio/mpeg",
         headers=response_headers,
