@@ -14,7 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.email import hash_password, verify_password
 from app.core.config import Settings, get_settings
 from app.core.deps import current_user, current_user_loose, db_session
-from app.db.models import Referral, User
+from app.db.models import Referral, User, WalletTransaction
+from app.db.models.payment import Payment, PaymentStatus
 from app.schemas.auth import CurrentUser
 from app.services.promo import PromoError, redeem_promo
 from app.services.users import _REFERRAL_BONUS_REFERRER
@@ -92,12 +93,15 @@ async def referral_stats(
         )
     ).scalar_one()
 
-    # Earned = sum of bonuses already paid out to this referrer.
+    # Earned = referral bonuses actually paid out for invitees' PURCHASES.
+    # NB: we deliberately do NOT use Referral.bonus_paid here — legacy rows had
+    # it set to True at signup (old auto-credit logic), so it doesn't mean the
+    # invitee bought anything. Only purchase-driven payouts count.
     earned = (
         await session.execute(
-            select(func.coalesce(func.sum(Referral.bonus_tokens), 0)).where(
-                Referral.referrer_id == user.id,
-                Referral.bonus_paid.is_(True),
+            select(func.coalesce(func.sum(WalletTransaction.amount_tokens), 0)).where(
+                WalletTransaction.user_id == user.id,
+                WalletTransaction.reason == "referral_purchase_bonus",
             )
         )
     ).scalar_one()
@@ -105,10 +109,10 @@ async def referral_stats(
     rows = (
         await session.execute(
             select(
+                Referral.referred_id,
                 User.display_name,
                 User.telegram_username,
                 Referral.created_at,
-                Referral.bonus_paid,
             )
             .join(User, User.id == Referral.referred_id)
             .where(Referral.referrer_id == user.id)
@@ -117,11 +121,28 @@ async def referral_stats(
         )
     ).all()
 
+    # "Bought" = the invitee has at least one completed payment (ground truth,
+    # independent of the legacy bonus_paid flag).
+    invitee_ids = [r.referred_id for r in rows]
+    purchased_ids: set[int] = set()
+    if invitee_ids:
+        prows = (
+            await session.execute(
+                select(Payment.user_id)
+                .where(
+                    Payment.user_id.in_(invitee_ids),
+                    Payment.status == PaymentStatus.completed,
+                )
+                .distinct()
+            )
+        ).all()
+        purchased_ids = {p.user_id for p in prows}
+
     recent = [
         ReferralInvitee(
             name=(r.display_name or r.telegram_username or "Пользователь"),
             joined_at=r.created_at.isoformat() if r.created_at else None,
-            purchased=bool(r.bonus_paid),
+            purchased=r.referred_id in purchased_ids,
         )
         for r in rows
     ]
