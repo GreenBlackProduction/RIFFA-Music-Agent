@@ -35,3 +35,12 @@ createRoot(root).render(
     </QueryClientProvider>
   </StrictMode>,
 );
+
+// We intentionally run NO service worker (a navigation-fetch SW double-fetched
+// single-use auth nonces and broke Telegram login). Actively unregister any SW
+// a previous build registered, so returning users recover without manual steps.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations?.().then((regs) => {
+    regs.forEach((r) => r.unregister());
+  }).catch(() => { /* non-fatal */ });
+}
