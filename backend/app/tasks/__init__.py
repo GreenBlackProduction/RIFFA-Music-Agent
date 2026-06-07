@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, ClassVar
 
+import httpx
 from arq import cron
 from arq.connections import RedisSettings
 from loguru import logger
@@ -679,8 +680,30 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             nb = make_nanobanana_client(settings)
             prompt = params.get("prompt", "")
             model = params.get("model", "nano-banana")
+            ref_url = (params.get("reference_url") or "").strip()
             await _publish(ctx, gen_id, {"status": "processing", "step": "generating"})
-            image_url = await nb.generate_cover_art(prompt, model=model)
+            if ref_url:
+                # Image→image: fetch the source and edit it so the result keeps
+                # the original composition (used by "enhance"). Falls back to a
+                # fresh generation if the source can't be fetched.
+                try:
+                    async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as _h:
+                        _r = await _h.get(ref_url)
+                        _r.raise_for_status()
+                        src_bytes = _r.content
+                    mime = (_r.headers.get("content-type") or "image/png").split(";")[0].strip()
+                    ext = "jpg" if "jpeg" in mime or "jpg" in mime else "png"
+                    image_url = await nb.edit_cover_art(
+                        prompt, src_bytes, model=model, filename=f"source.{ext}", mime=mime,
+                    )
+                except httpx.HTTPError as _fetch_err:
+                    logger.warning(
+                        "cover_art enhance: source fetch failed ({}), falling back to generate",
+                        _fetch_err,
+                    )
+                    image_url = await nb.generate_cover_art(prompt, model=model)
+            else:
+                image_url = await nb.generate_cover_art(prompt, model=model)
             result = {"image_url": image_url}
 
         elif gen.type == GenerationType.occasion:

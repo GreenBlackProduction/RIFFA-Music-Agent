@@ -72,6 +72,7 @@ export function FileActions({
   downloadUrl,
   generationId,
   audioId,
+  imageUrl,
   trackIndex,
   isActive,
   isPlaying,
@@ -259,10 +260,17 @@ export function FileActions({
     setEnhancePending(true);
     setMenuOpen(false);
     try {
+      // Image-to-image: pass the SOURCE cover so the model edits it instead of
+      // inventing a brand-new picture (the old text-only prompt produced an
+      // unrelated image). Prompt locks composition/subject and forbids text.
       const resp = await generateCoverArt({
-        prompt: `enhance and upscale: ${title || "cover art"}`,
+        prompt:
+          "Enhance this cover art: increase sharpness, lighting and fine detail. " +
+          "Keep the EXACT same composition, subject, framing and colours. " +
+          "Do not add, remove or change any text. Square 1:1 vinyl cover art, no packaging or mockup.",
         model: "nano-banana-pro",
         title: `${title || t("fileActions.fallbackCover")} (HD)`,
+        reference_url: imageUrl,
       });
       trackGeneration(
         resp.generation_id,

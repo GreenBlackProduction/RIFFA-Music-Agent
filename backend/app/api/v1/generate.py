@@ -113,6 +113,9 @@ class CoverArtRequest(BaseModel):
     model: str = Field(default="nano-banana", max_length=64)
     title: str = Field(default="", max_length=80)
     idempotency_key: str = Field(default="", max_length=64)
+    # When set, the cover is generated image→image from this source (used by
+    # "enhance" to keep the original composition). Empty → plain text→image.
+    reference_url: str = Field(default="", max_length=1024)
 
 
 class OccasionRequest(BaseModel):
