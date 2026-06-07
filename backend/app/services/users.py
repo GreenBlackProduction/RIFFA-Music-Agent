@@ -13,14 +13,14 @@ from app.auth.email import hash_password, verify_password
 from app.auth.telegram import TelegramAccount
 from app.core.config import get_settings
 from app.db.models import Referral, User, WalletTransaction
-from app.services.notifications import notify_admin_new_user
+from app.services.notifications import notify_admin_new_user, notify_balance_credited
 from app.services.telegram_sync import sync_bot_user_on_first_login
 
-_NEW_USER_BONUS = 3          # free tokens on first registration
-_REFERRAL_BONUS_REFERRER = 10  # tokens for the person who shared the link
-_REFERRAL_BONUS_REFERRED = 4   # tokens for the new user who joined via link
-# Итого для нового пользователя по реферальной ссылке:
-#   _NEW_USER_BONUS + _REFERRAL_BONUS_REFERRED = 3 + 4 = 7 токенов
+_NEW_USER_BONUS = 3            # free tokens on first registration (everyone)
+_REFERRAL_BONUS_REFERRER = 10  # tokens for the inviter — paid ONLY once the
+                               # invited user buys a token package (anti-farm).
+# The invited user gets just the standard _NEW_USER_BONUS on registration; there
+# is no extra "joined via link" bonus, so throwaway signups can't farm tokens.
 
 
 async def _notify_admin_signup(user: User, source: str) -> None:
@@ -86,7 +86,13 @@ async def _generate_referral_code(session: AsyncSession) -> str:
 async def _apply_referral(
     session: AsyncSession, new_user: User, referral_code: str | None
 ) -> None:
-    """Credit both parties when a valid referral code is used on registration."""
+    """Record a referral on registration as PENDING — no tokens granted here.
+
+    The invited user gets only the standard welcome bonus. The inviter's reward
+    is paid later, the first time the invited user buys a token package (see
+    :func:`credit_referrer_on_first_purchase`). This stops users from farming
+    referral tokens by registering throwaway accounts via their own link.
+    """
     if not referral_code:
         return
 
@@ -106,42 +112,77 @@ async def _apply_referral(
     if existing:
         return
 
-    referral = Referral(
-        referrer_id=referrer.id,
-        referred_id=new_user.id,
-        bonus_paid=True,
-        bonus_tokens=_REFERRAL_BONUS_REFERRER,
+    # Pending: bonus_paid stays False until the invited user makes a purchase.
+    session.add(
+        Referral(
+            referrer_id=referrer.id,
+            referred_id=new_user.id,
+            bonus_paid=False,
+            bonus_tokens=_REFERRAL_BONUS_REFERRER,
+        )
     )
-    session.add(referral)
+    await session.flush()
+    logger.info(
+        "Referral recorded (pending purchase): referrer={} referred={}",
+        referrer.id, new_user.id,
+    )
 
-    # Credit referrer (+10 tokens)
-    referrer.balance_tokens += _REFERRAL_BONUS_REFERRER
+
+async def credit_referrer_on_first_purchase(
+    session: AsyncSession, buyer_user_id: int
+) -> None:
+    """Pay the inviter their referral bonus the first time the invited user buys
+    a token package. Idempotent via ``Referral.bonus_paid`` — safe to call on
+    every purchase; only the first one (still unpaid) pays out.
+
+    Must be called from every purchase-confirmation path (Robokassa webhook,
+    Telegram Stars) so the reward can't be skipped by choosing a payment method.
+    """
+    referral = (
+        await session.execute(
+            select(Referral).where(
+                Referral.referred_id == buyer_user_id,
+                Referral.bonus_paid.is_(False),
+            )
+        )
+    ).scalar_one_or_none()
+    if referral is None:
+        return
+
+    referrer = (
+        await session.execute(select(User).where(User.id == referral.referrer_id))
+    ).scalar_one_or_none()
+    # Mark paid regardless so an orphaned referral doesn't retry forever.
+    referral.bonus_paid = True
+    if referrer is None:
+        await session.flush()
+        return
+
+    bonus = referral.bonus_tokens or _REFERRAL_BONUS_REFERRER
+    referrer.balance_tokens += bonus
     session.add(
         WalletTransaction(
             user_id=referrer.id,
-            amount_tokens=_REFERRAL_BONUS_REFERRER,
-            reason="referral_bonus",
-            reference_id=str(new_user.id),
+            amount_tokens=bonus,
+            reason="referral_purchase_bonus",
+            reference_id=str(buyer_user_id),
         )
     )
-
-    # Credit new user (+4 tokens)
-    new_user.balance_tokens += _REFERRAL_BONUS_REFERRED
-    session.add(
-        WalletTransaction(
-            user_id=new_user.id,
-            amount_tokens=_REFERRAL_BONUS_REFERRED,
-            reason="referral_welcome_bonus",
-            reference_id=str(referrer.id),
-        )
-    )
-
     await session.flush()
     logger.info(
-        "Referral applied: referrer={} +{} tokens, referred={} +{} tokens",
-        referrer.id, _REFERRAL_BONUS_REFERRER,
-        new_user.id, _REFERRAL_BONUS_REFERRED,
+        "Referral bonus paid on purchase: referrer={} +{} tokens (invited={})",
+        referrer.id, bonus, buyer_user_id,
     )
+
+    # Best-effort Telegram ping to the inviter.
+    try:
+        settings = get_settings()
+        if referrer.telegram_user_id and settings.telegram_bot_token:
+            await notify_balance_credited(
+                settings.telegram_bot_token, referrer, bonus, "referral"
+            )
+    except Exception as exc:
+        logger.warning("referral purchase notify failed: {}", exc)
 
 
 class AuthError(Exception):

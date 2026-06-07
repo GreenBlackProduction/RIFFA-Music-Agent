@@ -23,6 +23,7 @@ from app.core.config import Settings, get_settings
 from app.core.deps import current_user, db_session
 from app.db.models.payment import Payment, PaymentProvider, PaymentStatus
 from app.db.models.user import User
+from app.services.users import credit_referrer_on_first_purchase
 from app.services.wallet import credit_tokens
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -277,6 +278,8 @@ async def robokassa_webhook(
         reason="purchase:robokassa",
         reference_id=str(payment.id),
     )
+    # First purchase by an invited user pays the inviter's referral bonus.
+    await credit_referrer_on_first_purchase(session, payment.user_id)
     payment.status = PaymentStatus.completed
     payment.raw_payload = {**(payment.raw_payload or {}), "out_sum": out_sum}
     await session.commit()

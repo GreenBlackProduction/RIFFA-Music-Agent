@@ -764,14 +764,31 @@ export function ProfilePage() {
             <h2>{isEN ? "invite friends" : "приглашай друзей"}</h2>
           </div>
           <div className="p-panel">
+            <p style={{ margin: "0 0 16px", fontSize: 13.5, lineHeight: 1.55, color: "var(--ink-2)" }}>
+              {isEN ? (
+                <>
+                  Want free tokens for your generations? Invite friends and earn from their
+                  purchases. When someone you invited signs up <strong>and buys any token
+                  pack</strong>, you get <strong style={{ color: "var(--hi)" }}>+10 tokens</strong>.
+                  Your friend gets 3 tokens just for signing up.
+                </>
+              ) : (
+                <>
+                  Хочешь бесплатные токены для своих генераций? Приглашай друзей и зарабатывай
+                  на их покупках. Когда приглашённый зарегистрируется <strong>и купит любой
+                  пакет токенов</strong>, ты получишь <strong style={{ color: "var(--hi)" }}>+10
+                  токенов</strong>. Друг получает 3 токена просто за регистрацию.
+                </>
+              )}
+            </p>
             <div className="stats" style={{ border: "none", background: "transparent", marginBottom: 16 }}>
               <div className="stat" style={{ background: "var(--paper-3)" }}>
                 <div className="label">{isEN ? "invited" : "приглашено"}</div>
                 <div className="val">0<small>{isEN ? "fr." : "др."}</small></div>
               </div>
               <div className="stat" style={{ background: "var(--paper-3)" }}>
-                <div className="label">{isEN ? "bonus tokens" : "бонусных токенов"}</div>
-                <div className="val">0<Coin size={13} style={{ marginLeft: 2 }} /></div>
+                <div className="label">{isEN ? "bonus per purchase" : "бонус за покупку"}</div>
+                <div className="val">10<Coin size={13} style={{ marginLeft: 2 }} /></div>
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
