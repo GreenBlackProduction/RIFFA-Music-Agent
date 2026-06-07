@@ -458,6 +458,11 @@ export const ru: LocaleTree = {
     promptPreview: {
       label: "Итоговый prompt",
       desc: "То, что отправится в Suno / SFX API",
+      music: "Suno · музыка",
+      sfx: "Suno · SFX",
+      cover: "Nano-Banana · обложка",
+      musicDesc: "Отправится в Suno · V5.5",
+      sfxDesc: "Отправится в Suno · SFX",
     },
   },
 
@@ -692,6 +697,10 @@ export const ru: LocaleTree = {
       generating: "Suno AI создаёт музыку...",
       submitting_wav: "Конвертация в WAV...",
       converting_wav: "Конвертация в WAV...",
+      music_cover: "Отправляю в Nano-Banana...",
+      generating_cover: "Nano-Banana создаёт обложку...",
+      music_sfx: "Отправляю в Suno · SFX...",
+      generating_sfx: "Suno создаёт звуковой эффект...",
     },
     types: {
       song: "Песня",

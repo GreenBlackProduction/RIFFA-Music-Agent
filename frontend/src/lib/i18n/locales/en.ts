@@ -453,6 +453,11 @@ export const en: TranslationKeys = {
     promptPreview: {
       label: "Final prompt",
       desc: "What will be sent to the Suno / SFX API",
+      music: "Suno · music",
+      sfx: "Suno · SFX",
+      cover: "Nano-Banana · cover",
+      musicDesc: "Sent to Suno · V5.5",
+      sfxDesc: "Sent to Suno · SFX",
     },
   },
 
@@ -687,6 +692,10 @@ export const en: TranslationKeys = {
       generating: "Suno AI is composing...",
       submitting_wav: "Converting to WAV...",
       converting_wav: "Converting to WAV...",
+      music_cover: "Sending to Nano-Banana...",
+      generating_cover: "Nano-Banana is creating the cover...",
+      music_sfx: "Sending to Suno · SFX...",
+      generating_sfx: "Suno is creating the sound effect...",
     },
     types: {
       song: "Song",

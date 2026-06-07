@@ -101,8 +101,14 @@ function useLabels() {
   const { t } = useTranslation();
   const typeLabel = (k: string) =>
     TYPE_KEYS.includes(k as (typeof TYPE_KEYS)[number]) ? t(`activeGen.types.${k}`) : k;
-  const stepLabel = (k: string | null | undefined) => {
+  const stepLabel = (k: string | null | undefined, type?: string) => {
     if (!k) return t("activeGen.waiting");
+    // The generic "music"/"generating" steps must name the real engine per
+    // type — cover art runs on Nano-Banana, SFX is a Suno SFX job, not music.
+    if ((k === "music" || k === "generating") && type) {
+      if (type === "cover_art") return t(`activeGen.steps.${k}_cover`);
+      if (type === "sound_effect") return t(`activeGen.steps.${k}_sfx`);
+    }
     return STEP_KEYS.includes(k as (typeof STEP_KEYS)[number]) ? t(`activeGen.steps.${k}`) : k;
   };
   return { t, typeLabel, stepLabel };
@@ -250,7 +256,7 @@ function CardBody({ gen, onOpenPreview }: CardActionsProps) {
       <div className="active-gen__bar" aria-hidden="true">
         <div className="active-gen__bar-fill" style={{ width: `${gen.progress}%` }} />
       </div>
-      <p className="active-gen__step">{stepLabel(gen.step)}</p>
+      <p className="active-gen__step">{stepLabel(gen.step, gen.type)}</p>
     </>
   );
 }
@@ -299,7 +305,7 @@ export function CollapsedGenerationProgress() {
     <aside ref={containerRef} className="collapsed-gen-progress" aria-label={t("activeGen.progressAria")}>
       {entries.map((gen) => {
         const label = gen.title || typeLabel(gen.type) || t("activeGen.generationFallback");
-        const step = gen.step ? stepLabel(gen.step) : t("activeGen.waitingShort");
+        const step = gen.step ? stepLabel(gen.step, gen.type) : t("activeGen.waitingShort");
         return (
           <div key={gen.id} className="collapsed-gen-progress__row">
             <div className="collapsed-gen-progress__meta">

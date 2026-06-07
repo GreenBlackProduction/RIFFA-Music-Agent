@@ -2521,8 +2521,33 @@ export function StudioPage() {
 
         <div className="prompt-preview">
           <header>
-            <strong>{t("studio.promptPreview.label")}</strong>
-            <span className="muted">{t("studio.promptPreview.desc")}</span>
+            {(() => {
+              // Engine label/desc must reflect the active module — not a single
+              // hardcoded "Suno / SFX" for everything (cover art uses Nano-Banana).
+              if (activeModule === "cover_art") {
+                const m = COVER_ART_MODELS.find((x) => x.id === state.coverArtModel);
+                return (
+                  <>
+                    <strong>{t("studio.promptPreview.cover")}</strong>
+                    <span className="muted">{`${m?.name ?? "Nano-Banana"} · 1024×1024`}</span>
+                  </>
+                );
+              }
+              if (activeModule === "sound_effect") {
+                return (
+                  <>
+                    <strong>{t("studio.promptPreview.sfx")}</strong>
+                    <span className="muted">{t("studio.promptPreview.sfxDesc")}</span>
+                  </>
+                );
+              }
+              return (
+                <>
+                  <strong>{t("studio.promptPreview.music")}</strong>
+                  <span className="muted">{t("studio.promptPreview.musicDesc")}</span>
+                </>
+              );
+            })()}
           </header>
           {(activeModule === "song" || activeModule === "instrumental" || activeModule === "cover" || activeModule === "sound_effect") && (
             <div className="prompt-preview__track-name">
