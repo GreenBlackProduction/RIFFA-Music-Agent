@@ -400,6 +400,9 @@ export function RadioPage() {
           onClick={() => setMood("collection")}
         >
           {t("radio.filterCollection")}
+          {collectionQuery.data && (
+            <span className="pill__count">{collectionQuery.data.total}</span>
+          )}
         </button>
       </div>
 
