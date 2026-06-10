@@ -284,6 +284,7 @@ interface SongState {
   sfxSource: string;
   sfxCustomSource: string;
   sfxEnv: string;
+  sfxEnvCustom: string;
   sfxDuration: string;
   sfxStyle: string;
   sfxExtra: string;
@@ -336,6 +337,7 @@ const INITIAL_STATE: SongState = {
   sfxSource: "impact",
   sfxCustomSource: "",
   sfxEnv: "studio",
+  sfxEnvCustom: "",
   sfxDuration: "short",
   sfxStyle: "cinematic",
   sfxExtra: "",
@@ -460,7 +462,10 @@ function buildPrompt(module: Module, state: SongState): string {
       ? state.sfxCustomSource.trim()
       : valueLabel(state.sfxSource, SFX_SOURCES);
     parts.push(`Sound source: ${sfxSrc}`);
-    parts.push(`Environment: ${valueLabel(state.sfxEnv, SFX_ENVS)}`);
+    const sfxEnvironment = state.sfxEnv === "custom" && state.sfxEnvCustom.trim()
+      ? state.sfxEnvCustom.trim()
+      : valueLabel(state.sfxEnv, SFX_ENVS);
+    parts.push(`Environment: ${sfxEnvironment}`);
     parts.push(`Duration: ${valueLabel(state.sfxDuration, SFX_DURATIONS)}`);
     parts.push(`Character: ${valueLabel(state.sfxStyle, SFX_STYLES)}`);
     if (state.sfxExtra.trim()) parts.push(`Attack/tail/intensity/texture: ${state.sfxExtra.trim()}`);
@@ -2013,7 +2018,17 @@ export function StudioPage() {
             </div>
             <div className="builder-step">
               <strong>{t("studio.sfx.envLabel")}</strong>
-              {renderChipRow(uiSfxEnvs, "sfxEnv")}
+              {renderChipRow(uiSfxEnvs, "sfxEnv", true)}
+              {state.sfxEnv === "custom" && (
+                <input
+                  className="inline-input"
+                  type="text"
+                  placeholder={isEn ? "e.g. Cathedral hall, Underwater, Cave..." : "Например: Зал собора, Под водой, Пещера..."}
+                  value={state.sfxEnvCustom}
+                  onChange={(e) => update("sfxEnvCustom", e.target.value)}
+                  maxLength={128}
+                />
+              )}
             </div>
             <div className="builder-step">
               <strong>{t("studio.sfx.durationLabel")}</strong>
