@@ -1,10 +1,9 @@
 // Tombstone service worker.
 //
-// The previous version was a pass-through (`fetch(event.request)` for every
-// request). Once it controlled a page, it re-issued cross-origin requests
-// (Google Fonts) as `fetch()` — which reclassifies them from `style-src` to
-// `connect-src` and trips the page CSP, and it broke Vite's lazy CSS preload
-// (white screen on returning visits). It cached nothing, so it had no upside.
+// A real SW broke critical flows: a navigation-fetch handler double-fetched
+// single-use auth nonces (/tg-auth?nonce=…) → Telegram login failed; an earlier
+// pass-through version tripped the Google-Fonts CSP and broke Vite's lazy CSS
+// (white screen). So we intentionally run NO service worker.
 //
 // This version intercepts no requests (no `fetch` handler), clears any old
 // caches, and unregisters itself. Returning browsers fetch this file on their
