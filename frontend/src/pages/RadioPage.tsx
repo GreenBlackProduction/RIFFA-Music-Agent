@@ -16,6 +16,7 @@ import {
   fetchSharedGeneration,
   recordRadioPlay,
   voteRadioTrack,
+  rateGeneration,
 } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth";
 import { usePlayer } from "@/store/player";
@@ -271,6 +272,20 @@ export function RadioPage() {
     },
   });
 
+  // Own tracks can't be voted on (anti-fraud 400). Instead a like on your own
+  // radio track sets the personal Generation.rating — same as the player — so
+  // it lands in "Моя коллекция" and lights the heart, without inflating the
+  // public counter.
+  const rateMutation = useMutation({
+    mutationFn: ({ id, rating }: {
+      id: string; rating: "like" | "dislike" | "remove";
+    }) => rateGeneration(id, rating),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: RADIO_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: ["history"] });
+    },
+  });
+
   const playMutation = useMutation({
     mutationFn: ({ id, trackIndex }: { id: string; trackIndex: number }) =>
       recordRadioPlay(id, trackIndex),
@@ -317,7 +332,12 @@ export function RadioPage() {
   function toggleVote(track: RadioTrackOut, next: "like" | "dislike") {
     const current = track.my_vote;
     const rating = current === next ? "remove" : next;
-    voteMutation.mutate({ id: track.id, trackIndex: track.track_index, rating });
+    // Own track → personal rating (player parity); foreign → public radio vote.
+    if (track.is_own) {
+      rateMutation.mutate({ id: track.id, rating });
+    } else {
+      voteMutation.mutate({ id: track.id, trackIndex: track.track_index, rating });
+    }
   }
 
   const authError =

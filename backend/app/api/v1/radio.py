@@ -344,6 +344,11 @@ async def list_radio(
         author = authors_map.get(g.user_id)
         my_vote = my_votes.get((g.id, idx))
         is_own = me is not None and g.user_id == me.id
+        # Own tracks can't be radio-voted (anti-fraud), so a self-like is stored
+        # as the personal Generation.rating. Surface it on the heart here so the
+        # UI reflects the like the user just gave their own track.
+        if is_own and g.rating is not None:
+            my_vote = g.rating.value
         out = _to_out(g, idx, author, my_vote, is_own)
         if out is not None:
             items.append(out)
