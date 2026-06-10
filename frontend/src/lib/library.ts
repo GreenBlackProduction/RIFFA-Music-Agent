@@ -50,6 +50,9 @@ export interface LibraryItem {
   /** Per-variant: ``true`` when *this specific* track index is currently
    *  published on the public Radio. */
   isPublic: boolean;
+  /** ``true`` when you rated this generation "like" — drives the
+   *  "Понравились вам" filter on the Library page. */
+  liked: boolean;
 }
 
 /**
@@ -143,6 +146,7 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
     : gen.published_track_index !== null && gen.published_track_index !== undefined
     ? [gen.published_track_index]
     : [];
+  const liked = gen.rating === "like";
   // Cover art: image-only result — display image as cover, no audio.
   if (libType === "cover_art") {
     if (!gen.image_url) return [];
@@ -163,6 +167,7 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
         audioId: undefined,
         isOwn: true,
         isPublic: false,
+        liked,
       },
     ];
   }
@@ -187,6 +192,7 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
         audioId: undefined,
         isOwn: true,
         isPublic: false,
+        liked,
       },
     ];
   }
@@ -209,6 +215,7 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
         audioId: undefined,
         isOwn: true,
         isPublic: false,
+        liked,
       },
     ];
   }
@@ -229,6 +236,7 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
     isOwn: true,
     // Per-variant: check the indices array first (new), fall back to single index (legacy).
     isPublic: gen.is_public && publishedIndices.includes(i),
+    liked,
   }));
 }
 

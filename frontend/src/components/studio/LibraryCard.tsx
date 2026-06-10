@@ -41,6 +41,7 @@ export function LibraryCard() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [genreFilter, setGenreFilter] = useState<string>("");
   const [moodFilter, setMoodFilter] = useState<string>("");
+  const [likedOnly, setLikedOnly] = useState(false);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const typeLabel = (k: LibraryItemType) => t(`library.types.${k}`);
   const [failedCovers, setFailedCovers] = useState<Set<string>>(new Set());
@@ -86,9 +87,10 @@ export function LibraryCard() {
     let list = filter === "all" ? items : items.filter((i) => i.type === filter);
     if (genreFilter) list = list.filter((i) => primaryGenre(i.genre).toLowerCase() === genreFilter.toLowerCase());
     if (moodFilter)  list = list.filter((i) => i.mood  === moodFilter);
+    if (likedOnly)   list = list.filter((i) => i.liked);
     if (sortOrder === "oldest") list = [...list].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     return list;
-  }, [items, filter, genreFilter, moodFilter, sortOrder]);
+  }, [items, filter, genreFilter, moodFilter, likedOnly, sortOrder]);
 
   // Reset secondary filters when type filter changes
   useEffect(() => {
@@ -311,6 +313,13 @@ export function LibraryCard() {
               {uniqueGenres.map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
           )}
+          <button
+            type="button"
+            className={`filter-chip${likedOnly ? " filter-chip--active" : ""}`}
+            onClick={() => setLikedOnly((v) => !v)}
+          >
+            {t("library.filterLiked", { defaultValue: "Понравились вам" })}
+          </button>
           <select
             className="library-select library-select--sort"
             value={sortOrder}
