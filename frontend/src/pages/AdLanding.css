@@ -1,0 +1,98 @@
+/* ════════════════════════════════════════════════
+   RIFFA · AdLanding.css — общие стили рекламных посадочных
+   (/business и /gift). Всё скоупнуто под .adl, чтобы не задеть
+   главный лендинг, который делит с этими страницами LandingPage.css.
+   ════════════════════════════════════════════════ */
+
+/* ── Читаемость: на рекламных страницах текст не бывает полупрозрачным ── */
+.rl-root.adl .nav-links a { opacity: 1; }
+.rl-root.adl .section-tag { opacity: 1; color: #4A4641; }
+.rl-root.adl .section-head .right { opacity: 1; color: #4A4641; }
+.rl-root.adl .type-card p { opacity: 1; color: #4A4641; }
+.rl-root.adl .type-card .type-num { opacity: 1; color: #4A4641; }
+.rl-root.adl .type-card .type-meta { opacity: 1; }
+.rl-root.adl .process-step p { opacity: 1; color: #37332F; }
+.rl-root.adl .process-step .tip { opacity: 1; color: #4A4641; }
+.rl-root.adl .price-tier { opacity: 1; }
+.rl-root.adl .price-tokens { opacity: 1; }
+.rl-root.adl .price-features li { opacity: 1; }
+.rl-root.adl .price-features li::before { opacity: 1; color: #0F5D47; }
+.rl-root.adl .footer-bottom { opacity: 1; color: #37332F; }
+.rl-root.adl .footer-bottom span { opacity: 1; }
+
+/* ── Скролл-reveal: классы вешает IntersectionObserver страницы ── */
+.rl-root.adl .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.65s ease, transform 0.65s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.rl-root.adl .reveal.visible { opacity: 1; transform: none; }
+.rl-root.adl .reveal-delay-1 { transition-delay: 0.07s; }
+.rl-root.adl .reveal-delay-2 { transition-delay: 0.14s; }
+.rl-root.adl .reveal-delay-3 { transition-delay: 0.21s; }
+.rl-root.adl .reveal-delay-4 { transition-delay: 0.28s; }
+.rl-root.adl .reveal-delay-5 { transition-delay: 0.35s; }
+
+/* ── Вход hero при загрузке ── */
+@keyframes adl-fade-up {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: none; }
+}
+.rl-root.adl [data-anim] { animation: adl-fade-up 0.75s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.rl-root.adl [data-anim="2"] { animation-delay: 0.12s; }
+.rl-root.adl [data-anim="3"] { animation-delay: 0.24s; }
+.rl-root.adl [data-anim="4"] { animation-delay: 0.36s; }
+.rl-root.adl [data-anim="5"] { animation-delay: 0.48s; }
+
+/* ── Бегущая строка ── */
+.adl-marquee { overflow: hidden; border-top: 1px solid rgba(22, 20, 19, 0.18); border-bottom: 1px solid rgba(22, 20, 19, 0.18); padding: 14px 0; background: #DDD8C9; }
+.adl-marquee__track { display: inline-flex; white-space: nowrap; will-change: transform; animation: adl-marquee 28s linear infinite; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #161413; font-weight: 600; }
+.adl-marquee__track span { padding-right: 56px; }
+.adl-marquee:hover .adl-marquee__track { animation-play-state: paused; }
+@keyframes adl-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* ── Эквалайзер (SVG-иллюстрации и список примеров) ── */
+@keyframes adl-eq { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
+.adl-eq { transform-box: fill-box; transform-origin: 50% 50%; animation: adl-eq 1.05s ease-in-out infinite; }
+@keyframes adl-ring { from { transform: scale(1); opacity: 0.5; } to { transform: scale(1.9); opacity: 0; } }
+.adl-ring { transform-box: fill-box; transform-origin: 50% 50%; animation: adl-ring 1.6s ease-out infinite; }
+
+/* ── Карточки: живее ховеры ── */
+.rl-root.adl .type-card { transition: background 0.2s, transform 0.2s, box-shadow 0.25s; }
+.rl-root.adl .type-card:hover { transform: translateY(-5px); }
+.rl-root.adl .price-card { transition: background 0.2s, transform 0.2s, box-shadow 0.25s; }
+.rl-root.adl .price-card .price-amount { transition: color 0.2s; }
+.rl-root.adl .price-card:not(.bp-featured):hover { transform: translateY(-5px); }
+/* Фикс featured-карточки: при ховере остаётся чёрной, цена заливается
+   фирменным оранжевым. Перебивает nth-child-правила LandingPage.css
+   (.adl + .bp-featured дают более высокую специфичность). */
+.rl-root.adl .price-card.bp-featured:hover { background: #161413 !important; border-color: #161413 !important; transform: translateY(-5px); box-shadow: 0 12px 36px rgba(220, 99, 40, 0.28); }
+.rl-root.adl .price-card.bp-featured:hover .price-amount { color: rgb(220, 99, 40) !important; }
+
+/* ── Кнопки ── */
+.rl-root.adl .btn-primary { transition: transform 0.18s, box-shadow 0.22s, opacity 0.18s; }
+.rl-root.adl .btn-primary:hover { opacity: 1; transform: translateY(-2px); box-shadow: 0 12px 26px rgba(15, 93, 71, 0.32); }
+.rl-root.adl .nav-cta { transition: transform 0.18s, box-shadow 0.22s, opacity 0.18s; }
+.rl-root.adl .nav-cta:hover { opacity: 1; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15, 93, 71, 0.3); }
+.rl-root.adl .btn-ghost { transition: transform 0.18s, background 0.18s; }
+.rl-root.adl .btn-ghost:hover { transform: translateY(-2px); }
+
+/* ── Список примеров (/gift) ── */
+.adl-ex { border: 1px solid rgba(22, 20, 19, 0.18); border-top: none; }
+.adl-ex-row { display: grid; grid-template-columns: 56px 1fr auto auto; align-items: center; gap: 18px; padding: 18px 24px; border-bottom: 1px solid rgba(22, 20, 19, 0.18); transition: background 0.18s, transform 0.18s; cursor: pointer; background: transparent; border-left: none; border-right: none; width: 100%; text-align: left; }
+.adl-ex-row:last-child { border-bottom: none; }
+.adl-ex-row:hover { background: rgba(15, 93, 71, 0.05); transform: translateX(4px); }
+.adl-ex-num { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; color: #0F5D47; }
+.adl-ex-title { font-size: 17px; font-weight: 600; color: #161413; }
+.adl-ex-meta { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; color: #4A4641; margin-top: 4px; text-transform: uppercase; }
+.adl-ex-eq { display: inline-flex; gap: 3px; height: 16px; align-items: flex-end; }
+.adl-ex-eq i { width: 3px; background: #0F5D47; display: block; height: 100%; transform-origin: bottom; animation: adl-eq 1s ease-in-out infinite; }
+.adl-ex-eq i:nth-child(2) { animation-delay: 0.18s; }
+.adl-ex-eq i:nth-child(3) { animation-delay: 0.36s; }
+.adl-ex-play { width: 44px; height: 44px; border-radius: 50%; border: 2px solid #0F5D47; background: transparent; color: #0F5D47; display: grid; place-items: center; cursor: pointer; transition: transform 0.15s, background 0.15s, color 0.15s; }
+.adl-ex-row:hover .adl-ex-play, .adl-ex-play.on { background: #0F5D47; color: #E9E5DA; transform: scale(1.08); }
+.adl-ex-soon { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.08em; color: #4A4641; border: 1px solid rgba(22, 20, 19, 0.3); padding: 4px 10px; border-radius: 999px; }
+
+/* ── Доступность: уважаем reduce-motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .rl-root.adl [data-anim] { animation: none; }
+  .rl-root.adl .reveal { opacity: 1; transform: none; transition: none; }
+  .adl-marquee__track { animation: none; }
+  .adl-eq, .adl-ring, .adl-ex-eq i { animation: none; }
+}

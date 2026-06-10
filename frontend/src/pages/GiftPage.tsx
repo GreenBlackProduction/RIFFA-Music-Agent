@@ -2,20 +2,31 @@
    RIFFA · /gift — посадочная «Песня в подарок».
    Аудитория постарше: максимально простой язык, никакого «ИИ» —
    просто сервис, где легко и недорого заказать песню для близкого.
-   Дизайн-система lend-v3: переиспользует .rl-root стили LandingPage.css.
+   Дизайн-система lend-v3: .rl-root стили из LandingPage.css +
+   анимации/читаемость из AdLanding.css (скоуп .adl).
    ════════════════════════════════════════════════ */
 
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import "./LandingPage.css";
+import "./AdLanding.css";
 
 /* paper bg, emerald accent — палитра основного лендинга */
 const c = {
   bg: "#E9E5DA", bg2: "#DDD8C9",
-  ink: "#161413", ink2: "#4A4641", rule: "rgba(22,20,19,0.18)",
+  ink: "#161413", ink2: "#4A4641", ink3: "#37332F", rule: "rgba(22,20,19,0.18)",
   accent: "#0F5D47", orange: "rgb(220, 99, 40)", red: "#FF3B1F",
 };
+
+/* Примеры поздравительных песен. Файлы кладём в public/sounds/gift/
+   (NN.mp3) — пока файла нет, строка показывает бейдж «скоро». */
+const GIFT_EXAMPLES = [
+  { title: "С юбилеем, мама", meta: "юбилей · для мамы", src: "/sounds/gift/01.mp3" },
+  { title: "С днём рождения, дружище", meta: "день рождения · другу", src: "/sounds/gift/02.mp3" },
+  { title: "Десять лет вместе", meta: "годовщина · жене", src: "/sounds/gift/03.mp3" },
+  { title: "Просто потому что люблю", meta: "без повода", src: "/sounds/gift/04.mp3" },
+];
 
 function Mark({ size = 22 }: { size?: number }) {
   return (
@@ -24,6 +35,18 @@ function Mark({ size = 22 }: { size?: number }) {
       <circle cx="50" cy="50" r="38" fill="#E9E5DA" />
       <polygon points="40,32 40,68 72,50" fill="#FF3B1F" />
     </svg>
+  );
+}
+
+function Marquee({ items }: { items: string[] }) {
+  const line = items.join("  ·  ") + "  ·  ";
+  return (
+    <div className="adl-marquee" aria-hidden="true">
+      <div className="adl-marquee__track">
+        <span>{line}</span>
+        <span>{line}</span>
+      </div>
+    </div>
   );
 }
 
@@ -41,23 +64,33 @@ function GiftCardSVG() {
         <rect width="560" height="420" fill="url(#gift-dots)" />
         {/* открытка */}
         <rect x="60" y="48" width="440" height="324" rx="18" fill={c.bg} stroke={c.ink} strokeWidth="1.2" />
-        <text x="84" y="92" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink} opacity="0.5">ПЕСНЯ В ПОДАРОК</text>
+        <text x="84" y="92" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink2}>ПЕСНЯ В ПОДАРОК</text>
         <text x="476" y="92" fontFamily="JetBrains Mono" fontSize="10" fill={c.red} textAnchor="end">♥</text>
         <line x1="84" y1="104" x2="476" y2="104" stroke={c.ink} strokeWidth="0.8" />
         <text x="84" y="148" fontFamily="Inter" fontSize="26" fontWeight="700" fill={c.ink}>«Для мамы»</text>
-        <text x="84" y="172" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink} opacity="0.6">ОТ СЕРЁЖИ · НА ЮБИЛЕЙ · 3:08</text>
+        <text x="84" y="172" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink2}>ОТ СЕРЁЖИ · НА ЮБИЛЕЙ · 3:08</text>
         {/* плеер */}
         <rect x="84" y="196" width="392" height="64" rx="12" stroke={c.ink} strokeWidth="0.8" fill="none" />
+        <circle className="adl-ring" cx="120" cy="228" r="18" fill="none" stroke={c.accent} strokeWidth="2" />
         <circle cx="120" cy="228" r="18" fill={c.accent} />
         <polygon points="114,219 114,237 130,228" fill="#E9E5DA" />
         {[0, 7, 14, 21, 28, 35, 42, 49, 56, 63, 70, 77, 84, 91, 98, 105, 112].map((x, i) => {
           const h = [8, 14, 10, 18, 12, 20, 14, 9, 16, 11, 19, 13, 8, 15, 10, 12, 7][i];
-          return <line key={x} x1={158 + x * 2.4} y1={228 - h / 2} x2={158 + x * 2.4} y2={228 + h / 2} stroke={i < 7 ? c.accent : c.ink} strokeWidth="2.2" strokeLinecap="round" opacity={i < 7 ? 1 : 0.35} />;
+          return (
+            <line
+              key={x}
+              className={i < 9 ? "adl-eq" : undefined}
+              style={i < 9 ? { animationDelay: `${(i % 5) * 0.14}s` } : undefined}
+              x1={158 + x * 2.4} y1={228 - h / 2} x2={158 + x * 2.4} y2={228 + h / 2}
+              stroke={i < 9 ? c.accent : c.ink} strokeWidth="2.2" strokeLinecap="round"
+              opacity={i < 9 ? 1 : 0.35}
+            />
+          );
         })}
-        <text x="460" y="233" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink} opacity="0.6" textAnchor="end">1:12</text>
+        <text x="460" y="233" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink2} textAnchor="end">1:12</text>
         {/* строки песни */}
-        <text x="84" y="296" fontFamily="Inter" fontSize="14" fontStyle="italic" fill={c.ink} opacity="0.75">«Твои руки пахнут пирогами,</text>
-        <text x="84" y="318" fontFamily="Inter" fontSize="14" fontStyle="italic" fill={c.ink} opacity="0.75">твой голос — самый тёплый дом…»</text>
+        <text x="84" y="296" fontFamily="Inter" fontSize="14" fontStyle="italic" fill={c.ink3}>«Твои руки пахнут пирогами,</text>
+        <text x="84" y="318" fontFamily="Inter" fontSize="14" fontStyle="italic" fill={c.ink3}>твой голос — самый тёплый дом…»</text>
         {/* кнопки */}
         <rect x="84" y="336" width="120" height="26" rx="13" fill={c.ink} />
         <text x="144" y="353" fontFamily="JetBrains Mono" fontSize="9" fill={c.bg} textAnchor="middle" fontWeight="600">↓ СКАЧАТЬ</text>
@@ -72,6 +105,9 @@ export function GiftPage() {
   const navigate = useNavigate();
   const rootRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [playing, setPlaying] = useState<number | null>(null);
+  const [missing, setMissing] = useState<Set<number>>(new Set());
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     document.title = "Песня в подарок близкому человеку — готова сегодня | RIFFA";
@@ -85,7 +121,19 @@ export function GiftPage() {
     return () => window.removeEventListener("scroll", fn);
   }, []);
 
-  // Scroll-reveal — тот же эффект, что на главном лендинге
+  // Проверяем, какие файлы примеров уже загружены (nginx отдаёт 404 на отсутствующие)
+  useEffect(() => {
+    GIFT_EXAMPLES.forEach((ex, i) => {
+      fetch(ex.src, { method: "HEAD" })
+        .then((r) => { if (!r.ok) setMissing((s) => new Set(s).add(i)); })
+        .catch(() => setMissing((s) => new Set(s).add(i)));
+    });
+  }, []);
+
+  // Глушим плеер при уходе со страницы
+  useEffect(() => () => { audioRef.current?.pause(); }, []);
+
+  // Scroll-reveal — классы из AdLanding.css
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -94,7 +142,7 @@ export function GiftPage() {
     const io = new IntersectionObserver((entries) => {
       entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("visible"); io.unobserve(e.target); } });
     }, { threshold: 0.1 });
-    root.querySelectorAll<HTMLElement>(".type-card, .process-step, .price-card, .section-head").forEach((el, i) => {
+    root.querySelectorAll<HTMLElement>(".type-card, .process-step, .price-card, .section-head, .adl-ex-row").forEach((el, i) => {
       el.classList.add("reveal");
       const d = i % 6;
       if (d) el.classList.add(`reveal-delay-${d}`);
@@ -108,6 +156,19 @@ export function GiftPage() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
   const start = () => navigate("/studio");
+
+  function toggleExample(i: number) {
+    if (missing.has(i)) return;
+    if (!audioRef.current) audioRef.current = new Audio();
+    const audio = audioRef.current;
+    if (playing === i) { audio.pause(); setPlaying(null); return; }
+    audio.src = GIFT_EXAMPLES[i].src;
+    audio.onended = () => setPlaying(null);
+    audio.onerror = () => { setMissing((s) => new Set(s).add(i)); setPlaying(null); };
+    audio.play()
+      .then(() => setPlaying(i))
+      .catch(() => { setMissing((s) => new Set(s).add(i)); setPlaying(null); });
+  }
 
   const glassBg = scrolled ? "rgba(233,229,218,0.95)" : "rgba(233,229,218,0.85)";
 
@@ -123,12 +184,12 @@ export function GiftPage() {
   const steps = [
     { h: "Расскажите о человеке", p: "Имя, пара тёплых деталей, любимая история. Двух-трёх предложений достаточно — остальное мы сделаем сами.", tip: "«мама Наташа, печёт лучшие пироги,\nвырастила нас троих» — этого хватит" },
     { h: "Выберите настроение", p: "Весёлая, нежная или торжественная. Стиль — любой: от душевного романса до зажигательной танцевальной.", tip: "не разбираетесь в жанрах?\nпросто напишите «как у Аллы Пугачёвой»" },
-    { h: "Получите песню", p: "Слушайте, скачивайте, отправляйте в WhatsApp или Telegram. Или включите вживую — за столом, под торт.", tip: "готово в тот же день,\nдаже если праздник завтра" },
+    { h: "Получите песню", p: "Слушайте, скачивайте, отправляйте в WhatsApp или Telegram. Или включите вживую — за столом, под торт.", tip: "готово в течение 10 минут,\nдаже если праздник завтра" },
   ];
 
   const reasons = [
     { n: "01", h: "Личное", p: "Песня именно про вашего человека: с его именем, вашей историей и словами, которые важны только вам двоим." },
-    { n: "02", h: "Быстро", p: "Песня будет готова сегодня. Даже если день рождения уже завтра утром — вы успеваете." },
+    { n: "02", h: "Быстро", p: "Песня будет готова в течение 10 минут. Даже если день рождения уже завтра утром — вы успеваете." },
     { n: "03", h: "Просто", p: "Никаких студий, музыкантов и сложных программ. Всё делается с телефона за несколько минут." },
     { n: "04", h: "Недорого", p: "Первую песню можно сделать бесплатно. Дальше — от 100 рублей. Дешевле открытки с букетом." },
   ];
@@ -136,12 +197,12 @@ export function GiftPage() {
   const faq = [
     { q: "Я не разбираюсь в музыке. Справлюсь?", a: "Да. Вы просто отвечаете на пару вопросов простыми словами — как рассказали бы подруге. Всю музыкальную часть сервис берёт на себя." },
     { q: "Песня правда будет про моего человека?", a: "Да. Имя, ваша история и детали, которые вы расскажете, попадут в текст песни. Это не шаблон — каждая песня пишется заново." },
-    { q: "Как подарить песню?", a: "Как удобно: отправьте ссылкой в WhatsApp или Telegram, скачайте файл, запишите на флешку или включите вживую на празднике." },
+    { q: "Как подарить песню?", a: "Как удобно: отправьте ссылкой в WhatsApp или Telegram через кнопку «Поделиться», скачайте файл, запишите на флешку или включите вживую на празднике." },
     { q: "Сколько это стоит?", a: "Попробовать — бесплатно: первая песня в подарок от нас. Дальше пакет за 100 ₽, которого хватит на пять разных песен — выберете лучшую." },
   ];
 
   return (
-    <div className="rl-root page" ref={rootRef} style={{ background: c.bg, color: c.ink }}>
+    <div className="rl-root adl page" ref={rootRef} style={{ background: c.bg, color: c.ink }}>
       {/* NAV */}
       <nav className={`nav${scrolled ? " glass" : ""}`} style={{ background: glassBg, borderColor: c.rule, color: c.ink }}>
         <div className="wrap">
@@ -151,6 +212,7 @@ export function GiftPage() {
               <span style={{ color: c.ink, fontFamily: "system-ui, sans-serif", fontWeight: 700, fontSize: 22 }}>RIFFA · песня в подарок</span>
             </div>
             <div className="nav-links">
+              <a href="#examples" style={{ color: c.ink }} onClick={scrollTo("examples")}>примеры</a>
               <a href="#occasions" style={{ color: c.ink }} onClick={scrollTo("occasions")}>поводы</a>
               <a href="#how" style={{ color: c.ink }} onClick={scrollTo("how")}>как заказать</a>
               <a href="#price" style={{ color: c.ink }} onClick={scrollTo("price")}>цена</a>
@@ -163,43 +225,87 @@ export function GiftPage() {
       {/* HERO */}
       <section id="hero" className="hero" style={{ borderColor: c.rule, background: c.bg, color: c.ink }}>
         <div className="wrap">
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.45, marginBottom: 28, display: "flex", justifyContent: "space-between" }}>
+          <div data-anim="1" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: c.ink2, marginBottom: 28, display: "flex", justifyContent: "space-between" }}>
             <span style={{ fontSize: "13px" }}>riffastudio.site · ПЕСНЯ В ПОДАРОК</span>
             <span>· 2026</span>
           </div>
           <div className="hero-split">
             <div>
-              <h1 className="hero-headline" style={{ color: c.orange, fontSize: "76px" }}>
+              <h1 className="hero-headline" data-anim="2" style={{ color: c.orange, fontSize: "76px" }}>
                 Подарите <span style={{ color: c.accent }}>песню.</span><br />
                 <span style={{ color: "#232323", fontSize: "0.62em" }}>Про него. Про неё. Про вас.</span>
               </h1>
-              <p style={{ fontSize: 19, lineHeight: 1.55, marginTop: 28, maxWidth: 520, fontWeight: 500, opacity: 0.8 }}>
+              <p data-anim="3" style={{ fontSize: 19, lineHeight: 1.55, marginTop: 28, maxWidth: 520, fontWeight: 500, color: c.ink3 }}>
                 Расскажите о близком человеке — мы превратим вашу историю в настоящую
                 песню с его именем. Подарок, который не пылится на полке.
               </p>
-              <div className="hero-actions" style={{ marginTop: "36px" }}>
+              <div className="hero-actions" data-anim="4" style={{ marginTop: "36px" }}>
                 <button className="btn-primary" style={{ background: c.accent, color: "#E9E5DA", height: 52, padding: "0 32px", fontSize: "13px", letterSpacing: "1.5px", border: "none", cursor: "pointer" }} onClick={start}>СОЗДАТЬ ПЕСНЮ</button>
-                <button className="btn-ghost" style={{ color: "#EC560B", borderColor: "#EC560B", padding: "0 28px", fontSize: "13px", letterSpacing: "1px", height: 52, background: "transparent", cursor: "pointer" }} onClick={() => navigate("/radio")}>ПОСЛУШАТЬ ПРИМЕРЫ</button>
+                <button className="btn-ghost" style={{ color: "#EC560B", borderColor: "#EC560B", padding: "0 28px", fontSize: "13px", letterSpacing: "1px", height: 52, background: "transparent", cursor: "pointer" }} onClick={scrollTo("examples")}>ПОСЛУШАТЬ ПРИМЕРЫ</button>
               </div>
             </div>
-            <GiftCardSVG />
+            <div data-anim="5">
+              <GiftCardSVG />
+            </div>
           </div>
-          <p style={{
-            color: c.ink, letterSpacing: "0.02em", fontWeight: 500,
+          <p data-anim="5" style={{
+            color: c.ink3, letterSpacing: "0.02em", fontWeight: 500,
             margin: "32px 0 0", lineHeight: "1.65", fontSize: "16px",
-            borderTop: `1px solid ${c.rule}`, paddingTop: "24px", opacity: 0.75,
+            borderTop: `1px solid ${c.rule}`, paddingTop: "24px",
           }}>
-            Первая песня — бесплатно. Готово в тот же день: даже если праздник завтра,
-            вы успеваете. Никаких студий и сложных программ — всё с телефона.
+            Первая песня — бесплатно. Готово в течение 10 минут. Никаких студий
+            и сложных программ — всё с телефона.
           </p>
         </div>
       </section>
 
-      {/* 01 · ПОВОДЫ */}
-      <section id="occasions" className="types-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
+      {/* БЕГУЩАЯ СТРОКА */}
+      <Marquee items={["ДЕНЬ РОЖДЕНИЯ", "ЮБИЛЕЙ", "СВАДЬБА", "ГОДОВЩИНА", "8 МАРТА", "ВЫПУСКНОЙ", "ПРОСТО ТАК", "ПЕРВАЯ ПЕСНЯ — БЕСПЛАТНО"]} />
+
+      {/* 01 · ПРИМЕРЫ */}
+      <section id="examples" className="types-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">01</span> · поводы</div>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">01</span> · примеры</div>
+            <h2 style={{ color: c.orange }}>Послушайте, как это звучит.</h2>
+            <div className="right">настоящие поздравительные песни</div>
+          </div>
+          <div className="adl-ex">
+            {GIFT_EXAMPLES.map((ex, i) => (
+              <button key={ex.src} type="button" className="adl-ex-row" onClick={() => toggleExample(i)}>
+                <span className="adl-ex-num">{"0" + (i + 1)}</span>
+                <span>
+                  <span className="adl-ex-title" style={{ display: "block" }}>{ex.title}</span>
+                  <span className="adl-ex-meta" style={{ display: "block" }}>{ex.meta}</span>
+                </span>
+                {playing === i ? (
+                  <span className="adl-ex-eq" aria-hidden="true"><i /><i /><i /></span>
+                ) : <span />}
+                {missing.has(i) ? (
+                  <span className="adl-ex-soon">скоро</span>
+                ) : (
+                  <span className={`adl-ex-play${playing === i ? " on" : ""}`} aria-label={playing === i ? "Пауза" : "Слушать"}>
+                    {playing === i ? (
+                      <svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="2" width="3.4" height="10" rx="1" fill="currentColor" /><rect x="8.6" y="2" width="3.4" height="10" rx="1" fill="currentColor" /></svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 14 14"><polygon points="3,2 3,12 12,7" fill="currentColor" /></svg>
+                    )}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <p style={{ marginTop: 18, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.ink2 }}>
+            Все песни созданы в RIFFA — так же, как создадите вы: рассказали историю, выбрали настроение, получили песню.
+          </p>
+        </div>
+      </section>
+
+      {/* 02 · ПОВОДЫ */}
+      <section id="occasions" className="types-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+        <div className="wrap">
+          <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">02</span> · поводы</div>
             <h2 style={{ color: c.orange }}>Для любого случая — свой повод спеть.</h2>
             <div className="right">и без повода тоже</div>
           </div>
@@ -208,18 +314,18 @@ export function GiftPage() {
               <div key={o.h} className="type-card" style={{ borderColor: c.rule, borderBottom: `1px solid ${c.rule}` }}>
                 <div className="type-icon" style={{ fontSize: 44, height: 64 }}>{o.icon}</div>
                 <h3 style={{ color: c.ink, fontSize: 17 }}>{o.h}</h3>
-                <p style={{ color: c.ink, fontSize: 13.5, opacity: 0.7 }}>{o.p}</p>
+                <p style={{ fontSize: 13.5 }}>{o.p}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* 02 · КАК ЗАКАЗАТЬ */}
-      <section id="how" className="process-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+      {/* 03 · КАК ЗАКАЗАТЬ */}
+      <section id="how" className="process-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">02</span> · как заказать</div>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">03</span> · как заказать</div>
             <h2 style={{ color: c.orange }}>Три простых шага. Справится каждый.</h2>
             <div className="right"></div>
           </div>
@@ -228,39 +334,39 @@ export function GiftPage() {
               <div key={i} className="process-step" style={{ borderColor: c.rule }}>
                 <div className="step-num" style={{ color: c.accent, opacity: 1 }}>{"0" + (i + 1)}</div>
                 <h3 style={{ color: c.ink }}>{s.h}</h3>
-                <p style={{ color: c.ink }}>{s.p}</p>
-                <div className="tip" style={{ borderColor: c.rule, color: c.ink, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.02em" }}>{s.tip}</div>
+                <p>{s.p}</p>
+                <div className="tip" style={{ borderColor: c.rule, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.02em" }}>{s.tip}</div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* 03 · ПОЧЕМУ ПЕСНЯ */}
-      <section id="why" className="types-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
+      {/* 04 · ПОЧЕМУ ПЕСНЯ */}
+      <section id="why" className="types-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">03</span> · почему песня</div>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">04</span> · почему песня</div>
             <h2 style={{ color: c.orange }}>Лучший подарок — тот, что про человека.</h2>
             <div className="right"></div>
           </div>
           <div className="types-grid" style={{ borderColor: c.rule, gridTemplateColumns: "repeat(4, 1fr)" }}>
             {reasons.map((r) => (
               <div key={r.n} className="type-card" style={{ borderColor: c.rule }}>
-                <div className="type-num" style={{ color: c.ink }}>{r.n}</div>
+                <div className="type-num">{r.n}</div>
                 <h3 style={{ color: c.accent, fontSize: 18 }}>{r.h}</h3>
-                <p style={{ color: c.ink, fontSize: 14, opacity: 0.75 }}>{r.p}</p>
+                <p style={{ fontSize: 14 }}>{r.p}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* 04 · ЦЕНА */}
+      {/* 05 · ЦЕНА */}
       <section id="price" className="pricing-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">04</span> · цена</div>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">05</span> · цена</div>
             <h2 style={{ color: c.orange }}>Дешевле букета. Памятнее любого свитера.</h2>
             <div className="right" style={{ fontSize: "15px" }}>без подписок</div>
           </div>
@@ -276,7 +382,7 @@ export function GiftPage() {
               </ul>
               <button className="price-cta" style={{ background: "transparent", color: c.ink, borderColor: c.accent, borderWidth: "3px", fontSize: "18px", cursor: "pointer" }} onClick={start}>НАЧАТЬ</button>
             </div>
-            <div className="price-card featured" style={{ background: c.ink, border: "none", padding: "32px 28px" }}>
+            <div className="price-card featured bp-featured" style={{ background: c.ink, border: "none", padding: "32px 28px" }}>
               <div className="price-tier" style={{ color: "#E9E5DA", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: "14px" }}>ПЕСНЯ В ПОДАРОК</div>
               <div className="price-amount" style={{ fontSize: "40px", color: "#E9E5DA" }}>от 100 ₽</div>
               <div className="price-tokens" style={{ borderColor: "rgba(233,229,218,0.3)", color: "#E9E5DA", fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, fontSize: "16px" }}>хватит на 5 разных песен</div>
@@ -291,11 +397,11 @@ export function GiftPage() {
         </div>
       </section>
 
-      {/* 05 · FAQ */}
+      {/* 06 · FAQ */}
       <section id="faq" className="types-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">05</span> · вопросы</div>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">06</span> · вопросы</div>
             <h2 style={{ color: c.orange }}>Спрашивают чаще всего.</h2>
             <div className="right"></div>
           </div>
@@ -304,7 +410,7 @@ export function GiftPage() {
               <div key={i} style={{ padding: "28px 28px 32px", borderRight: i % 2 === 0 ? `1px solid ${c.rule}` : "none", borderBottom: i < 2 ? `1px solid ${c.rule}` : "none" }}>
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: c.accent, fontWeight: 600, marginBottom: 10 }}>Q{i + 1}</div>
                 <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 10px" }}>{f.q}</h3>
-                <p style={{ fontSize: 14, lineHeight: 1.55, opacity: 0.7, margin: 0 }}>{f.a}</p>
+                <p style={{ fontSize: 14, lineHeight: 1.55, color: c.ink3, margin: 0 }}>{f.a}</p>
               </div>
             ))}
           </div>
@@ -317,7 +423,7 @@ export function GiftPage() {
           <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 44, margin: 0, letterSpacing: "-0.02em", color: c.bg }}>
             Сделайте подарок, <span style={{ color: "#7BD389" }}>который не забудут.</span>
           </h2>
-          <p style={{ fontSize: 16, opacity: 0.7, margin: "18px auto 32px", maxWidth: 560 }}>
+          <p style={{ fontSize: 16, color: "#C9C4B8", margin: "18px auto 32px", maxWidth: 560 }}>
             Первая песня — бесплатно. Начните сейчас — через десять минут у вас будет
             подарок, которого нет ни в одном магазине.
           </p>
@@ -330,7 +436,7 @@ export function GiftPage() {
       {/* FOOTER */}
       <footer className="footer" style={{ background: c.bg, color: c.ink }}>
         <div className="wrap">
-          <div className="footer-bottom" style={{ borderColor: c.rule, color: c.ink, opacity: 1, borderTop: "none" }}>
+          <div className="footer-bottom" style={{ borderColor: c.rule, borderTop: "none" }}>
             <span>© 2026 riffa studio · все права защищены</span>
             <span style={{ cursor: "pointer" }} onClick={() => navigate("/")}>riffastudio.site</span>
             <span>telegram: @the_riffa_bot · @riffasupport</span>
