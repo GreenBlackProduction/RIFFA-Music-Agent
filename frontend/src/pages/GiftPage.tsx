@@ -108,6 +108,57 @@ function Marquee({ items }: { items: string[] }) {
   );
 }
 
+/* ── Конфетти-поле: фигурки по краям секции, контент всегда поверх ──
+   Три раскладки чередуются между секциями; на тёмном фоне — светлая палитра. */
+type CfPiece = { x: string; y: string; w: number; h: number; r: number; ci: number; shape: "dot" | "dash" | "tri" };
+const CF_LAYOUTS: CfPiece[][] = [
+  [
+    { x: "1.5%", y: "16%", w: 15, h: 3.5, r: 40, ci: 0, shape: "dash" },
+    { x: "3%", y: "74%", w: 8, h: 8, r: 0, ci: 2, shape: "dot" },
+    { x: "96.5%", y: "12%", w: 7, h: 7, r: 0, ci: 1, shape: "dot" },
+    { x: "95.5%", y: "64%", w: 14, h: 3.5, r: -55, ci: 3, shape: "dash" },
+    { x: "55%", y: "5%", w: 10, h: 10, r: 14, ci: 3, shape: "tri" },
+  ],
+  [
+    { x: "2%", y: "30%", w: 11, h: 11, r: -10, ci: 1, shape: "tri" },
+    { x: "1.5%", y: "85%", w: 13, h: 3, r: -35, ci: 0, shape: "dash" },
+    { x: "96%", y: "26%", w: 14, h: 3.5, r: 65, ci: 2, shape: "dash" },
+    { x: "97%", y: "78%", w: 8, h: 8, r: 0, ci: 0, shape: "dot" },
+    { x: "40%", y: "4%", w: 6, h: 6, r: 0, ci: 3, shape: "dot" },
+  ],
+  [
+    { x: "2.5%", y: "12%", w: 7, h: 7, r: 0, ci: 3, shape: "dot" },
+    { x: "1.5%", y: "58%", w: 15, h: 3.5, r: 25, ci: 1, shape: "dash" },
+    { x: "96%", y: "18%", w: 10, h: 10, r: 30, ci: 0, shape: "tri" },
+    { x: "96.5%", y: "84%", w: 6, h: 6, r: 0, ci: 2, shape: "dot" },
+    { x: "70%", y: "6%", w: 13, h: 3, r: -50, ci: 1, shape: "dash" },
+  ],
+];
+const CF_COLORS = ["rgb(220,99,40)", "#0F5D47", "#FF3B1F", "#D9A441"];
+const CF_COLORS_DARK = ["#E9E5DA", "#7BD389", "rgb(220,99,40)", "#D9A441"];
+
+function ConfettiField({ variant = 0, dark = false }: { variant?: number; dark?: boolean }) {
+  const palette = dark ? CF_COLORS_DARK : CF_COLORS;
+  return (
+    <>
+      {CF_LAYOUTS[variant % CF_LAYOUTS.length].map((p, i) => (
+        <span
+          key={i}
+          className="gp-cf"
+          aria-hidden="true"
+          style={{
+            left: p.x, top: p.y, width: p.w, height: p.h,
+            background: palette[p.ci],
+            borderRadius: p.shape === "dot" ? "50%" : p.shape === "dash" ? 2 : 0,
+            clipPath: p.shape === "tri" ? "polygon(50% 0, 100% 100%, 0 100%)" : undefined,
+            transform: p.r ? `rotate(${p.r}deg)` : undefined,
+          }}
+        />
+      ))}
+    </>
+  );
+}
+
 /* Схематичная «открытка с песней» — в духе SchematicSVG главного лендинга */
 function GiftCardSVG() {
   return (
@@ -338,7 +389,8 @@ export function GiftPage() {
       <Marquee items={["ДЕНЬ РОЖДЕНИЯ", "ЮБИЛЕЙ", "СВАДЬБА", "ГОДОВЩИНА", "8 МАРТА", "ВЫПУСКНОЙ", "ПРОСТО ТАК", "ПЕРВАЯ ПЕСНЯ — БЕСПЛАТНО"]} />
 
       {/* 01 · ПРИМЕРЫ */}
-      <section id="examples" className="types-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
+      <section id="examples" className="types-section gp-cf-host" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
+        <ConfettiField variant={0} />
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">01</span> · примеры</div>
@@ -377,7 +429,8 @@ export function GiftPage() {
       </section>
 
       {/* 02 · ПОВОДЫ */}
-      <section id="occasions" className="types-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+      <section id="occasions" className="types-section gp-cf-host" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+        <ConfettiField variant={1} />
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">02</span> · поводы</div>
@@ -399,7 +452,8 @@ export function GiftPage() {
       </section>
 
       {/* 03 · КАК ЗАКАЗАТЬ */}
-      <section id="how" className="process-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
+      <section id="how" className="process-section gp-cf-host" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
+        <ConfettiField variant={2} />
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">03</span> · как заказать</div>
@@ -420,7 +474,8 @@ export function GiftPage() {
       </section>
 
       {/* 04 · ПОЧЕМУ ПЕСНЯ */}
-      <section id="why" className="types-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+      <section id="why" className="types-section gp-cf-host" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+        <ConfettiField variant={0} />
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">04</span> · почему песня</div>
@@ -440,7 +495,8 @@ export function GiftPage() {
       </section>
 
       {/* 05 · FAQ */}
-      <section id="faq" className="types-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
+      <section id="faq" className="types-section gp-cf-host" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
+        <ConfettiField variant={1} />
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">05</span> · вопросы</div>
@@ -460,7 +516,8 @@ export function GiftPage() {
       </section>
 
       {/* 06 · ЦЕНА — в самом низу, перед финальным CTA */}
-      <section id="price" className="pricing-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+      <section id="price" className="pricing-section gp-cf-host" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+        <ConfettiField variant={2} />
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">06</span> · цена</div>
@@ -495,7 +552,8 @@ export function GiftPage() {
       </section>
 
       {/* CTA-ПОЛОСА */}
-      <section style={{ background: c.ink, color: c.bg }}>
+      <section className="gp-cf-host" style={{ background: c.ink, color: c.bg }}>
+        <ConfettiField variant={0} dark />
         <div className="wrap" style={{ padding: "72px 32px", textAlign: "center" }}>
           <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 44, margin: 0, letterSpacing: "-0.02em", color: c.bg }}>
             Сделайте подарок, <span style={{ color: "#7BD389" }}>который не забудут.</span>

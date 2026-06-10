@@ -105,6 +105,16 @@
   to   { transform: translateY(-9px) rotate(14deg); }
 }
 
+/* конфетти-поле по всей странице: фигурки живут в секциях по краям,
+   контент секции всегда поверх (z-index), на мобильных скрыты */
+.gp-cf-host { position: relative; }
+.gp-cf-host > .wrap { position: relative; z-index: 1; }
+.gp-cf { position: absolute; pointer-events: none; z-index: 0; animation: gp-float 4.4s ease-in-out infinite alternate; }
+.gp-cf:nth-of-type(odd) { animation-duration: 5.6s; }
+.gp-cf:nth-of-type(3n) { animation-delay: 0.9s; }
+.gp-cf:nth-of-type(4n) { animation-delay: 1.6s; animation-duration: 4.9s; }
+@media (max-width: 640px) { .gp-cf { display: none; } }
+
 /* рукописное волнистое подчёркивание слова в заголовке */
 .gp-wavy { position: relative; white-space: nowrap; }
 .gp-wavy::after {
@@ -118,5 +128,5 @@
   .rl-root.adl [data-anim] { animation: none; }
   .rl-root.adl .reveal { opacity: 1; transform: none; transition: none; }
   .adl-marquee__track { animation: none; }
-  .adl-eq, .adl-ring, .adl-ex-eq i, .gp-conf { animation: none; }
+  .adl-eq, .adl-ring, .adl-ex-eq i, .gp-conf, .gp-cf { animation: none; }
 }
