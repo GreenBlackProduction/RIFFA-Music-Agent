@@ -770,22 +770,30 @@ async def generate_similar(
             detail="track is not on radio",
         )
 
-    # Source must be a vocal/instrumental track — covers/SFX/cover_art aren't
-    # remixable through this flow.
-    new_type = (
-        GenerationType.instrumental
-        if src.type == GenerationType.instrumental
-        else GenerationType.song
-    )
+    # Source must be a music track — SFX / cover_art aren't remixable.
+    # A cover counts: it carries genre/mood/tempo, so we can spin a fresh
+    # song/instrumental in the same vein. An instrumental cover (no vocals)
+    # remixes to an instrumental; a vocal cover to a song.
     if src.type not in (
         GenerationType.song,
         GenerationType.instrumental,
         GenerationType.occasion,
+        GenerationType.cover_song,
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="similar generation supports only song / instrumental sources",
+            detail="similar generation supports only song / instrumental / cover sources",
         )
+    src_is_instrumental = (
+        src.type == GenerationType.instrumental
+        or (
+            src.type == GenerationType.cover_song
+            and bool((src.params or {}).get("instrumental"))
+        )
+    )
+    new_type = (
+        GenerationType.instrumental if src_is_instrumental else GenerationType.song
+    )
 
     src_params = dict(src.params or {})
     src_agent_mp = src_params.get("agent_music_params") or {}
