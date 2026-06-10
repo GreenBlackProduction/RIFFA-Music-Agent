@@ -122,9 +122,18 @@ function GiftCardSVG() {
         <rect width="560" height="420" fill="url(#gift-dots)" />
         {/* открытка */}
         <rect x="60" y="48" width="440" height="324" rx="18" fill={c.bg} stroke={c.ink} strokeWidth="1.2" />
-        <text x="84" y="92" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink2}>ПЕСНЯ В ПОДАРОК</text>
-        <text x="476" y="92" fontFamily="JetBrains Mono" fontSize="10" fill={c.red} textAnchor="end">♥</text>
-        <line x1="84" y1="104" x2="476" y2="104" stroke={c.ink} strokeWidth="0.8" />
+        {/* подарочная лента через правый верхний угол + бант у заголовка */}
+        <path d="M404 48 L438 48 L500 110 L500 144 Z" fill={c.red} />
+        <path d="M404 48 L438 48 L500 110 L500 144 Z" fill="none" stroke={c.ink} strokeWidth="0.6" opacity="0.35" />
+        <g transform="translate(99,89)" fill={c.red}>
+          <ellipse cx="-8" cy="0" rx="8" ry="5" transform="rotate(-22)" />
+          <ellipse cx="8" cy="0" rx="8" ry="5" transform="rotate(22)" />
+          <circle cx="0" cy="0" r="3.4" fill={c.ink} />
+          <path d="M-2 3 L-8 15 L-1 12 Z" />
+          <path d="M2 3 L8 15 L1 12 Z" />
+        </g>
+        <text x="120" y="92" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink2}>ПЕСНЯ В ПОДАРОК</text>
+        <line x1="84" y1="110" x2="476" y2="110" stroke={c.ink} strokeWidth="0.8" />
         <text x="84" y="148" fontFamily="Inter" fontSize="26" fontWeight="700" fill={c.ink}>«Для мамы»</text>
         <text x="84" y="172" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink2}>ОТ СЕРЁЖИ · НА ЮБИЛЕЙ · 3:08</text>
         {/* плеер */}
@@ -231,12 +240,12 @@ export function GiftPage() {
   const glassBg = scrolled ? "rgba(233,229,218,0.95)" : "rgba(233,229,218,0.85)";
 
   const occasions = [
-    { h: "День рождения", p: "Именинник услышит песню, где звучит его имя — такого подарка у него ещё не было" },
-    { h: "Свадьба и годовщина", p: "Ваша общая история — в песне для первого танца или семейного вечера" },
-    { h: "Маме", p: "Все тёплые слова, которые сложно сказать вслух — легко спеть" },
-    { h: "Юбилей", p: "Песня про юбиляра соберёт весь стол — и слёзы, и аплодисменты" },
-    { h: "Выпускной", p: "Памятная песня для класса, группы или любимого учителя" },
-    { h: "Просто так", p: "Без повода — самый честный повод сказать человеку, что он дорог" },
+    { h: "День рождения", p: "Именинник услышит песню, где звучит его имя — такого подарка у него ещё не было", pad: "#F6D8C4" },
+    { h: "Свадьба и годовщина", p: "Ваша общая история — в песне для первого танца или семейного вечера", pad: "#E3D6EC" },
+    { h: "Маме", p: "Все тёплые слова, которые сложно сказать вслух — легко спеть", pad: "#F3CFD8" },
+    { h: "Юбилей", p: "Песня про юбиляра соберёт весь стол — и слёзы, и аплодисменты", pad: "#EFE3B8" },
+    { h: "Выпускной", p: "Памятная песня для класса, группы или любимого учителя", pad: "#CFE0D8" },
+    { h: "Просто так", p: "Без повода — самый честный повод сказать человеку, что он дорог", pad: "#F2C9C2" },
   ];
 
   const steps = [
@@ -288,9 +297,17 @@ export function GiftPage() {
             <span>· 2026</span>
           </div>
           <div className="hero-split">
-            <div>
+            <div style={{ position: "relative" }}>
+              {/* конфетти-акценты вокруг заголовка */}
+              <span className="gp-conf" aria-hidden="true" style={{ top: -22, left: -10, width: 9, height: 9, borderRadius: "50%", background: c.orange }} />
+              <span className="gp-conf" aria-hidden="true" style={{ top: -34, left: "42%", width: 16, height: 3.5, borderRadius: 2, background: c.accent, transform: "rotate(40deg)" }} />
+              <span className="gp-conf" aria-hidden="true" style={{ top: -14, right: "16%", width: 6, height: 6, borderRadius: "50%", background: c.red }} />
+              <span className="gp-conf" aria-hidden="true" style={{ top: "38%", left: -30, width: 11, height: 11, background: "#D9A441", clipPath: "polygon(50% 0, 100% 100%, 0 100%)" }} />
+              <span className="gp-conf" aria-hidden="true" style={{ top: "26%", right: -16, width: 7, height: 7, borderRadius: "50%", background: c.accent }} />
+              <span className="gp-conf" aria-hidden="true" style={{ top: "6%", right: -34, width: 14, height: 3.5, borderRadius: 2, background: "#D9A441", transform: "rotate(70deg)" }} />
+              <span className="gp-conf" aria-hidden="true" style={{ bottom: "30%", left: "30%", width: 13, height: 3, borderRadius: 2, background: c.red, transform: "rotate(-30deg)" }} />
               <h1 className="hero-headline" data-anim="2" style={{ color: c.orange, fontSize: "76px" }}>
-                Подарите <span style={{ color: c.accent }}>песню.</span><br />
+                Подарите <span className="gp-wavy" style={{ color: c.accent }}>песню.</span><br />
                 <span style={{ color: "#232323", fontSize: "0.62em" }}>Про него. Про неё. Про вас.</span>
               </h1>
               <p data-anim="3" style={{ fontSize: 19, lineHeight: 1.55, marginTop: 28, maxWidth: 520, fontWeight: 500, color: c.ink3 }}>
@@ -370,7 +387,9 @@ export function GiftPage() {
           <div className="types-grid" style={{ borderColor: c.rule, gridTemplateColumns: "repeat(3, 1fr)" }}>
             {occasions.map((o, i) => (
               <div key={o.h} className="type-card" style={{ borderColor: c.rule, borderBottom: `1px solid ${c.rule}` }}>
-                <div className="type-icon" style={{ height: 64 }}>{occasionIcon(i, c.ink)}</div>
+                <div className="type-icon" style={{ height: 72 }}>
+                  <span className="gp-icon-pad" style={{ background: o.pad }}>{occasionIcon(i, c.ink)}</span>
+                </div>
                 <h3 style={{ color: c.ink, fontSize: 17 }}>{o.h}</h3>
                 <p style={{ fontSize: 13.5 }}>{o.p}</p>
               </div>
