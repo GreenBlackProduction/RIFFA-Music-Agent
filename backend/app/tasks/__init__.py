@@ -75,6 +75,11 @@ def _dump_payload(gen_id: str, gen_type: str, payload: dict[str, Any]) -> None:
 
 _PROGRESS_CHANNEL = "gen:progress:{}"
 
+# Cover default: lean toward the uploaded source so the now-richer style brief
+# refines the cover rather than redrawing it. Tunable; overridable per-request
+# via params["audio_weight"].
+_COVER_AUDIO_WEIGHT_DEFAULT = 0.7
+
 
 def _ensure_rich_style(enriched: str | None, preset_style: str) -> str:
     """Never ship a lazier prompt than the deterministic preset.
@@ -543,43 +548,64 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                     upload_url,
                 )
 
-            # Build style from genre, mood, tempo, and additional details
-            style_parts = []
-            genre = params.get("genre", "") or params.get("custom_genre", "")
-            if genre:
-                style_parts.append(genre)
-            if params.get("mood"):
-                style_parts.append(params["mood"])
-            if params.get("tempo"):
-                style_parts.append(params["tempo"])
-            if params.get("style"):
-                style_parts.append(params["style"])
-
-            final_style = ", ".join(style_parts)[:1000]  # Suno limit
+            # Build a rich style with the same engine song/instrumental use, but
+            # in cover mode (no full-length structure nudge — the uploaded audio
+            # defines length/structure). Replaces the old bare "genre, mood, tempo"
+            # join that gave Suno almost nothing to work with.
+            is_instrumental = bool(params.get("instrumental", False))
+            cover_vocal = (
+                "no_vocal" if is_instrumental
+                else {"m": "male", "f": "female"}.get(params.get("vocal_gender"), "")
+            )
+            cover_song_params = SongParams(
+                user_description="",
+                genre=params.get("genre", ""),
+                custom_genre=params.get("custom_genre", ""),
+                subgenre="",
+                mood=params.get("mood", ""),
+                tempo=params.get("tempo", ""),
+                vocal=cover_vocal,
+                era="",
+                techniques=[],
+                key_instruments=[],
+                constraints="",
+                suggested_bpm="",
+                # User's free-text style brief keeps highest authority, if any.
+                style_prompt=params.get("style", "").strip(),
+            )
+            final_style, _w, _c = build_suno_style(
+                cover_song_params,
+                user_id=gen.user_id,
+                for_cover=True,
+            )
+            # style_weight / weirdness_constraint stay as chosen in the UI — we
+            # only enriched the textual style, not the user's balance sliders.
 
             if not gen.title:
                 gen.title = "Cover"
             cover_title = gen.title
             _dump_payload(gen_id, "cover_song", {
                 "upload_url": upload_url,
-                "genre": genre,
+                "genre": params.get("genre", "") or params.get("custom_genre", ""),
                 "mood": params.get("mood", ""),
                 "tempo": params.get("tempo", ""),
                 "style": final_style,
                 "lyrics": params.get("lyrics", ""),
                 "title": cover_title,
-                "instrumental": params.get("instrumental", False),
+                "instrumental": is_instrumental,
                 "vocal_gender": params.get("vocal_gender"),
+                "audio_weight": params.get("audio_weight", _COVER_AUDIO_WEIGHT_DEFAULT),
             })
             suno_result = await suno.generate_cover(
                 upload_url=upload_url,
                 style=final_style,
                 prompt=params.get("lyrics", ""),
                 title=cover_title,
-                instrumental=params.get("instrumental", False),
+                instrumental=is_instrumental,
                 vocal_gender=params.get("vocal_gender"),
                 style_weight=params.get("style_weight"),
                 weirdness_constraint=params.get("weirdness_constraint"),
+                audio_weight=params.get("audio_weight", _COVER_AUDIO_WEIGHT_DEFAULT),
                 progress_cb=progress_cb,
             )
             result = {

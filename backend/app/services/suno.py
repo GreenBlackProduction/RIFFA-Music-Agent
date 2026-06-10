@@ -425,6 +425,7 @@ class SunoClient:
         vocal_gender: str | None = None,
         style_weight: float | None = None,
         weirdness_constraint: float | None = None,
+        audio_weight: float | None = None,
         progress_cb: ProgressCb | None = None,
     ) -> SunoResult:
         # Suno /generate/upload-cover parameter rules
@@ -477,6 +478,11 @@ class SunoClient:
             payload["styleWeight"] = max(0.0, min(1.0, style_weight))
         if weirdness_constraint is not None:
             payload["weirdnessConstraint"] = max(0.0, min(1.0, weirdness_constraint))
+        # audioWeight controls how strongly the result clings to the uploaded
+        # source vs. the style brief. A high value keeps the richer style brief
+        # (assembled by the caller) from dragging the cover away from the original.
+        if audio_weight is not None:
+            payload["audioWeight"] = max(0.0, min(1.0, audio_weight))
 
         if progress_cb:
             progress_cb({"step": "submitting"})

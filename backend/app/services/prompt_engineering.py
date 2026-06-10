@@ -63,6 +63,7 @@ def build_suno_style(
     *,
     rng: random.Random | None = None,
     user_id: int | None = None,
+    for_cover: bool = False,
 ) -> tuple[str, float, float]:
     """Build Suno V5.5 (style, weight, constraint).
 
@@ -219,7 +220,10 @@ def build_suno_style(
 
     # Step 8.7: nudge Suno toward a full-length, multi-section track — thin
     # prompts yield 30-second snippets, an explicit structure cue lengthens them.
-    style_parts.append("full-length multi-section arrangement, intro build development and outro")
+    # Skipped for covers: the uploaded audio already defines length and structure,
+    # so this cue only fights the source.
+    if not for_cover:
+        style_parts.append("full-length multi-section arrangement, intro build development and outro")
 
     # Step 9: assemble + trim to Suno V5.5 limit
     raw = ", ".join(p for p in style_parts if p)
