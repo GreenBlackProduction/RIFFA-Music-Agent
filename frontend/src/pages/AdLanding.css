@@ -11,6 +11,7 @@
 .rl-root.adl .type-card p { opacity: 1; color: #4A4641; }
 .rl-root.adl .type-card .type-num { opacity: 1; color: #4A4641; }
 .rl-root.adl .type-card .type-meta { opacity: 1; }
+.rl-root.adl .type-icon { opacity: 1; filter: none; }
 .rl-root.adl .process-step p { opacity: 1; color: #37332F; }
 .rl-root.adl .process-step .tip { opacity: 1; color: #4A4641; }
 .rl-root.adl .price-tier { opacity: 1; }

@@ -38,6 +38,64 @@ function Mark({ size = 22 }: { size?: number }) {
   );
 }
 
+/* Тематические SVG-иконки поводов — сплошная заливка ink, как у type-карточек
+   главного лендинга. Эмодзи заменены: их рендерит ОС посетителя (на части
+   устройств — бесцветные контуры или пустые квадраты), SVG одинаков у всех. */
+function occasionIcon(key: number, ink: string) {
+  switch (key) {
+    case 0: /* день рождения — торт со свечой */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill={ink}>
+        <path d="M11.1 4.6h1.8V8h-1.8V4.6z" />
+        <path d="M12 1.2c.7.9 1.2 1.5 1.2 2.2a1.2 1.2 0 0 1-2.4 0c0-.7.5-1.3 1.2-2.2z" />
+        <path d="M5.5 9.5h13v3.4c-.9.8-2 .8-2.9 0-.9.9-2.3.9-3.2 0-.9.9-2.3.9-3.2 0-.9.8-2 .8-2.9 0V9.5h-.8z" />
+        <path d="M4 14.6c1.2.7 2.6.6 3.7-.1 1.1.8 2.7.8 3.8 0 1.1.8 2.7.8 3.8 0 1.1.7 2.5.8 3.7.1V20h1v1.8H3V20h1v-5.4z" />
+      </svg>
+    );
+    case 1: /* свадьба — кольца */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={ink} strokeWidth="1.9">
+        <circle cx="9" cy="14" r="5.6" />
+        <circle cx="15" cy="14" r="5.6" />
+        <path d="M15 5.2l1.9 1.9L15 9l-1.9-1.9z" fill={ink} stroke="none" />
+      </svg>
+    );
+    case 2: /* маме — тюльпан */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill={ink}>
+        <path d="M7.5 3.5c0 3.6 1.9 6 4.5 6s4.5-2.4 4.5-6c-1.4 1.4-2.7 1.4-3.4.2L12 2.6l-1.1 1.1c-.7 1.2-2 1.2-3.4-.2z" />
+        <rect x="11.2" y="9.5" width="1.6" height="11" rx="0.8" />
+        <path d="M11.6 15.8c-3-.5-5-2.2-5.7-4.8 3 .5 5 2.2 5.7 4.8z" />
+        <path d="M12.4 15.8c.7-2.6 2.7-4.3 5.7-4.8-.7 2.6-2.7 4.3-5.7 4.8z" />
+      </svg>
+    );
+    case 3: /* юбилей — бокалы чокаются */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill={ink}>
+        <g transform="rotate(-14 8 12)">
+          <path d="M5.6 3h5l-.5 6.2c-.1 1.6-1 2.6-2 2.8V19h2v1.6H4.1V19h2v-7c-1-.2-1.9-1.2-2-2.8L5.6 3z" />
+        </g>
+        <g transform="rotate(14 16 12)">
+          <path d="M13.4 3h5l-.5 6.2c-.1 1.6-1 2.6-2 2.8V19h2v1.6h-6V19h2v-7c-1-.2-1.9-1.2-2-2.8L13.4 3z" />
+        </g>
+        <circle cx="12" cy="2.6" r="0.9" />
+        <circle cx="9.8" cy="1.4" r="0.6" />
+        <circle cx="14.2" cy="1.4" r="0.6" />
+      </svg>
+    );
+    case 4: /* выпускной — академическая шапочка */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill={ink}>
+        <path d="M12 4 1.8 8.8 12 13.6l10.2-4.8L12 4z" />
+        <path d="M6.4 11.6v3.6c0 1.5 2.5 2.7 5.6 2.7s5.6-1.2 5.6-2.7v-3.6L12 14.3l-5.6-2.7z" />
+        <path d="M20.6 9.9h1.2v5.4h-1.2z" />
+        <circle cx="21.2" cy="16.4" r="1.1" />
+      </svg>
+    );
+    case 5: /* просто так — сердце */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill={ink}>
+        <path d="M12 21C5.4 15.4 2.4 11.6 2.4 8.1 2.4 5.3 4.7 3.2 7.2 3.2c1.9 0 3.8 1.1 4.8 2.9 1-1.8 2.9-2.9 4.8-2.9 2.5 0 4.8 2.1 4.8 4.9 0 3.5-3 7.3-9.6 12.9z" />
+      </svg>
+    );
+    default: return null;
+  }
+}
+
 function Marquee({ items }: { items: string[] }) {
   const line = items.join("  ·  ") + "  ·  ";
   return (
@@ -173,12 +231,12 @@ export function GiftPage() {
   const glassBg = scrolled ? "rgba(233,229,218,0.95)" : "rgba(233,229,218,0.85)";
 
   const occasions = [
-    { icon: "🎂", h: "День рождения", p: "Именинник услышит песню, где звучит его имя — такого подарка у него ещё не было" },
-    { icon: "💍", h: "Свадьба и годовщина", p: "Ваша общая история — в песне для первого танца или семейного вечера" },
-    { icon: "🌷", h: "Маме", p: "Все тёплые слова, которые сложно сказать вслух — легко спеть" },
-    { icon: "🥂", h: "Юбилей", p: "Песня про юбиляра соберёт весь стол — и слёзы, и аплодисменты" },
-    { icon: "🎓", h: "Выпускной", p: "Памятная песня для класса, группы или любимого учителя" },
-    { icon: "❤️", h: "Просто так", p: "Без повода — самый честный повод сказать человеку, что он дорог" },
+    { h: "День рождения", p: "Именинник услышит песню, где звучит его имя — такого подарка у него ещё не было" },
+    { h: "Свадьба и годовщина", p: "Ваша общая история — в песне для первого танца или семейного вечера" },
+    { h: "Маме", p: "Все тёплые слова, которые сложно сказать вслух — легко спеть" },
+    { h: "Юбилей", p: "Песня про юбиляра соберёт весь стол — и слёзы, и аплодисменты" },
+    { h: "Выпускной", p: "Памятная песня для класса, группы или любимого учителя" },
+    { h: "Просто так", p: "Без повода — самый честный повод сказать человеку, что он дорог" },
   ];
 
   const steps = [
@@ -310,9 +368,9 @@ export function GiftPage() {
             <div className="right">и без повода тоже</div>
           </div>
           <div className="types-grid" style={{ borderColor: c.rule, gridTemplateColumns: "repeat(3, 1fr)" }}>
-            {occasions.map((o) => (
+            {occasions.map((o, i) => (
               <div key={o.h} className="type-card" style={{ borderColor: c.rule, borderBottom: `1px solid ${c.rule}` }}>
-                <div className="type-icon" style={{ fontSize: 44, height: 64 }}>{o.icon}</div>
+                <div className="type-icon" style={{ height: 64 }}>{occasionIcon(i, c.ink)}</div>
                 <h3 style={{ color: c.ink, fontSize: 17 }}>{o.h}</h3>
                 <p style={{ fontSize: 13.5 }}>{o.p}</p>
               </div>
@@ -362,16 +420,36 @@ export function GiftPage() {
         </div>
       </section>
 
-      {/* 05 · ЦЕНА */}
-      <section id="price" className="pricing-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
+      {/* 05 · FAQ */}
+      <section id="faq" className="types-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">05</span> · цена</div>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">05</span> · вопросы</div>
+            <h2 style={{ color: c.orange }}>Спрашивают чаще всего.</h2>
+            <div className="right"></div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, border: `1px solid ${c.rule}`, borderTop: "none" }}>
+            {faq.map((f, i) => (
+              <div key={i} style={{ padding: "28px 28px 32px", borderRight: i % 2 === 0 ? `1px solid ${c.rule}` : "none", borderBottom: i < 2 ? `1px solid ${c.rule}` : "none" }}>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: c.accent, fontWeight: 600, marginBottom: 10 }}>Q{i + 1}</div>
+                <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 10px" }}>{f.q}</h3>
+                <p style={{ fontSize: 14, lineHeight: 1.55, color: c.ink3, margin: 0 }}>{f.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 06 · ЦЕНА — в самом низу, перед финальным CTA */}
+      <section id="price" className="pricing-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+        <div className="wrap">
+          <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">06</span> · цена</div>
             <h2 style={{ color: c.orange }}>Дешевле букета. Памятнее любого свитера.</h2>
             <div className="right" style={{ fontSize: "15px" }}>без подписок</div>
           </div>
           <div className="pricing-grid" style={{ borderColor: c.rule, gridTemplateColumns: "1fr 1fr" }}>
-            <div className="price-card" style={{ borderColor: c.rule }}>
+            <div className="price-card" style={{ borderColor: c.rule, background: c.bg }}>
               <div className="price-tier" style={{ color: c.accent, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: "14px" }}>ПОПРОБОВАТЬ</div>
               <div className="price-amount" style={{ fontSize: "40px", color: c.ink }}>Бесплатно</div>
               <div className="price-tokens" style={{ borderColor: c.rule, color: c.accent, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600, fontSize: "16px" }}>первая песня — в подарок от нас</div>
@@ -393,26 +471,6 @@ export function GiftPage() {
               </ul>
               <button className="price-cta" style={{ background: "rgba(233,229,218,0.15)", color: "#FFFFFF", borderColor: c.accent, borderWidth: "3px", fontSize: "18px", cursor: "pointer" }} onClick={start}>СОЗДАТЬ ПЕСНЮ</button>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 06 · FAQ */}
-      <section id="faq" className="types-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
-        <div className="wrap">
-          <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">06</span> · вопросы</div>
-            <h2 style={{ color: c.orange }}>Спрашивают чаще всего.</h2>
-            <div className="right"></div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, border: `1px solid ${c.rule}`, borderTop: "none" }}>
-            {faq.map((f, i) => (
-              <div key={i} style={{ padding: "28px 28px 32px", borderRight: i % 2 === 0 ? `1px solid ${c.rule}` : "none", borderBottom: i < 2 ? `1px solid ${c.rule}` : "none" }}>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: c.accent, fontWeight: 600, marginBottom: 10 }}>Q{i + 1}</div>
-                <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 10px" }}>{f.q}</h3>
-                <p style={{ fontSize: 14, lineHeight: 1.55, color: c.ink3, margin: 0 }}>{f.a}</p>
-              </div>
-            ))}
           </div>
         </div>
       </section>

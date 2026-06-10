@@ -14,6 +14,15 @@ import "./AdLanding.css";
 
 const TG_LEAD = "https://t.me/RIFFAsupport_bot"; // куда падают заявки B2B
 
+/* Примеры композиций разных настроений. Файлы кладём в public/sounds/business/
+   (NN.mp3) — пока файла нет, строка показывает бейдж «скоро». */
+const BIZ_EXAMPLES = [
+  { title: "Кофейня — утро", meta: "лоу-фай · спокойное · 76 BPM", src: "/sounds/business/01.mp3" },
+  { title: "Фитнес — драйв", meta: "электроника · энергичное · 140 BPM", src: "/sounds/business/02.mp3" },
+  { title: "Йога — тишина", meta: "эмбиент · умиротворённое · 60 BPM", src: "/sounds/business/03.mp3" },
+  { title: "Бар — вечер", meta: "грув · уверенное · 105 BPM", src: "/sounds/business/04.mp3" },
+];
+
 /* paper bg, emerald accent — палитра основного лендинга */
 const c = {
   bg: "#E9E5DA", bg2: "#DDD8C9",
@@ -29,6 +38,59 @@ function Mark({ size = 22 }: { size?: number }) {
       <polygon points="40,32 40,68 72,50" fill="#FF3B1F" />
     </svg>
   );
+}
+
+/* Тематические SVG-иконки атмосфер — сплошная заливка ink, как у type-карточек
+   главного лендинга. Эмодзи заменены: их рендерит ОС посетителя (на части
+   устройств — бесцветные контуры или пустые квадраты), SVG одинаков у всех. */
+function venueIcon(key: number, ink: string) {
+  switch (key) {
+    case 0: /* кофейня — чашка с паром и блюдцем */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill={ink}>
+        <path d="M4 9h13v4.2A5.8 5.8 0 0 1 11.2 19h-1.4A5.8 5.8 0 0 1 4 13.2V9z" />
+        <path d="M17.8 10.2c2 .2 3.7 1.1 3.7 2.8 0 1.8-2 2.9-4.2 3l.4-1.7c1.1-.2 1.9-.7 1.9-1.3 0-.5-.7-1-1.6-1.1l-.2-1.7z" />
+        <rect x="3" y="20.2" width="15" height="1.8" rx="0.9" />
+        <path d="M8.2 2.6c0 1.3 1.3 1.6 1.3 2.9 0 .7-.4 1.2-.7 1.6l-1.4-.5c.3-.4.6-.7.6-1.1 0-1-1.3-1.4-1.3-2.8 0-.7.4-1.3.8-1.7l1.4.5c-.4.4-.7.7-.7 1.1z" />
+        <path d="M12.4 2.6c0 1.3 1.3 1.6 1.3 2.9 0 .7-.4 1.2-.7 1.6l-1.4-.5c.3-.4.6-.7.6-1.1 0-1-1.3-1.4-1.3-2.8 0-.7.4-1.3.8-1.7l1.4.5c-.4.4-.7.7-.7 1.1z" />
+      </svg>
+    );
+    case 1: /* фитнес — гантель */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill={ink}>
+        <rect x="7" y="11" width="10" height="2" />
+        <rect x="4.4" y="7.5" width="2.4" height="9" rx="1.2" />
+        <rect x="1.8" y="9.5" width="1.9" height="5" rx="0.95" />
+        <rect x="17.2" y="7.5" width="2.4" height="9" rx="1.2" />
+        <rect x="20.3" y="9.5" width="1.9" height="5" rx="0.95" />
+      </svg>
+    );
+    case 2: /* йога — лотос */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill={ink}>
+        <path d="M12 4c-1.9 2.6-1.9 6.4 0 9 1.9-2.6 1.9-6.4 0-9z" />
+        <path d="M4.5 8.5c.4 3.2 2.7 5.8 6 6.6-.9-3.2-3.1-5.7-6-6.6z" />
+        <path d="M19.5 8.5c-2.9.9-5.1 3.4-6 6.6 3.3-.8 5.6-3.4 6-6.6z" />
+        <path d="M3 16.2c2.4 2.6 5.6 4 9 4s6.6-1.4 9-4c-2.9.6-6 .9-9 .9s-6.1-.3-9-.9z" />
+      </svg>
+    );
+    case 3: /* бар — бокал мартини */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill={ink}>
+        <path d="M3.5 4h17l-7.2 8v6h3.2v2H7.5v-2h3.3v-6L3.5 4zm4.3 3h9.4l1.8-2H6l1.8 2z" fillRule="evenodd" />
+        <circle cx="16.8" cy="3" r="1.4" />
+      </svg>
+    );
+    case 4: /* магазин — пакет с ручками */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill={ink}>
+        <path d="M5.5 8.2h13l-1 12.8h-11l-1-12.8z" />
+        <path d="M9.4 9.5V6.6a2.6 2.6 0 0 1 5.2 0v2.9h-1.8V6.6a.8.8 0 0 0-1.6 0v2.9H9.4z" fill="#E9E5DA" />
+        <path d="M8.5 8.2V6.6a3.5 3.5 0 0 1 7 0v1.6h-1.7V6.6a1.8 1.8 0 0 0-3.6 0v1.6H8.5z" />
+      </svg>
+    );
+    case 5: /* таймкафе — песочные часы */ return (
+      <svg width="48" height="48" viewBox="0 0 24 24" fill={ink}>
+        <path d="M5.5 2.5h13v2.1c0 2.9-2.6 4.5-4.1 7.4 1.5 2.9 4.1 4.5 4.1 7.4v2.1h-13v-2.1c0-2.9 2.6-4.5 4.1-7.4-1.5-2.9-4.1-4.5-4.1-7.4V2.5zm2 2.1c0 2.2 2.1 3.7 3.4 5.6h2.2c1.3-1.9 3.4-3.4 3.4-5.6H7.5z" fillRule="evenodd" />
+      </svg>
+    );
+    default: return null;
+  }
 }
 
 function Marquee({ items }: { items: string[] }) {
@@ -97,6 +159,9 @@ export function BusinessPage() {
   const navigate = useNavigate();
   const rootRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [playing, setPlaying] = useState<number | null>(null);
+  const [missing, setMissing] = useState<Set<number>>(new Set());
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     document.title = "Фоновая музыка для бизнеса — плейлисты для кофеен, фитнеса, студий | RIFFA";
@@ -119,7 +184,7 @@ export function BusinessPage() {
     const io = new IntersectionObserver((entries) => {
       entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("visible"); io.unobserve(e.target); } });
     }, { threshold: 0.1 });
-    root.querySelectorAll<HTMLElement>(".type-card, .process-step, .price-card, .section-head").forEach((el, i) => {
+    root.querySelectorAll<HTMLElement>(".type-card, .process-step, .price-card, .section-head, .adl-ex-row").forEach((el, i) => {
       el.classList.add("reveal");
       const d = i % 6;
       if (d) el.classList.add(`reveal-delay-${d}`);
@@ -128,11 +193,36 @@ export function BusinessPage() {
     return () => io.disconnect();
   }, []);
 
+  // Проверяем, какие файлы примеров уже загружены (nginx отдаёт 404 на отсутствующие)
+  useEffect(() => {
+    BIZ_EXAMPLES.forEach((ex, i) => {
+      fetch(ex.src, { method: "HEAD" })
+        .then((r) => { if (!r.ok) setMissing((s) => new Set(s).add(i)); })
+        .catch(() => setMissing((s) => new Set(s).add(i)));
+    });
+  }, []);
+
+  // Глушим плеер при уходе со страницы
+  useEffect(() => () => { audioRef.current?.pause(); }, []);
+
   const scrollTo = (id: string) => (e: React.MouseEvent) => {
     e.preventDefault();
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
   const lead = () => window.open(TG_LEAD, "_blank", "noopener");
+
+  function toggleExample(i: number) {
+    if (missing.has(i)) return;
+    if (!audioRef.current) audioRef.current = new Audio();
+    const audio = audioRef.current;
+    if (playing === i) { audio.pause(); setPlaying(null); return; }
+    audio.src = BIZ_EXAMPLES[i].src;
+    audio.onended = () => setPlaying(null);
+    audio.onerror = () => { setMissing((s) => new Set(s).add(i)); setPlaying(null); };
+    audio.play()
+      .then(() => setPlaying(i))
+      .catch(() => { setMissing((s) => new Set(s).add(i)); setPlaying(null); });
+  }
 
   const glassBg = scrolled ? "rgba(233,229,218,0.95)" : "rgba(233,229,218,0.85)";
 
@@ -144,12 +234,12 @@ export function BusinessPage() {
   ];
 
   const venues = [
-    { icon: "☕", h: "Кофейня и пекарня", p: "Мягкий лоу-фай, джаз-хоп и соул — гости задерживаются дольше" },
-    { icon: "🏋️", h: "Фитнес и тренажёрка", p: "Драйв и энергия, 120–150 BPM — темп зала держится сам" },
-    { icon: "🧘", h: "Йога и массаж", p: "Спокойный эмбиент без слов — ничто не отвлекает от практики" },
-    { icon: "🍸", h: "Бар и ресторан", p: "Вечерний грув и диско — атмосфера, под которую заказывают ещё" },
-    { icon: "🛍", h: "Магазин и шоурум", p: "Ненавязчивый фон — покупатели не спешат к выходу" },
-    { icon: "⏳", h: "Таймкафе и коворкинг", p: "Фокус и уют — музыка, под которую работается" },
+    { h: "Кофейня и пекарня", p: "Мягкий лоу-фай, джаз-хоп и соул — гости задерживаются дольше" },
+    { h: "Фитнес и тренажёрка", p: "Драйв и энергия, 120–150 BPM — темп зала держится сам" },
+    { h: "Йога и массаж", p: "Спокойный эмбиент без слов — ничто не отвлекает от практики" },
+    { h: "Бар и ресторан", p: "Вечерний грув и диско — атмосфера, под которую заказывают ещё" },
+    { h: "Магазин и шоурум", p: "Ненавязчивый фон — покупатели не спешат к выходу" },
+    { h: "Таймкафе и коворкинг", p: "Фокус и уют — музыка, под которую работается" },
   ];
 
   const features = [
@@ -191,8 +281,9 @@ export function BusinessPage() {
             <div className="nav-links">
               <a href="#pain" style={{ color: c.ink }} onClick={scrollTo("pain")}>проблема</a>
               <a href="#venues" style={{ color: c.ink }} onClick={scrollTo("venues")}>атмосферы</a>
-              <a href="#pricing" style={{ color: c.ink }} onClick={scrollTo("pricing")}>цены</a>
+              <a href="#examples" style={{ color: c.ink }} onClick={scrollTo("examples")}>примеры</a>
               <a href="#how" style={{ color: c.ink }} onClick={scrollTo("how")}>как заказать</a>
+              <a href="#pricing" style={{ color: c.ink }} onClick={scrollTo("pricing")}>цены</a>
             </div>
             <button className="nav-cta" style={{ background: c.accent, color: "#E9E5DA", fontSize: "13px" }} onClick={lead}>Заказать плейлист</button>
           </div>
@@ -217,7 +308,7 @@ export function BusinessPage() {
               </p>
               <div className="hero-actions" data-anim="4" style={{ marginTop: "36px" }}>
                 <button className="btn-primary" style={{ background: c.accent, color: "#E9E5DA", height: 52, padding: "0 32px", fontSize: "13px", letterSpacing: "1.5px", border: "none", cursor: "pointer" }} onClick={lead}>ЗАКАЗАТЬ ПЛЕЙЛИСТ</button>
-                <button className="btn-ghost" style={{ color: "#EC560B", borderColor: "#EC560B", padding: "0 28px", fontSize: "13px", letterSpacing: "1px", height: 52, background: "transparent", cursor: "pointer" }} onClick={() => navigate("/radio")}>ПОСЛУШАТЬ ПРИМЕРЫ</button>
+                <button className="btn-ghost" style={{ color: "#EC560B", borderColor: "#EC560B", padding: "0 28px", fontSize: "13px", letterSpacing: "1px", height: 52, background: "transparent", cursor: "pointer" }} onClick={scrollTo("examples")}>ПОСЛУШАТЬ ПРИМЕРЫ</button>
               </div>
             </div>
             <div data-anim="5">
@@ -287,9 +378,9 @@ export function BusinessPage() {
             <div className="right">6 готовых направлений</div>
           </div>
           <div className="types-grid" style={{ borderColor: c.rule, gridTemplateColumns: "repeat(3, 1fr)" }}>
-            {venues.map((v) => (
+            {venues.map((v, i) => (
               <div key={v.h} className="type-card" style={{ borderColor: c.rule, borderBottom: `1px solid ${c.rule}` }}>
-                <div className="type-icon" style={{ fontSize: 44, height: 64 }}>{v.icon}</div>
+                <div className="type-icon" style={{ height: 64 }}>{venueIcon(i, c.ink)}</div>
                 <h3 style={{ color: c.ink, fontSize: 17 }}>{v.h}</h3>
                 <p style={{ fontSize: 13.5 }}>{v.p}</p>
                 <div className="type-meta" style={{ borderColor: c.rule, color: c.accent, fontWeight: 800, fontSize: 11, letterSpacing: "0.8px" }}>есть пресет</div>
@@ -299,11 +390,91 @@ export function BusinessPage() {
         </div>
       </section>
 
-      {/* 04 · ЦЕНЫ */}
+      {/* 04 · ПРИМЕРЫ */}
+      <section id="examples" className="types-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+        <div className="wrap">
+          <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">04</span> · примеры</div>
+            <h2 style={{ color: c.orange }}>Послушайте настроения в деле.</h2>
+            <div className="right">фрагменты реальных плейлистов</div>
+          </div>
+          <div className="adl-ex" style={{ background: c.bg }}>
+            {BIZ_EXAMPLES.map((ex, i) => (
+              <button key={ex.src} type="button" className="adl-ex-row" onClick={() => toggleExample(i)}>
+                <span className="adl-ex-num">{"0" + (i + 1)}</span>
+                <span>
+                  <span className="adl-ex-title" style={{ display: "block" }}>{ex.title}</span>
+                  <span className="adl-ex-meta" style={{ display: "block" }}>{ex.meta}</span>
+                </span>
+                {playing === i ? (
+                  <span className="adl-ex-eq" aria-hidden="true"><i /><i /><i /></span>
+                ) : <span />}
+                {missing.has(i) ? (
+                  <span className="adl-ex-soon">скоро</span>
+                ) : (
+                  <span className={`adl-ex-play${playing === i ? " on" : ""}`} aria-label={playing === i ? "Пауза" : "Слушать"}>
+                    {playing === i ? (
+                      <svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="2" width="3.4" height="10" rx="1" fill="currentColor" /><rect x="8.6" y="2" width="3.4" height="10" rx="1" fill="currentColor" /></svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 14 14"><polygon points="3,2 3,12 12,7" fill="currentColor" /></svg>
+                    )}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <p style={{ marginTop: 18, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.ink2 }}>
+            Каждый плейлист собирается под конкретное заведение — это лишь ориентиры по настроению.
+          </p>
+        </div>
+      </section>
+
+      {/* 05 · КАК ЗАКАЗАТЬ */}
+      <section id="how" className="process-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
+        <div className="wrap">
+          <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">05</span> · как заказать</div>
+            <h2 style={{ color: c.orange }}>Три шага — и музыка играет у вас.</h2>
+            <div className="right"></div>
+          </div>
+          <div className="process-grid">
+            {steps.map((s, i) => (
+              <div key={i} className="process-step" style={{ borderColor: c.rule }}>
+                <div className="step-num" style={{ color: c.accent, opacity: 1 }}>{"0" + (i + 1)}</div>
+                <h3 style={{ color: c.ink }}>{s.h}</h3>
+                <p>{s.p}</p>
+                <div className="tip" style={{ borderColor: c.rule, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.02em" }}>{s.tip}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 06 · FAQ */}
+      <section id="faq" className="types-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
+        <div className="wrap">
+          <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">06</span> · вопросы</div>
+            <h2 style={{ color: c.orange }}>Коротко о главном.</h2>
+            <div className="right"></div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, border: `1px solid ${c.rule}`, borderTop: "none" }}>
+            {faq.map((f, i) => (
+              <div key={i} style={{ padding: "28px 28px 32px", borderRight: i % 2 === 0 ? `1px solid ${c.rule}` : "none", borderBottom: i < 2 ? `1px solid ${c.rule}` : "none" }}>
+                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: c.accent, fontWeight: 600, marginBottom: 10 }}>Q{i + 1}</div>
+                <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 10px" }}>{f.q}</h3>
+                <p style={{ fontSize: 14, lineHeight: 1.55, color: c.ink3, margin: 0 }}>{f.a}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 07 · ЦЕНЫ — в самом низу, перед финальным CTA */}
       <section id="pricing" className="pricing-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">04</span> · цены</div>
+            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">07</span> · цены</div>
             <h2 style={{ color: c.orange }}>Платите за часы — получаете музыку навсегда.</h2>
             <div className="right" style={{ fontSize: "15px" }}>разовая покупка</div>
           </div>
@@ -329,47 +500,6 @@ export function BusinessPage() {
           <p style={{ marginTop: 20, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: c.ink2 }}>
             Нужно больше часов, несколько точек или особый формат — напишите, соберём индивидуальное предложение.
           </p>
-        </div>
-      </section>
-
-      {/* 05 · КАК ЗАКАЗАТЬ */}
-      <section id="how" className="process-section" style={{ background: c.bg2, color: c.ink, borderColor: c.rule }}>
-        <div className="wrap">
-          <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">05</span> · как заказать</div>
-            <h2 style={{ color: c.orange }}>Три шага — и музыка играет у вас.</h2>
-            <div className="right"></div>
-          </div>
-          <div className="process-grid">
-            {steps.map((s, i) => (
-              <div key={i} className="process-step" style={{ borderColor: c.rule }}>
-                <div className="step-num" style={{ color: c.accent, opacity: 1 }}>{"0" + (i + 1)}</div>
-                <h3 style={{ color: c.ink }}>{s.h}</h3>
-                <p>{s.p}</p>
-                <div className="tip" style={{ borderColor: c.rule, fontFamily: "'JetBrains Mono', monospace", letterSpacing: "0.02em" }}>{s.tip}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* 06 · FAQ */}
-      <section id="faq" className="types-section" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
-        <div className="wrap">
-          <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">06</span> · вопросы</div>
-            <h2 style={{ color: c.orange }}>Коротко о главном.</h2>
-            <div className="right"></div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, border: `1px solid ${c.rule}`, borderTop: "none" }}>
-            {faq.map((f, i) => (
-              <div key={i} style={{ padding: "28px 28px 32px", borderRight: i % 2 === 0 ? `1px solid ${c.rule}` : "none", borderBottom: i < 2 ? `1px solid ${c.rule}` : "none" }}>
-                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: c.accent, fontWeight: 600, marginBottom: 10 }}>Q{i + 1}</div>
-                <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 10px" }}>{f.q}</h3>
-                <p style={{ fontSize: 14, lineHeight: 1.55, color: c.ink3, margin: 0 }}>{f.a}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
