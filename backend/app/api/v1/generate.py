@@ -296,8 +296,15 @@ async def _normalize_freeform_brief(body: Any, settings: Settings) -> None:
     miss the raw input is kept and generation still proceeds.
     """
     raw = (getattr(body, "custom_genre", "") or "").strip()
+    # A free-typed phrase can also land directly in `genre` (not custom_genre),
+    # e.g. the form's genre field. If `genre` isn't a known preset, treat it as
+    # freeform too so it doesn't poison the tag.
     if not raw:
-        return
+        g = (getattr(body, "genre", "") or "").strip()
+        if g and not canonical_genre(g):
+            raw = g
+        else:
+            return
 
     # 1. Local canonical match first — instant, no GPT (typos of known genres).
     canon = canonical_genre(raw)
@@ -309,22 +316,35 @@ async def _normalize_freeform_brief(body: Any, settings: Settings) -> None:
     # 2. Truly freeform / unknown → cheap GPT normalization.
     description = (getattr(body, "description", "") or getattr(body, "style", "") or "")
     brief = await normalize_freeform_genre(raw, description, settings=settings)
-    if not brief:
-        return  # couldn't improve — keep the raw input
+    if brief:
+        body.genre = brief["genre"]
+        body.custom_genre = ""
+        if brief["mood"] and not (getattr(body, "mood", "") or "").strip():
+            body.mood = brief["mood"]
+        if brief["tempo"] and not (getattr(body, "tempo", "") or "").strip():
+            body.tempo = brief["tempo"]
+        # Fold the subgenre into the free-text description so the prompt engineer
+        # keeps the nuance (e.g. "Japanese Math Rock").
+        sub = brief["subgenre"]
+        if sub and hasattr(body, "description"):
+            desc = (getattr(body, "description", "") or "").strip()
+            if sub.lower() not in desc.lower():
+                body.description = f"{desc} · {sub}".strip(" ·")
 
-    body.genre = brief["genre"]
-    body.custom_genre = ""
-    if brief["mood"] and not (getattr(body, "mood", "") or "").strip():
-        body.mood = brief["mood"]
-    if brief["tempo"] and not (getattr(body, "tempo", "") or "").strip():
-        body.tempo = brief["tempo"]
-    # Fold the subgenre into the free-text description so the prompt engineer
-    # keeps the nuance (e.g. "Japanese Math Rock").
-    sub = brief["subgenre"]
-    if sub and hasattr(body, "description"):
-        desc = (getattr(body, "description", "") or "").strip()
-        if sub.lower() not in desc.lower():
-            body.description = f"{desc} · {sub}".strip(" ·")
+    # 3. Final guard: if `genre` is STILL a freeform phrase (GPT missed, or it
+    # was an instruction like «нужен такой же жанр как у исполнителя»), keep it
+    # out of the clean genre tag. Fold it into the description so Suno still
+    # sees the intent, and blank the tag — tags stay strictly genre/mood/BPM.
+    final_genre = (getattr(body, "genre", "") or "").strip()
+    if final_genre and not canonical_genre(final_genre) and (
+        len(final_genre.split()) > 3 or len(final_genre) > 32
+    ):
+        if hasattr(body, "description"):
+            desc = (getattr(body, "description", "") or "").strip()
+            if final_genre.lower() not in desc.lower():
+                body.description = f"{desc} · {final_genre}".strip(" ·")
+        body.genre = ""
+        body.custom_genre = ""
 
 
 @router.post("/song", response_model=GenerateResponse, status_code=status.HTTP_202_ACCEPTED)
