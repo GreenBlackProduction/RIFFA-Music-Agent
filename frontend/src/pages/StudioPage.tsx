@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { usePlayer } from "@/store/player";
+import { useAuth } from "@/lib/auth";
 
 import { Panel } from "@/components/ui/Panel";
 import { Chip } from "@/components/ui/Chip";
@@ -749,6 +750,8 @@ function RecentTracks() {
 }
 
 export function StudioPage() {
+  const { user } = useAuth();
+  const userId = String(user?.id ?? "");
   const { t, i18n: i18nInst } = useTranslation();
   const isEn = (i18nInst.resolvedLanguage ?? "ru").startsWith("en");
   // Хелпер: даёт переведённое имя/описание модуля по его id (song, instrumental, ...)
@@ -1279,6 +1282,18 @@ export function StudioPage() {
       };
 
       mediaRecorder.onstop = async () => {
+        // Close the recorder window immediately — the audio chunks are already
+        // captured, so WAV conversion + upload run in the background (the cover
+        // button shows an "uploading" state). Previously these awaits kept the
+        // modal open until upload finished, so it looked like it never closed.
+        stream.getTracks().forEach((track) => track.stop());
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        if (recordingTimerRef.current !== null) {
+          clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = null;
+        }
+
         const mimeType = mediaRecorder.mimeType || "audio/webm";
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         try {
@@ -1289,15 +1304,6 @@ export function StudioPage() {
             err instanceof Error ? err.message : "Не удалось сконвертировать запись в WAV.";
           alert(`Не удалось обработать запись: ${msg}`);
           setState((prev) => ({ ...prev, coverFileName: "", coverUrl: "" }));
-        } finally {
-          // Release microphone only after upload is complete
-          stream.getTracks().forEach((track) => track.stop());
-          isRecordingRef.current = false;
-          setIsRecording(false);
-          if (recordingTimerRef.current !== null) {
-            clearInterval(recordingTimerRef.current);
-            recordingTimerRef.current = null;
-          }
         }
       };
 
@@ -1830,6 +1836,7 @@ export function StudioPage() {
         {agentOpen && activeModule === "song" && (
           <AgentChat
             key={agentSeed ?? "fresh"}
+            userId={userId}
             module="song"
             initialAnswer={agentSeed ?? undefined}
             selectedGenre={combineGenres(state.genres, state.customGenre) || state.genre}
@@ -2276,6 +2283,7 @@ export function StudioPage() {
 
             {coverArtAgentOpen && (
               <AgentChat
+                userId={userId}
                 module="cover_art"
                 agentInitiates={true}
                 onComplete={(r) => {
