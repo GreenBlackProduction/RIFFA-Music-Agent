@@ -19,6 +19,7 @@ import asyncio
 import json
 import re
 from collections import Counter
+from time import perf_counter
 from typing import Annotated, Any, Literal
 
 from collections.abc import AsyncIterator
@@ -1592,6 +1593,7 @@ async def _stream_agent_completion(
     chat_messages: list[dict[str, str]],
     chosen_model: str,
     reply_lang: str,
+    user_id: int | None = None,
 ) -> AsyncIterator[bytes]:
     """SSE generator: streams reply deltas + a final structured event.
 
@@ -1613,6 +1615,7 @@ async def _stream_agent_completion(
     """
     accumulated = ""
     last_reply_pos = 0
+    _t0 = perf_counter()
     try:
         stream_resp = await client.chat.completions.create(  # type: ignore[call-overload]
             model=chosen_model,
@@ -1655,7 +1658,10 @@ async def _stream_agent_completion(
         )
         return
 
-    final = _postprocess_agent_reply(accumulated, body, chosen_model, reply_lang)
+    final = _postprocess_agent_reply(
+        accumulated, body, chosen_model, reply_lang,
+        user_id=user_id, latency_ms=int((perf_counter() - _t0) * 1000),
+    )
     yield (
         b"event: complete\n"
         b"data: " + final.model_dump_json().encode("utf-8")
@@ -1905,6 +1911,7 @@ async def agent_chat(
         # `response_format` accepts the {"type": "json_object"} literal at
         # runtime, but the typed-dict variant in openai 1.61 is too narrow
         # for mypy to pick the right overload — silence just this call.
+        _t0 = perf_counter()
         resp = await client.chat.completions.create(  # type: ignore[call-overload]
             model=chosen_model,
             messages=chat_messages,
@@ -1912,6 +1919,7 @@ async def agent_chat(
             max_tokens=1800,
             response_format={"type": "json_object"},
         )
+        _latency_ms = int((perf_counter() - _t0) * 1000)
         raw = (resp.choices[0].message.content or "").strip()
     except Exception as exc:
         logger.exception("agent_chat: GPT call failed for user {}: {}", user.id, exc)
@@ -1920,7 +1928,52 @@ async def agent_chat(
             detail="Agent backend is temporarily unavailable",
         ) from exc
 
-    return _postprocess_agent_reply(raw, body, chosen_model, reply_lang)
+    return _postprocess_agent_reply(
+        raw, body, chosen_model, reply_lang,
+        user_id=user.id, latency_ms=_latency_ms,
+    )
+
+
+def _log_agent_turn(
+    *,
+    body: AgentChatRequest,
+    chosen_model: str,
+    done: bool,
+    music_params: dict[str, Any],
+    suggestions: list[str],
+    reply: str,
+    user_id: int | None,
+    latency_ms: int | None,
+) -> None:
+    """One structured line per agent turn for offline analysis / tuning.
+
+    Logged to the app log (not the DB) so we don't persist user conversations:
+    only coarse signals — module, model, latency, whether it finalised, the key
+    music params, and the last user message (truncated) — enough to study where
+    the agent over/under-asks and which briefs convert. Grep ``AGENT_TURN``.
+    """
+    last_user = ""
+    user_turns = 0
+    for m in body.messages:
+        if getattr(m, "role", "") == "user":
+            user_turns += 1
+            last_user = getattr(m, "content", "") or last_user
+    payload = {
+        "user_id": user_id,
+        "module": body.module,
+        "model": chosen_model,
+        "latency_ms": latency_ms,
+        "done": done,
+        "user_turns": user_turns,
+        "last_user": last_user[:200],
+        "genre": music_params.get("genre") or music_params.get("custom_genre") or "",
+        "mood": music_params.get("mood", ""),
+        "tempo": music_params.get("tempo", ""),
+        "vocal": music_params.get("vocal", ""),
+        "suggestions": len(suggestions),
+        "reply_len": len(reply),
+    }
+    logger.info("AGENT_TURN {}", json.dumps(payload, ensure_ascii=False))
 
 
 def _postprocess_agent_reply(
@@ -1928,6 +1981,9 @@ def _postprocess_agent_reply(
     body: AgentChatRequest,
     chosen_model: str,
     reply_lang: str,
+    *,
+    user_id: int | None = None,
+    latency_ms: int | None = None,
 ) -> AgentChatResponse:
     """Parse + validate + safety-net the raw JSON reply from GPT.
 
@@ -2035,6 +2091,12 @@ def _postprocess_agent_reply(
     if not reply:
         reply = "Понял." if done else "Можешь рассказать чуть подробнее?"
 
+    _log_agent_turn(
+        body=body, chosen_model=chosen_model, done=done,
+        music_params=music_params, suggestions=suggestions, reply=reply,
+        user_id=user_id, latency_ms=latency_ms,
+    )
+
     return AgentChatResponse(
         reply=reply, done=done, summary=summary, prompt=prompt,
         short_prompt=short_prompt,
@@ -2132,7 +2194,7 @@ async def agent_chat_stream(
 
     chosen_model = _pick_model(body.messages)
     return StreamingResponse(
-        _stream_agent_completion(body, client, chat_messages, chosen_model, reply_lang),
+        _stream_agent_completion(body, client, chat_messages, chosen_model, reply_lang, user_id=user.id),
         media_type="text/event-stream",
         # Disable nginx buffering — without this the proxy holds chunks
         # until the connection closes, defeating the whole point of streaming.
