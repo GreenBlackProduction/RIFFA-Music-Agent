@@ -161,7 +161,20 @@ export function BusinessPage() {
   const [scrolled, setScrolled] = useState(false);
   const [playing, setPlaying] = useState<number | null>(null);
   const [missing, setMissing] = useState<Set<number>>(new Set());
+  const [activeSec, setActiveSec] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Scrollspy: какая секция сейчас в центральной полосе экрана —
+  // её заголовок подсвечивается фирменным оранжевым.
+  useEffect(() => {
+    if (!("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) setActiveSec((e.target as HTMLElement).id); });
+    }, { rootMargin: "-35% 0px -55% 0px", threshold: 0 });
+    document.querySelectorAll("section[id]").forEach((s) => io.observe(s));
+    return () => io.disconnect();
+  }, []);
+  const h2c = (id: string) => ({ color: activeSec === id ? c.orange : c.ink });
 
   useEffect(() => {
     document.title = "Фоновая музыка для бизнеса — плейлисты для кофеен, фитнеса, студий | RIFFA";
@@ -224,7 +237,8 @@ export function BusinessPage() {
       .catch(() => { setMissing((s) => new Set(s).add(i)); setPlaying(null); });
   }
 
-  const glassBg = scrolled ? "rgba(233,229,218,0.95)" : "rgba(233,229,218,0.85)";
+  // Чистый бежевый с явной прозрачностью — стекло читается сразу.
+  const glassBg = scrolled ? "rgba(233,229,218,0.78)" : "rgba(233,229,218,0.6)";
 
   const pains = [
     { n: "01", h: "Штрафы за чужую музыку", p: "Колонка с плейлистом из стриминга — это публичное воспроизведение. РАО и ВОИС приходят с претензиями даже к маленьким кофейням." },
@@ -334,10 +348,10 @@ export function BusinessPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">01</span> · знакомо?</div>
-            <h2 style={{ color: c.orange }}>Фоновая музыка — головная боль владельца.</h2>
+            <h2 style={h2c("pain")}>Фоновая музыка — головная боль владельца.</h2>
             <div className="right">4 типовые проблемы</div>
           </div>
-          <div className="types-grid" style={{ borderColor: c.rule, gridTemplateColumns: "repeat(4, 1fr)" }}>
+          <div className="types-grid adl-cols-4" style={{ borderColor: c.rule }}>
             {pains.map((it) => (
               <div key={it.n} className="type-card" style={{ borderColor: c.rule }}>
                 <div className="type-num">{it.n}</div>
@@ -354,10 +368,10 @@ export function BusinessPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">02</span> · решение</div>
-            <h2 style={{ color: c.orange }}>Плейлист, созданный под ваше заведение.</h2>
+            <h2 style={h2c("solution")}>Плейлист, созданный под ваше заведение.</h2>
             <div className="right">riffa для бизнеса</div>
           </div>
-          <div className="types-grid" style={{ borderColor: c.rule, gridTemplateColumns: "repeat(4, 1fr)" }}>
+          <div className="types-grid adl-cols-4" style={{ borderColor: c.rule }}>
             {features.map((it) => (
               <div key={it.n} className="type-card" style={{ borderColor: c.rule }}>
                 <div className="type-num">{it.n}</div>
@@ -374,10 +388,10 @@ export function BusinessPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">03</span> · атмосферы</div>
-            <h2 style={{ color: c.orange }}>Под формат вашего бизнеса.</h2>
+            <h2 style={h2c("venues")}>Под формат вашего бизнеса.</h2>
             <div className="right">6 готовых направлений</div>
           </div>
-          <div className="types-grid" style={{ borderColor: c.rule, gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="types-grid adl-cols-3" style={{ borderColor: c.rule }}>
             {venues.map((v, i) => (
               <div key={v.h} className="type-card" style={{ borderColor: c.rule, borderBottom: `1px solid ${c.rule}` }}>
                 <div className="type-icon" style={{ height: 64 }}>{venueIcon(i, c.ink)}</div>
@@ -395,7 +409,7 @@ export function BusinessPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">04</span> · примеры</div>
-            <h2 style={{ color: c.orange }}>Послушайте настроения в деле.</h2>
+            <h2 style={h2c("examples")}>Послушайте настроения в деле.</h2>
             <div className="right">фрагменты реальных плейлистов</div>
           </div>
           <div className="adl-ex" style={{ background: c.bg }}>
@@ -434,7 +448,7 @@ export function BusinessPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">05</span> · как заказать</div>
-            <h2 style={{ color: c.orange }}>Три шага — и музыка играет у вас.</h2>
+            <h2 style={h2c("how")}>Три шага — и музыка играет у вас.</h2>
             <div className="right"></div>
           </div>
           <div className="process-grid">
@@ -455,12 +469,12 @@ export function BusinessPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">06</span> · вопросы</div>
-            <h2 style={{ color: c.orange }}>Коротко о главном.</h2>
+            <h2 style={h2c("faq")}>Коротко о главном.</h2>
             <div className="right"></div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, border: `1px solid ${c.rule}`, borderTop: "none" }}>
+          <div className="adl-faq">
             {faq.map((f, i) => (
-              <div key={i} style={{ padding: "28px 28px 32px", borderRight: i % 2 === 0 ? `1px solid ${c.rule}` : "none", borderBottom: i < 2 ? `1px solid ${c.rule}` : "none" }}>
+              <div key={i} className="adl-faq-cell">
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: c.accent, fontWeight: 600, marginBottom: 10 }}>Q{i + 1}</div>
                 <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 10px" }}>{f.q}</h3>
                 <p style={{ fontSize: 14, lineHeight: 1.55, color: c.ink3, margin: 0 }}>{f.a}</p>
@@ -475,10 +489,10 @@ export function BusinessPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">07</span> · цены</div>
-            <h2 style={{ color: c.orange }}>Платите за часы — получаете музыку навсегда.</h2>
+            <h2 style={h2c("pricing")}>Платите за часы — получаете музыку навсегда.</h2>
             <div className="right" style={{ fontSize: "15px" }}>разовая покупка</div>
           </div>
-          <div className="pricing-grid" style={{ borderColor: c.rule, gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="pricing-grid adl-cols-3" style={{ borderColor: c.rule }}>
             {tiers.map((tier) => (
               <div key={tier.name} className={`price-card${tier.featured ? " featured bp-featured" : ""}`} style={{ borderColor: c.rule, background: tier.featured ? c.ink : "transparent", border: tier.featured ? "none" : undefined, padding: tier.featured ? "32px 28px" : undefined }}>
                 <div className="price-tier" style={{ color: tier.featured ? "#E9E5DA" : c.accent, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: "14px" }}>{tier.name}</div>
@@ -506,7 +520,7 @@ export function BusinessPage() {
       {/* CTA-ПОЛОСА */}
       <section style={{ background: c.ink, color: c.bg }}>
         <div className="wrap" style={{ padding: "72px 32px", textAlign: "center" }}>
-          <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 44, margin: 0, letterSpacing: "-0.02em", color: c.bg }}>
+          <h2 className="adl-cta-h" style={{ fontFamily: "'Archivo Black', sans-serif", margin: 0, letterSpacing: "-0.02em", color: c.bg }}>
             Запустите свою музыку <span style={{ color: "#7BD389" }}>на этой неделе.</span>
           </h2>
           <p style={{ fontSize: 16, color: "#C9C4B8", margin: "18px auto 32px", maxWidth: 560 }}>

@@ -123,6 +123,39 @@
   background-size: 46px 10px;
 }
 
+/* ── Шапка: чистый бежевый без зерна, явное стекло ──
+   Grain-оверлей .rl-root::before лежит на z-index 300 поверх всего;
+   поднимаем nav выше него — текстура на шапку больше не ложится. */
+.rl-root.adl .nav { z-index: 350; }
+
+/* ── Scrollspy: заголовок секции подсвечивается, когда юзер в её области ── */
+.rl-root.adl .section-head h2 { transition: color 0.35s ease; }
+
+/* ── Сетки: на десктопе как было, на мобильных складываются ──
+   (инлайн grid-template-columns перебивал медиазапросы — теперь классы) */
+.rl-root.adl .adl-cols-4 { grid-template-columns: repeat(4, 1fr); }
+.rl-root.adl .adl-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.rl-root.adl .adl-cols-2 { grid-template-columns: 1fr 1fr; }
+
+/* FAQ-сетка с рамками, переезжающими при складывании */
+.adl-faq { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid rgba(22, 20, 19, 0.18); border-top: none; }
+.adl-faq-cell { padding: 28px 28px 32px; border-bottom: 1px solid rgba(22, 20, 19, 0.18); }
+.adl-faq-cell:nth-child(odd) { border-right: 1px solid rgba(22, 20, 19, 0.18); }
+.adl-faq-cell:nth-last-child(-n+2) { border-bottom: none; }
+
+/* финальный CTA-заголовок: не вылезает на узких экранах */
+.adl-cta-h { font-size: clamp(30px, 7.5vw, 44px) !important; }
+
+@media (max-width: 768px) {
+  .rl-root.adl .adl-cols-4, .rl-root.adl .adl-cols-3 { grid-template-columns: 1fr 1fr; }
+  .rl-root.adl .pricing-grid.adl-cols-3, .rl-root.adl .pricing-grid.adl-cols-2 { grid-template-columns: 1fr; }
+  .adl-faq { grid-template-columns: 1fr; }
+  .adl-faq-cell { border-right: none; }
+  .adl-faq-cell:nth-last-child(2) { border-bottom: 1px solid rgba(22, 20, 19, 0.18); }
+  .adl-ex-row { grid-template-columns: 40px 1fr auto auto; padding: 14px 16px; gap: 12px; }
+  .adl-ex-title { font-size: 15px; }
+}
+
 /* ── Доступность: уважаем reduce-motion ── */
 @media (prefers-reduced-motion: reduce) {
   .rl-root.adl [data-anim] { animation: none; }

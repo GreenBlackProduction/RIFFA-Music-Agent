@@ -223,6 +223,7 @@ export function GiftPage() {
   const navigate = useNavigate();
   const rootRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [activeSec, setActiveSec] = useState("");
   const [playing, setPlaying] = useState<number | null>(null);
   const [missing, setMissing] = useState<Set<number>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -288,7 +289,20 @@ export function GiftPage() {
       .catch(() => { setMissing((s) => new Set(s).add(i)); setPlaying(null); });
   }
 
-  const glassBg = scrolled ? "rgba(233,229,218,0.95)" : "rgba(233,229,218,0.85)";
+  // Scrollspy: какая секция сейчас в центральной полосе экрана —
+  // её заголовок подсвечивается фирменным оранжевым.
+  useEffect(() => {
+    if (!("IntersectionObserver" in window)) return;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => { if (e.isIntersecting) setActiveSec((e.target as HTMLElement).id); });
+    }, { rootMargin: "-35% 0px -55% 0px", threshold: 0 });
+    document.querySelectorAll("section[id]").forEach((s) => io.observe(s));
+    return () => io.disconnect();
+  }, []);
+  const h2c = (id: string) => ({ color: activeSec === id ? c.orange : c.ink });
+
+  // Чистый бежевый с явной прозрачностью — стекло читается сразу.
+  const glassBg = scrolled ? "rgba(233,229,218,0.78)" : "rgba(233,229,218,0.6)";
 
   const occasions = [
     { h: "День рождения", p: "Именинник услышит песню, где звучит его имя — такого подарка у него ещё не было", pad: "#F6D8C4" },
@@ -394,7 +408,7 @@ export function GiftPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">01</span> · примеры</div>
-            <h2 style={{ color: c.orange }}>Послушайте, как это звучит.</h2>
+            <h2 style={h2c("examples")}>Послушайте, как это звучит.</h2>
             <div className="right">настоящие поздравительные песни</div>
           </div>
           <div className="adl-ex">
@@ -434,10 +448,10 @@ export function GiftPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">02</span> · поводы</div>
-            <h2 style={{ color: c.orange }}>Для любого случая — свой повод спеть.</h2>
+            <h2 style={h2c("occasions")}>Для любого случая — свой повод спеть.</h2>
             <div className="right">и без повода тоже</div>
           </div>
-          <div className="types-grid" style={{ borderColor: c.rule, gridTemplateColumns: "repeat(3, 1fr)" }}>
+          <div className="types-grid adl-cols-3" style={{ borderColor: c.rule }}>
             {occasions.map((o, i) => (
               <div key={o.h} className="type-card" style={{ borderColor: c.rule, borderBottom: `1px solid ${c.rule}` }}>
                 <div className="type-icon" style={{ height: 72 }}>
@@ -457,7 +471,7 @@ export function GiftPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">03</span> · как заказать</div>
-            <h2 style={{ color: c.orange }}>Три простых шага. Справится каждый.</h2>
+            <h2 style={h2c("how")}>Три простых шага. Справится каждый.</h2>
             <div className="right"></div>
           </div>
           <div className="process-grid">
@@ -479,10 +493,10 @@ export function GiftPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">04</span> · почему песня</div>
-            <h2 style={{ color: c.orange }}>Лучший подарок — тот, что про человека.</h2>
+            <h2 style={h2c("why")}>Лучший подарок — тот, что про человека.</h2>
             <div className="right"></div>
           </div>
-          <div className="types-grid" style={{ borderColor: c.rule, gridTemplateColumns: "repeat(4, 1fr)" }}>
+          <div className="types-grid adl-cols-4" style={{ borderColor: c.rule }}>
             {reasons.map((r) => (
               <div key={r.n} className="type-card" style={{ borderColor: c.rule }}>
                 <div className="type-num">{r.n}</div>
@@ -500,12 +514,12 @@ export function GiftPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">05</span> · вопросы</div>
-            <h2 style={{ color: c.orange }}>Спрашивают чаще всего.</h2>
+            <h2 style={h2c("faq")}>Спрашивают чаще всего.</h2>
             <div className="right"></div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, border: `1px solid ${c.rule}`, borderTop: "none" }}>
+          <div className="adl-faq">
             {faq.map((f, i) => (
-              <div key={i} style={{ padding: "28px 28px 32px", borderRight: i % 2 === 0 ? `1px solid ${c.rule}` : "none", borderBottom: i < 2 ? `1px solid ${c.rule}` : "none" }}>
+              <div key={i} className="adl-faq-cell">
                 <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: c.accent, fontWeight: 600, marginBottom: 10 }}>Q{i + 1}</div>
                 <h3 style={{ fontSize: 17, fontWeight: 600, margin: "0 0 10px" }}>{f.q}</h3>
                 <p style={{ fontSize: 14, lineHeight: 1.55, color: c.ink3, margin: 0 }}>{f.a}</p>
@@ -521,10 +535,10 @@ export function GiftPage() {
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ fontSize: "19px" }}><span className="num">06</span> · цена</div>
-            <h2 style={{ color: c.orange }}>Дешевле букета. Памятнее любого свитера.</h2>
+            <h2 style={h2c("price")}>Дешевле букета. Памятнее любого свитера.</h2>
             <div className="right" style={{ fontSize: "15px" }}>без подписок</div>
           </div>
-          <div className="pricing-grid" style={{ borderColor: c.rule, gridTemplateColumns: "1fr 1fr" }}>
+          <div className="pricing-grid adl-cols-2" style={{ borderColor: c.rule }}>
             <div className="price-card" style={{ borderColor: c.rule, background: c.bg }}>
               <div className="price-tier" style={{ color: c.accent, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", fontSize: "14px" }}>ПОПРОБОВАТЬ</div>
               <div className="price-amount" style={{ fontSize: "40px", color: c.ink }}>Бесплатно</div>
@@ -555,7 +569,7 @@ export function GiftPage() {
       <section className="gp-cf-host" style={{ background: c.ink, color: c.bg }}>
         <ConfettiField variant={0} dark />
         <div className="wrap" style={{ padding: "72px 32px", textAlign: "center" }}>
-          <h2 style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 44, margin: 0, letterSpacing: "-0.02em", color: c.bg }}>
+          <h2 className="adl-cta-h" style={{ fontFamily: "'Archivo Black', sans-serif", margin: 0, letterSpacing: "-0.02em", color: c.bg }}>
             Сделайте подарок, <span style={{ color: "#7BD389" }}>который не забудут.</span>
           </h2>
           <p style={{ fontSize: 16, color: "#C9C4B8", margin: "18px auto 32px", maxWidth: 560 }}>
