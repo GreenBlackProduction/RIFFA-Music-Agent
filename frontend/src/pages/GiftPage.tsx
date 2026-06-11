@@ -170,8 +170,25 @@ function ConfettiField({ variant = 0, dark = false }: { variant?: number; dark?:
   );
 }
 
+/* Варианты «для кого песня» — открытка в hero листает их по кругу,
+   чтобы каждый посетитель узнал свой повод. */
+const CARD_VARIANTS = [
+  { title: "«Для мамы»", meta: "ОТ СЕРЁЖИ · НА ЮБИЛЕЙ · 3:08", l1: "«Твои руки пахнут пирогами,", l2: "твой голос — самый тёплый дом…»" },
+  { title: "«Для папы»", meta: "ОТ ДОЧКИ · НА ДЕНЬ РОЖДЕНИЯ · 2:54", l1: "«Ты научил меня не падать,", l2: "а если падать — то вставать…»" },
+  { title: "«Для любимой»", meta: "ОТ МУЖА · НА ГОДОВЩИНУ · 3:21", l1: "«Десять лет, а сердце так же", l2: "замирает у твоей двери…»" },
+  { title: "«Для дружища»", meta: "ОТ ПАЦАНОВ · НА СОРОК ЛЕТ · 3:05", l1: "«Кто ещё поднимет нас в субботу", l2: "в семь утра на рыбалку…»" },
+  { title: "«Для бабушки»", meta: "ОТ ВНУКОВ · ПРОСТО ТАК · 2:47", l1: "«Твой компот — на вкус как детство,", l2: "как каникулы в июне…»" },
+  { title: "«Для дочки»", meta: "ОТ ПАПЫ · НА ВЫПУСКНОЙ · 3:12", l1: "«Вчера — велосипед и бантики,", l2: "сегодня — взрослая совсем…»" },
+];
+
 /* Схематичная «открытка с песней» — в духе SchematicSVG главного лендинга */
 function GiftCardSVG() {
+  const [vi, setVi] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setVi((v) => (v + 1) % CARD_VARIANTS.length), 4000);
+    return () => clearInterval(t);
+  }, []);
+  const v = CARD_VARIANTS[vi];
   return (
     <div className="schematic-wrap" style={{ border: `1px solid ${c.rule}` }}>
       <svg viewBox="0 0 560 420" xmlns="http://www.w3.org/2000/svg">
@@ -196,8 +213,12 @@ function GiftCardSVG() {
         </g>
         <text x="120" y="92" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink2}>ПЕСНЯ В ПОДАРОК</text>
         <line x1="84" y1="110" x2="476" y2="110" stroke={c.ink} strokeWidth="0.8" />
-        <text x="84" y="148" fontFamily="Inter" fontSize="26" fontWeight="700" fill={c.ink}>«Для мамы»</text>
-        <text x="84" y="172" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink2}>ОТ СЕРЁЖИ · НА ЮБИЛЕЙ · 3:08</text>
+        <g key={vi} className="gp-swap">
+          <text x="84" y="148" fontFamily="Inter" fontSize="26" fontWeight="700" fill={c.ink}>{v.title}</text>
+          <text x="84" y="172" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink2}>{v.meta}</text>
+          <text x="84" y="296" fontFamily="Inter" fontSize="14" fontStyle="italic" fill={c.ink3}>{v.l1}</text>
+          <text x="84" y="318" fontFamily="Inter" fontSize="14" fontStyle="italic" fill={c.ink3}>{v.l2}</text>
+        </g>
         {/* плеер */}
         <rect x="84" y="196" width="392" height="64" rx="12" stroke={c.ink} strokeWidth="0.8" fill="none" />
         <circle className="adl-ring" cx="120" cy="228" r="18" fill="none" stroke={c.accent} strokeWidth="2" />
@@ -217,9 +238,6 @@ function GiftCardSVG() {
           );
         })}
         <text x="460" y="233" fontFamily="JetBrains Mono" fontSize="10" fill={c.ink2} textAnchor="end">1:12</text>
-        {/* строки песни */}
-        <text x="84" y="296" fontFamily="Inter" fontSize="14" fontStyle="italic" fill={c.ink3}>«Твои руки пахнут пирогами,</text>
-        <text x="84" y="318" fontFamily="Inter" fontSize="14" fontStyle="italic" fill={c.ink3}>твой голос — самый тёплый дом…»</text>
         {/* кнопки */}
         <rect x="84" y="336" width="120" height="26" rx="13" fill={c.ink} />
         <text x="144" y="353" fontFamily="JetBrains Mono" fontSize="9" fill={c.bg} textAnchor="middle" fontWeight="600">↓ СКАЧАТЬ</text>
