@@ -16,13 +16,15 @@ import "./AdLanding.css";
 
 const TG_LEAD = "https://t.me/RIFFAsupport_bot"; // куда падают заявки B2B
 
-/* Примеры композиций разных настроений. Файлы кладём в public/sounds/business/
-   (NN.mp3) — пока файла нет, строка показывает бейдж «скоро». */
+/* Примеры композиций под каждую атмосферу — реальные треки владельца
+   (public/sounds/business/NN.mp3). Бар делит файл с кофейней (так прислали). */
 const BIZ_EXAMPLES = [
-  { title: "Кофейня — утро", meta: "лоу-фай · спокойное · 76 BPM", src: "/sounds/business/01.mp3" },
-  { title: "Фитнес — драйв", meta: "электроника · энергичное · 140 BPM", src: "/sounds/business/02.mp3" },
-  { title: "Йога — тишина", meta: "эмбиент · умиротворённое · 60 BPM", src: "/sounds/business/03.mp3" },
-  { title: "Бар — вечер", meta: "грув · уверенное · 105 BPM", src: "/sounds/business/04.mp3" },
+  { title: "Velvet Brew", meta: "кофейня и пекарня · funk", src: "/sounds/business/01.mp3" },
+  { title: "Звон Бамбуковых Ветров", meta: "фитнес и тренажёрка · phonk", src: "/sounds/business/02.mp3" },
+  { title: "Музыка поющих чаш и гонгов", meta: "йога и массаж · ambient", src: "/sounds/business/03.mp3" },
+  { title: "Velvet Brew", meta: "бар и ресторан · funk", src: "/sounds/business/01.mp3" },
+  { title: "Echo Drift", meta: "магазин и шоурум · house", src: "/sounds/business/05.mp3" },
+  { title: "Echoes in Stillness", meta: "таймкафе и коворкинг · trip-hop", src: "/sounds/business/06.mp3" },
 ];
 
 /* paper bg, emerald accent — палитра основного лендинга */
