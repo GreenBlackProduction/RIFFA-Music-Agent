@@ -9,6 +9,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { ScrollToTop } from "@/components/ui/ScrollToTop";
+
 import "./LandingPage.css";
 import "./AdLanding.css";
 
@@ -176,6 +178,18 @@ export function BusinessPage() {
   }, []);
   const h2c = (id: string) => ({ color: activeSec === id ? c.orange : c.ink });
 
+  // Какая ссылка меню соответствует текущей секции (соседние блоки без
+  // собственного пункта приклеены к ближайшему по смыслу).
+  const NAV_MAP: Record<string, string> = {
+    pain: "pain", solution: "pain", venues: "venues",
+    examples: "examples", how: "how", faq: "how", pricing: "pricing",
+  };
+  const NAV_LINKS: Array<[string, string]> = [
+    ["pain", "проблема"], ["venues", "атмосферы"], ["examples", "примеры"],
+    ["how", "как заказать"], ["pricing", "цены"],
+  ];
+  const toTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+
   useEffect(() => {
     document.title = "Фоновая музыка для бизнеса — плейлисты для кофеен, фитнеса, студий | RIFFA";
     document.querySelector('meta[name="description"]')?.setAttribute("content",
@@ -288,16 +302,19 @@ export function BusinessPage() {
       <nav className={`nav${scrolled ? " glass" : ""}`} style={{ background: glassBg, borderColor: c.rule, color: c.ink }}>
         <div className="wrap">
           <div className="nav-inner">
-            <div className="nav-brand">
+            <div className="nav-brand" onClick={toTop} style={{ cursor: "pointer" }} title="К началу страницы">
               <Mark size={22} />
               <span style={{ color: c.ink, fontFamily: "system-ui, sans-serif", fontWeight: 700, fontSize: 22 }}>RIFFA для бизнеса</span>
             </div>
             <div className="nav-links">
-              <a href="#pain" style={{ color: c.ink }} onClick={scrollTo("pain")}>проблема</a>
-              <a href="#venues" style={{ color: c.ink }} onClick={scrollTo("venues")}>атмосферы</a>
-              <a href="#examples" style={{ color: c.ink }} onClick={scrollTo("examples")}>примеры</a>
-              <a href="#how" style={{ color: c.ink }} onClick={scrollTo("how")}>как заказать</a>
-              <a href="#pricing" style={{ color: c.ink }} onClick={scrollTo("pricing")}>цены</a>
+              {NAV_LINKS.map(([id, label]) => {
+                const active = NAV_MAP[activeSec] === id;
+                return (
+                  <a key={id} href={`#${id}`} className={active ? "active" : ""}
+                    style={{ color: active ? c.orange : c.ink, fontWeight: active ? 700 : undefined, transition: "color 0.25s" }}
+                    onClick={scrollTo(id)}>{label}</a>
+                );
+              })}
             </div>
             <button className="nav-cta" style={{ background: c.accent, color: "#E9E5DA", fontSize: "13px" }} onClick={lead}>Заказать плейлист</button>
           </div>
@@ -531,6 +548,8 @@ export function BusinessPage() {
           </button>
         </div>
       </section>
+
+      <ScrollToTop />
 
       {/* FOOTER */}
       <footer className="footer" style={{ background: c.bg, color: c.ink }}>

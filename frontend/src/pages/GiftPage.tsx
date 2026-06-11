@@ -9,6 +9,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { ScrollToTop } from "@/components/ui/ScrollToTop";
+
 import "./LandingPage.css";
 import "./AdLanding.css";
 
@@ -118,6 +120,9 @@ const CF_LAYOUTS: CfPiece[][] = [
     { x: "96.5%", y: "12%", w: 7, h: 7, r: 0, ci: 1, shape: "dot" },
     { x: "95.5%", y: "64%", w: 14, h: 3.5, r: -55, ci: 3, shape: "dash" },
     { x: "55%", y: "5%", w: 10, h: 10, r: 14, ci: 3, shape: "tri" },
+    { x: "25%", y: "3%", w: 6, h: 6, r: 0, ci: 1, shape: "dot" },
+    { x: "78%", y: "94%", w: 13, h: 3, r: 30, ci: 0, shape: "dash" },
+    { x: "4%", y: "42%", w: 9, h: 9, r: -18, ci: 3, shape: "tri" },
   ],
   [
     { x: "2%", y: "30%", w: 11, h: 11, r: -10, ci: 1, shape: "tri" },
@@ -125,6 +130,9 @@ const CF_LAYOUTS: CfPiece[][] = [
     { x: "96%", y: "26%", w: 14, h: 3.5, r: 65, ci: 2, shape: "dash" },
     { x: "97%", y: "78%", w: 8, h: 8, r: 0, ci: 0, shape: "dot" },
     { x: "40%", y: "4%", w: 6, h: 6, r: 0, ci: 3, shape: "dot" },
+    { x: "68%", y: "3%", w: 12, h: 3, r: -45, ci: 1, shape: "dash" },
+    { x: "18%", y: "95%", w: 7, h: 7, r: 0, ci: 2, shape: "dot" },
+    { x: "95%", y: "50%", w: 9, h: 9, r: 22, ci: 3, shape: "tri" },
   ],
   [
     { x: "2.5%", y: "12%", w: 7, h: 7, r: 0, ci: 3, shape: "dot" },
@@ -132,6 +140,9 @@ const CF_LAYOUTS: CfPiece[][] = [
     { x: "96%", y: "18%", w: 10, h: 10, r: 30, ci: 0, shape: "tri" },
     { x: "96.5%", y: "84%", w: 6, h: 6, r: 0, ci: 2, shape: "dot" },
     { x: "70%", y: "6%", w: 13, h: 3, r: -50, ci: 1, shape: "dash" },
+    { x: "30%", y: "95%", w: 8, h: 8, r: 0, ci: 0, shape: "dot" },
+    { x: "12%", y: "4%", w: 14, h: 3.5, r: 55, ci: 2, shape: "dash" },
+    { x: "3%", y: "88%", w: 10, h: 10, r: -25, ci: 1, shape: "tri" },
   ],
 ];
 const CF_COLORS = ["rgb(220,99,40)", "#0F5D47", "#FF3B1F", "#D9A441"];
@@ -301,6 +312,18 @@ export function GiftPage() {
   }, []);
   const h2c = (id: string) => ({ color: activeSec === id ? c.orange : c.ink });
 
+  // Какая ссылка меню соответствует текущей секции (соседние блоки без
+  // собственного пункта приклеены к ближайшему по смыслу).
+  const NAV_MAP: Record<string, string> = {
+    examples: "examples", occasions: "occasions", how: "how",
+    why: "how", faq: "price", price: "price",
+  };
+  const NAV_LINKS: Array<[string, string]> = [
+    ["examples", "примеры"], ["occasions", "поводы"],
+    ["how", "как заказать"], ["price", "цена"],
+  ];
+  const toTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+
   // Чистый бежевый с явной прозрачностью — стекло читается сразу.
   const glassBg = scrolled ? "rgba(233,229,218,0.78)" : "rgba(233,229,218,0.6)";
 
@@ -339,15 +362,19 @@ export function GiftPage() {
       <nav className={`nav${scrolled ? " glass" : ""}`} style={{ background: glassBg, borderColor: c.rule, color: c.ink }}>
         <div className="wrap">
           <div className="nav-inner">
-            <div className="nav-brand">
+            <div className="nav-brand" onClick={toTop} style={{ cursor: "pointer" }} title="К началу страницы">
               <Mark size={22} />
               <span style={{ color: c.ink, fontFamily: "system-ui, sans-serif", fontWeight: 700, fontSize: 22 }}>RIFFA · песня в подарок</span>
             </div>
             <div className="nav-links">
-              <a href="#examples" style={{ color: c.ink }} onClick={scrollTo("examples")}>примеры</a>
-              <a href="#occasions" style={{ color: c.ink }} onClick={scrollTo("occasions")}>поводы</a>
-              <a href="#how" style={{ color: c.ink }} onClick={scrollTo("how")}>как заказать</a>
-              <a href="#price" style={{ color: c.ink }} onClick={scrollTo("price")}>цена</a>
+              {NAV_LINKS.map(([id, label]) => {
+                const active = NAV_MAP[activeSec] === id;
+                return (
+                  <a key={id} href={`#${id}`} className={active ? "active" : ""}
+                    style={{ color: active ? c.orange : c.ink, fontWeight: active ? 700 : undefined, transition: "color 0.25s" }}
+                    onClick={scrollTo(id)}>{label}</a>
+                );
+              })}
             </div>
             <button className="nav-cta" style={{ background: c.accent, color: "#E9E5DA", fontSize: "13px" }} onClick={start}>Создать песню</button>
           </div>
@@ -581,6 +608,8 @@ export function GiftPage() {
           </button>
         </div>
       </section>
+
+      <ScrollToTop />
 
       {/* FOOTER */}
       <footer className="footer" style={{ background: c.bg, color: c.ink }}>
