@@ -6,4 +6,4 @@
   05.mp3 — «Echo Drift Vers3» (магазин/шоурум)    ← gen 11e4c917, track 0 (share OFCSsb0LhP8?v=0)
   06.mp3 — «Echoes in Stillness» (таймкафе)       ← gen 3fc66c1e, track 0 (share 6q8tWhyHABQ?v=0)
 
-04 не существует: строка «бар» переиспользует 01.mp3 (владелец прислал ту же ссылку).
+  04.mp3 — «Вечерний джаз-хоп» (бар/ресторан)   ← gen 4f6deb71, track 0 (share _s2OEHru1x8?v=0)

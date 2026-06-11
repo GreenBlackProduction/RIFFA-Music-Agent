@@ -17,12 +17,12 @@ import "./AdLanding.css";
 const TG_LEAD = "https://t.me/RIFFAsupport_bot"; // куда падают заявки B2B
 
 /* Примеры композиций под каждую атмосферу — реальные треки владельца
-   (public/sounds/business/NN.mp3). Бар делит файл с кофейней (так прислали). */
+   (public/sounds/business/NN.mp3). */
 const BIZ_EXAMPLES = [
   { title: "Velvet Brew", meta: "кофейня и пекарня · funk", src: "/sounds/business/01.mp3" },
   { title: "Звон Бамбуковых Ветров", meta: "фитнес и тренажёрка · phonk", src: "/sounds/business/02.mp3" },
   { title: "Музыка поющих чаш и гонгов", meta: "йога и массаж · ambient", src: "/sounds/business/03.mp3" },
-  { title: "Velvet Brew", meta: "бар и ресторан · funk", src: "/sounds/business/01.mp3" },
+  { title: "Вечерний джаз-хоп", meta: "бар и ресторан · jazz hop", src: "/sounds/business/04.mp3" },
   { title: "Echo Drift", meta: "магазин и шоурум · house", src: "/sounds/business/05.mp3" },
   { title: "Echoes in Stillness", meta: "таймкафе и коворкинг · trip-hop", src: "/sounds/business/06.mp3" },
 ];
