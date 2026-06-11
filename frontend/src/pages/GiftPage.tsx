@@ -14,6 +14,12 @@ import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import "./LandingPage.css";
 import "./AdLanding.css";
 
+/* Цель Яндекс Метрики — счётчик уже подключён в index.html/App.tsx */
+function reachGoal(goal: string) {
+  const w = window as unknown as { ym?: (id: number, action: string, goal: string) => void };
+  if (typeof w.ym === "function") w.ym(109298074, "reachGoal", goal);
+}
+
 /* paper bg, emerald accent — палитра основного лендинга */
 const c = {
   bg: "#E9E5DA", bg2: "#DDD8C9",
@@ -303,7 +309,10 @@ export function GiftPage() {
     e.preventDefault();
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
-  const start = () => navigate("/studio");
+  const start = () => {
+    reachGoal("gift_start_click");
+    navigate("/studio");
+  };
 
   function toggleExample(i: number) {
     if (missing.has(i)) return;
@@ -314,7 +323,7 @@ export function GiftPage() {
     audio.onended = () => setPlaying(null);
     audio.onerror = () => { setMissing((s) => new Set(s).add(i)); setPlaying(null); };
     audio.play()
-      .then(() => setPlaying(i))
+      .then(() => { setPlaying(i); reachGoal("gift_example_play"); })
       .catch(() => { setMissing((s) => new Set(s).add(i)); setPlaying(null); });
   }
 
