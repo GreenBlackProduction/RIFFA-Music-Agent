@@ -18,13 +18,15 @@ const EmailCallbackPage       = lazy(() => import("@/pages/EmailCallbackPage").t
 const TelegramAuthCallbackPage = lazy(() => import("@/pages/TelegramAuthCallbackPage").then((m) => ({ default: m.TelegramAuthCallbackPage })));
 const LibraryPage       = lazy(() => import("@/pages/LibraryPage").then((m) => ({ default: m.LibraryPage })));
 const LandingPage       = lazy(() => import("@/pages/LandingPage").then((m) => ({ default: m.LandingPage })));
+const BusinessPage      = lazy(() => import("@/pages/BusinessPage").then((m) => ({ default: m.BusinessPage })));
+const GiftPage          = lazy(() => import("@/pages/GiftPage").then((m) => ({ default: m.GiftPage })));
 const LoginPage         = lazy(() => import("@/pages/LoginPage").then((m) => ({ default: m.LoginPage })));
 const ProfilePage       = lazy(() => import("@/pages/ProfilePage").then((m) => ({ default: m.ProfilePage })));
 const RadioPage         = lazy(() => import("@/pages/RadioPage").then((m) => ({ default: m.RadioPage })));
 const SharePage         = lazy(() => import("@/pages/SharePage").then((m) => ({ default: m.SharePage })));
 const StudioPage        = lazy(() => import("@/pages/StudioPage").then((m) => ({ default: m.StudioPage })));
 
-const STANDALONE_PATHS = new Set<string>(["/", "/login", "/auth/email-callback", "/tg-auth"]);
+const STANDALONE_PATHS = new Set<string>(["/", "/login", "/auth/email-callback", "/tg-auth", "/business", "/gift"]);
 
 // Per-route <title> + meta so each page ranks for its own query (the SPA shipped
 // one static title for everything). Googlebot/Yandex render JS and pick these up.
@@ -160,6 +162,8 @@ export default function App() {
       <Suspense>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/business" element={<BusinessPage />} />
+          <Route path="/gift" element={<GiftPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth/email-callback" element={<EmailCallbackPage />} />
           <Route path="/tg-auth" element={<TelegramAuthCallbackPage />} />
