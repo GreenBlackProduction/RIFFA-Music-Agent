@@ -14,6 +14,12 @@ import { ScrollToTop } from "@/components/ui/ScrollToTop";
 import "./LandingPage.css";
 import "./AdLanding.css";
 
+/* Цель Яндекс Метрики — счётчик уже подключён в index.html/App.tsx */
+function reachGoal(goal: string) {
+  const w = window as unknown as { ym?: (id: number, action: string, goal: string) => void };
+  if (typeof w.ym === "function") w.ym(109298074, "reachGoal", goal);
+}
+
 const TG_LEAD = "https://t.me/RIFFAsupport_bot"; // куда падают заявки B2B
 
 /* Примеры композиций под каждую атмосферу — реальные треки владельца
@@ -238,7 +244,10 @@ export function BusinessPage() {
     e.preventDefault();
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
-  const lead = () => window.open(TG_LEAD, "_blank", "noopener");
+  const lead = () => {
+    reachGoal("business_lead_click");
+    window.open(TG_LEAD, "_blank", "noopener");
+  };
 
   function toggleExample(i: number) {
     if (missing.has(i)) return;
@@ -249,7 +258,7 @@ export function BusinessPage() {
     audio.onended = () => setPlaying(null);
     audio.onerror = () => { setMissing((s) => new Set(s).add(i)); setPlaying(null); };
     audio.play()
-      .then(() => setPlaying(i))
+      .then(() => { setPlaying(i); reachGoal("business_example_play"); })
       .catch(() => { setMissing((s) => new Set(s).add(i)); setPlaying(null); });
   }
 
