@@ -24,10 +24,10 @@ const c = {
 /* Примеры поздравительных песен. Файлы кладём в public/sounds/gift/
    (NN.mp3) — пока файла нет, строка показывает бейдж «скоро». */
 const GIFT_EXAMPLES = [
-  { title: "С юбилеем, мама", meta: "юбилей · для мамы", src: "/sounds/gift/01.mp3" },
-  { title: "С днём рождения, дружище", meta: "день рождения · другу", src: "/sounds/gift/02.mp3" },
-  { title: "Десять лет вместе", meta: "годовщина · жене", src: "/sounds/gift/03.mp3" },
-  { title: "Просто потому что люблю", meta: "без повода", src: "/sounds/gift/04.mp3" },
+  { title: "Тепло Сердца", meta: "для мамы", src: "/sounds/gift/01.mp3" },
+  { title: "С днём рождения, Сёма", meta: "день рождения", src: "/sounds/gift/02.mp3" },
+  { title: "Velvet Serenade", meta: "годовщина · жене", src: "/sounds/gift/03.mp3" },
+  { title: "Rise and Roar", meta: "мотивация · на сложный день", src: "/sounds/gift/04.mp3" },
 ];
 
 function Mark({ size = 22 }: { size?: number }) {
