@@ -43,13 +43,19 @@ def strip_artist_references(text: str) -> str:
 
 
 def resolve_artist(user: User, override: str = "") -> str:
-    """Pick the artist label shown on the user's tracks."""
+    """Pick the artist label shown on the user's tracks.
+
+    Priority MUST match ``tracks.py::_resolve_artist`` (display_name first):
+    the user's chosen display_name is the nick shown everywhere («Zelēnkin»),
+    not the raw telegram handle («Sergey_Zelenkin»). Mismatched order here made
+    new tracks diverge from the whole history.
+    """
     if override and override.strip():
         return override.strip()[:60]
-    if user.telegram_username:
-        return user.telegram_username[:60]
     if user.display_name and user.display_name != "RIFFA user":
         return user.display_name[:60]
+    if user.telegram_username:
+        return user.telegram_username[:60]
     if user.email:
         return user.email.split("@", 1)[0][:60]
     return "RIFFA"
