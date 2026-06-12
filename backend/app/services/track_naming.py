@@ -56,7 +56,7 @@ def resolve_artist(user: User, override: str = "") -> str:
 
 
 def compose_track_title(artist: str, short_title: str, max_len: int = 80) -> str:
-    """Format `{artist} — {short_title}` honouring the Suno 80-char title cap.
+    """Format `{artist} - {short_title}` honouring the Suno 80-char title cap.
 
     Trims the short title first so the artist remains intact. Falls back to the
     short title alone if artist is missing or the result still doesn't fit.
@@ -67,13 +67,13 @@ def compose_track_title(artist: str, short_title: str, max_len: int = 80) -> str
         return short_title[:max_len]
     if not short_title:
         return artist[:max_len]
-    full = f"{artist} — {short_title}"
+    full = f"{artist} - {short_title}"
     if len(full) <= max_len:
         return full
     # Try shrinking the short_title (preserve artist).
-    budget = max_len - len(artist) - 3  # 3 chars for " — "
+    budget = max_len - len(artist) - 3  # 3 chars for " - "
     if budget >= 8:
-        return f"{artist} — {short_title[:budget].rstrip(' .,;:-—')}"
+        return f"{artist} - {short_title[:budget].rstrip(' .,;:-—')}"
     # Artist alone is already too long — last resort, truncate the artist.
     return full[:max_len]
 

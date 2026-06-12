@@ -835,7 +835,7 @@ async def generate_similar(
         "similar_source_generation_id": generation_id,
     }
 
-    # Build canonical title for the new owner: "CurrentUser - Track Name (RIFFAMusic)".
+    # Build canonical title for the new owner: "CurrentUser - Track Name".
     # Never carry over the source's artist name or prefix-stack "Похожий — Похожий".
     artist = _resolve_artist(user)
     src_short = _extract_short_title(src.title or "трек")

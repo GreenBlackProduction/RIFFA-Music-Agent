@@ -24,7 +24,7 @@ from app.services.lyrics import make_lyrics_client
 from app.services.nanobanana import NanoBananaError, make_nanobanana_client
 from app.services.notifications import notify_generation_done
 from app.services.prompt_engineering import SongParams, build_suno_style, vocal_gender
-from app.services.track_naming import resolve_artist, compose_track_title
+from app.services.track_naming import compose_track_title, resolve_artist, strip_artist_references
 from app.services.suno import SunoError, SunoPending, make_suno_client
 from app.services.mirror import mirror_generation_result
 from app.services.wallet import InsufficientBalance, credit_tokens, deduct_tokens
@@ -338,7 +338,9 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
 
             if not gen.title:
                 short_title = await lyrics_client.generate_title(description_for_lyrics)
-                gen.title = short_title.strip()
+                gen.title = compose_track_title(
+                    track_artist, strip_artist_references(short_title.strip())
+                )
 
             # Agent-provided structured params override form fields
             agent_mp = params.get("agent_music_params") or {}
@@ -444,7 +446,9 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             )
             if not gen.title:
                 short_title = (params.get("description", "") or "Instrumental")[:60]
-                gen.title = short_title.strip()
+                gen.title = compose_track_title(
+                    track_artist, strip_artist_references(short_title.strip())
+                )
             title = gen.title
 
             await _publish(ctx, gen_id, {"status": "processing", "step": "enriching_music"})
@@ -750,7 +754,9 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
 
             if not gen.title:
                 short_title = await lyrics_client.generate_title(description)
-                gen.title = short_title.strip()
+                gen.title = compose_track_title(
+                    track_artist, strip_artist_references(short_title.strip())
+                )
 
             agent_mp = params.get("agent_music_params") or {}
             agent_research = params.get("agent_research_notes", "")

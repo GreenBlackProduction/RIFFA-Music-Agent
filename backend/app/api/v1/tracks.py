@@ -78,20 +78,25 @@ def _shorten_idea(idea: str, max_chars: int = 50) -> str:
     return head.strip(" .,;:-—\"'")
 
 
-def format_track_name(artist: str, short_title: str) -> str:
-    """Compose the canonical name: ``Artist - Title (RIFFAMusic)``."""
+def format_track_name(artist: str, short_title: str, *, with_suffix: bool = False) -> str:
+    """Compose the canonical name: ``Artist - Title``.
+
+    ``with_suffix=True`` appends ``(RIFFAMusic)`` — per the owner's rule the
+    suffix exists ONLY in downloaded files, never in stored/displayed titles.
+    """
     artist = artist.strip()
     short_title = short_title.strip()
     base = f"{artist} - {short_title}".strip(" -")
-    full = f"{base} {_RIFFA_SUFFIX}".strip()
+    full = f"{base} {_RIFFA_SUFFIX}".strip() if with_suffix else base
     # Suno V5.5 `title` cap is 80 chars. Trim the title slice (preserve artist).
     if len(full) <= 80:
         return full
     overflow = len(full) - 80
     if overflow < len(short_title) - 5:
         short_title = short_title[: len(short_title) - overflow - 1].rstrip(" .,;:-—") + "…"
-        return f"{artist} - {short_title} {_RIFFA_SUFFIX}"
-    # Last resort: drop the suffix.
+        tail = f" {_RIFFA_SUFFIX}" if with_suffix else ""
+        return f"{artist} - {short_title}{tail}"
+    # Last resort: plain truncation without the suffix.
     return f"{artist} - {_shorten_idea(short_title, 40)}"[:80]
 
 
@@ -137,11 +142,31 @@ async def auto_title(
 
 
 def _safe_filename(name: str, ext: str) -> str:
-    """Sanitize the filename so the browser ``Content-Disposition`` works on every OS."""
-    cleaned = unicodedata.normalize("NFKD", name)
-    cleaned = re.sub(r"[\\/:*?\"<>|\r\n\t]", "_", cleaned).strip()
+    """Sanitize the filename so the browser ``Content-Disposition`` works on every OS.
+
+    Keeps Unicode (Cyrillic etc.) intact — the actual latin-1 safety is handled
+    by :func:`_content_disposition` via the RFC 5987 ``filename*`` form.
+    """
+    cleaned = re.sub(r"[\\/:*?\"<>|\r\n\t]", "_", name).strip()
     cleaned = cleaned[:120] or "track"
     return f"{cleaned}.{ext}"
+
+
+def _content_disposition(filename: str) -> str:
+    """Build an attachment Content-Disposition safe for non-latin filenames.
+
+    HTTP headers are latin-1 only, so a Cyrillic filename crashes Starlette.
+    We send an ASCII fallback (``filename=``) plus the RFC 5987 UTF-8 form
+    (``filename*=``) that all modern browsers prefer.
+    """
+    from urllib.parse import quote
+
+    ascii_fallback = unicodedata.normalize("NFKD", filename)
+    ascii_fallback = "".join(c for c in ascii_fallback if unicodedata.category(c) != "Mn")
+    ascii_fallback = ascii_fallback.encode("ascii", "ignore").decode("ascii").strip()
+    ascii_fallback = re.sub(r'[\\/:*?"<>|]', "_", ascii_fallback) or "track.mp3"
+    quoted = quote(filename, safe="")
+    return f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quoted}"
 
 
 def _embed_id3(
@@ -267,11 +292,12 @@ async def download_track(
     # (V1 / V2). The "Vers N" (similar) / "Cover V N" markers already live in
     # gen.title; this V{n} is the within-generation variant.
     variant = f" V{track_index + 1}" if len(raw_tracks) > 1 else ""
-    if _RIFFA_SUFFIX in short_title:
-        base = short_title.replace(_RIFFA_SUFFIX, "").strip()
-        track_name = f"{base}{variant} {_RIFFA_SUFFIX}".strip()
-    else:
-        track_name = format_track_name(artist, f"{short_title}{variant}")
+    # Stored titles are clean («Ник - Название», no suffix). The (RIFFAMusic)
+    # mark is added HERE only — in the downloaded file's name and tags.
+    base = short_title.replace(_RIFFA_SUFFIX, "").strip(" -")
+    if not base.lower().startswith(artist.lower()):
+        base = f"{artist} - {base}".strip(" -")
+    track_name = f"{base}{variant} {_RIFFA_SUFFIX}".strip()
 
     cover_url = track.get("image_url")
 
@@ -318,7 +344,7 @@ async def download_track(
         content=tagged,
         media_type="audio/mpeg",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": _content_disposition(filename),
             "Cache-Control": "private, no-cache",
         },
     )

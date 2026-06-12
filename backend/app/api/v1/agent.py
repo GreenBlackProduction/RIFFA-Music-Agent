@@ -1237,65 +1237,33 @@ def _detect_reply_language(messages: list[ChatMessage]) -> str:
     return "English" if lat > cyr else "Russian"
 
 
-# Markers that signal the user is *committing* to a real music brief
-# (named a genre, asked for a specific module, used an imperative verb,
-# or asked for lyrics/words). When any of these is in the latest user
-# message we use the full gpt-4o — gpt-4o-mini degrades quickly under
-# the combined load of MODULE ROUTER + MUSIC_PARAMS validation +
-# LYRICS DRAFTING. Pure chit-chat ("привет", "что ты умеешь?", "ок") is
-# routed to gpt-4o-mini instead (3-5× cheaper, 2× faster).
-_COMMIT_MARKERS = (
-    # RU imperative verbs of intent
-    "сделай", "сделать", "напиши", "собери", "сгенерируй",
-    "запусти", "запускай", "поехали", "погнали", "го",
-    # EN imperative verbs of intent
-    "make ", "generate", "create", "launch", "let's go", "go ahead",
-    "do it", "build",
-    # EN genres / scene words
-    "lo-fi", "lofi", "techno", "house", "trance", "rock", "pop", "jazz",
-    "hip-hop", "hip hop", "rap", "ambient", "metal", "punk", "country",
-    "blues", "reggae", "ska", "funk", "soul", "r&b", "indie", "synthwave",
-    "shoegaze", "post-rock", "dnb", "drum and bass", "garage", "phonk",
-    "hyperpop", "vaporwave", "dubstep", "drill", "trap", "edm",
-    # RU genres
-    "рок", "поп", "рэп", "техно", "хаус", "джаз", "электроника",
-    "акустика", "классика", "метал", "панк", "блюз", "фанк", "регги",
-    # Module words
-    "инструментал", "instrumental", "песня", "song", "трек", "track",
-    "звуковой эффект", "sound effect", "sfx", "обложка", "cover art",
-    "кавер", "cover",
-    # Lyrics / text intent
-    "слова", "текст", "лирик", "lyrics", "стих", "куплет", "припев",
-    "verse", "chorus",
-    # Length / direction
-    "минут", "minute", "bpm", "темп", "tempo", "вокал", "vocal",
+_SMALLTALK_MARKERS = (
+    "привет", "здравств", "добрый день", "добрый вечер", "доброе утро",
+    "хай", "hi", "hello", "hey", "что ты умеешь", "как дела",
+    "спасибо", "благодар", "thanks", "thank you",
 )
 
 
 def _pick_model(messages: list[ChatMessage]) -> str:
-    """Route between gpt-4o (full quality) and gpt-4o-mini (cheap, fast).
+    """Quality-first routing: gpt-4o for every brief-shaping turn.
 
-    Heuristic: the full model handles every turn that's actually shaping a
-    music brief (commit markers present, OR conversation deep enough that
-    we're past the get-to-know stage). Pure chit-chat — short replies, no
-    commit markers, no prior brief — gets mini. The decision flips back to
-    the full model the moment the user names a genre / module / verb of
-    intent, so we never accidentally finalize with mini.
+    gpt-4o-mini is allowed ONLY for unmistakable small talk (greetings,
+    thanks). The previous marker-list heuristic sent any turn without a
+    genre/verb keyword to mini — so "Романтичная баллада" or a first message
+    like "хочу что-то для мамы" got the cheap model, which visibly swallows
+    the "понял задачу" acknowledgement and asks fewer questions (owner
+    complaint 2026-06-12: the agent must always respond like an attentive
+    human). The 3-5x cost difference is not worth the first impression.
     """
     if not messages:
         return "gpt-4o-mini"
     last_user = next((m for m in reversed(messages) if m.role == "user"), None)
     if last_user is None:
         return "gpt-4o-mini"
-    blob = last_user.content.lower()
-    if any(marker in blob for marker in _COMMIT_MARKERS):
-        return "gpt-4o"
-    # If the conversation already has substantive context (>=4 turns of
-    # back-and-forth, or any prior agent message containing structured
-    # brief language), stay on the full model for continuity.
-    if len(messages) >= 4:
-        return "gpt-4o"
-    return "gpt-4o-mini"
+    blob = last_user.content.lower().strip()
+    if len(blob) <= 30 and any(marker in blob for marker in _SMALLTALK_MARKERS):
+        return "gpt-4o-mini"
+    return "gpt-4o"
 
 
 async def _build_user_stats(session: AsyncSession, user: User) -> str:
