@@ -383,7 +383,6 @@ export function LandingPage() {
                 <div className="type-icon">{typeIcon(i, c.ink)}</div>
                 <h3 style={{ color: c.ink }}>{tp.name}</h3>
                 <p style={{ color: c.ink }}>{tp.sub}</p>
-                <div className="type-meta" style={{ borderColor: c.rule, color: "#0F5D47", fontWeight: 800, fontSize: 12, opacity: 1, height: "45px", letterSpacing: "0.8px" }}>без копирайта</div>
               </div>
             ))}
           </div>
@@ -748,9 +747,9 @@ function TrackCardSVG() {
         {actionBtn(395, 142, 113, "4", "↑ радио",      "accent")}
 
         {/* Row 2 — 3 buttons at y=182, h=32, gap=10 */}
-        {actionBtn(32,  182, 152, "5", "👍 / 👎 оценить",    "default")}
-        {actionBtn(194, 182, 152, "6", "✏️ переименовать",    "hi")}
-        {actionBtn(356, 182, 152, "7", "🔗 поделиться",       "hi")}
+        {actionBtn(32,  182, 152, "5", "♥ / ✕ оценить",     "default")}
+        {actionBtn(194, 182, 152, "6", "✎ переименовать",     "hi")}
+        {actionBtn(356, 182, 152, "7", "↗ поделиться",        "hi")}
 
         {/* ── Info strip (y 226–280) ── */}
         <line x1="20" y1="226" x2="520" y2="226" stroke={rule} strokeWidth="0.8" />
@@ -759,14 +758,14 @@ function TrackCardSVG() {
         <circle cx="78" cy="238" r="3.5" fill={emr} />
         <text x="86" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={emr} fontWeight="600">ГОТОВО</text>
 
-        <text x="158" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">ЖАНР</text>
-        <text x="192" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>ПОП</text>
+        <text x="170" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">ЖАНР</text>
+        <text x="204" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>ПОП</text>
 
-        <text x="248" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">НАСТР.</text>
-        <text x="287" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>МЕЛАНХОЛИЯ</text>
+        <text x="262" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">НАСТР.</text>
+        <text x="302" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>МЕЛАНХОЛИЯ</text>
 
-        <text x="392" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">BPM</text>
-        <text x="416" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>84</text>
+        <text x="428" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">BPM</text>
+        <text x="452" y="241" fontFamily="JetBrains Mono" fontSize="8" fill={ink}>84</text>
 
         {/* Tags row */}
         <rect x="28" y="250" width="36" height="16" rx="8" fill="transparent" stroke={emr} strokeWidth="0.8" />
