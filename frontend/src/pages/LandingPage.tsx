@@ -15,6 +15,8 @@ import "./LandingPage.css";
 
 const EDIT_MODE = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("edit") === "1";
 const BOT = "https://t.me/the_riffa_bot";
+// localStorage key for the landing radio chart — persists last non-empty chart.
+const LANDING_CHART_KEY = "riffa_landing_chart_v1";
 
 /* ═══════════ TWEAK DEFAULTS (frozen from the fresh mockup) ═══════════ */
 const t = {
@@ -34,7 +36,7 @@ const t = {
   p2feat: ["5 ген. песен / инстр. / каверов (10 треков)", "20 ген. звуковых эффектов", "до 10 ген. обложек"],
   p3name: "ПРОДВИНУТЫЙ", p3price: "400₽", p3tokens: "60 токенов\n~30 генераций",
   p3feat: ["30 ген. песен / инстр. / каверов (60 треков)", "120 ген. звуковых эффектов", "до 60 ген. обложек"],
-  p4name: "ПРЕМИУМ", p4price: "999₽", p4tokens: "150 · ~75 генераций",
+  p4name: "ПРЕМИУМ", p4price: "999₽", p4tokens: "150 токенов\n~75 генераций",
   p4feat: ["75 ген. песен / инстр. / каверов (150 треков)", "300 ген. звуковых эффектов", "до 150 ген. обложек"],
 };
 
@@ -150,16 +152,33 @@ export function LandingPage() {
   const [showTop, setShowTop] = useState(false);
   const [activeTrack, setActiveTrack] = useState<number | null>(null);
   const [hoverTrack, setHoverTrack] = useState<number | null>(null);
-  const [realRadioTracks, setRealRadioTracks] = useState<RadioTrackOut[]>([]);
+  // Landing chart persists the last non-empty radio chart in localStorage so
+  // it never falls back to demo tracks once real ones have ever loaded — even
+  // if the radio is briefly empty or the request fails. Landing-only.
+  const [realRadioTracks, setRealRadioTracks] = useState<RadioTrackOut[]>(() => {
+    try {
+      const cached = localStorage.getItem(LANDING_CHART_KEY);
+      const parsed = cached ? JSON.parse(cached) : null;
+      return Array.isArray(parsed) && parsed.length > 0 ? parsed : [];
+    } catch { return []; }
+  });
   const radioAudioRef = useRef<HTMLAudioElement | null>(null);
   const [typedPrompt, setTypedPrompt] = useState(TYPE_PROMPTS[0]);
   const [submitPulse, setSubmitPulse] = useState(false);
 
-  // Fetch real radio tracks for the landing chart
+  // Fetch real radio tracks for the landing chart. All-time chart (not just
+  // the past week) so the list isn't empty after a quiet week. Only a
+  // NON-EMPTY result replaces the current chart and is cached — an empty
+  // response or error keeps whatever real tracks are already shown.
   useEffect(() => {
     let alive = true;
-    fetchRadio({ sort: "plays", period: "week", limit: 6 })
-      .then((r) => { if (alive && r.items.length > 0) setRealRadioTracks(r.items); })
+    fetchRadio({ sort: "plays", period: "all", limit: 6 })
+      .then((r) => {
+        if (alive && r.items.length > 0) {
+          setRealRadioTracks(r.items);
+          try { localStorage.setItem(LANDING_CHART_KEY, JSON.stringify(r.items)); } catch { /* quota/private mode — non-fatal */ }
+        }
+      })
       .catch(() => {});
     return () => { alive = false; };
   }, []);
@@ -395,7 +414,7 @@ export function LandingPage() {
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
             <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">02</span> · агент</div>
             <h2 style={{ color: "rgb(220, 99, 40)" }}>Умный ИИ агент собирает промт на лету.</h2>
-            <div className="right" style={{ fontSize: "15px" }}>@the_riffa_bot</div>
+            <div className="right" style={{ fontSize: "15px" }}></div>
           </div>
           <div className="agent-grid">
             <div className="agent-left" style={{ borderColor: c.rule }}>
@@ -711,26 +730,28 @@ function TrackCardSVG() {
         <text x="90" y="66" fontFamily="Inter" fontSize="13" fontWeight="600" fill={ink}>Закат над городом</text>
         <text x="90" y="82" fontFamily="JetBrains Mono" fontSize="8" fill={ink} opacity="0.82">ПОП · МЕЛАНХОЛИЯ · 84 BPM</text>
 
-        {/* Duration */}
-        <text x="448" y="67" fontFamily="JetBrains Mono" fontSize="9" fill={ink} opacity="0.82" textAnchor="end">3:24</text>
-
-        {/* Waveform */}
+        {/* Right cluster — all centred on the row mid-line y=71, clear gaps:
+            waveform 318–393 · duration ~400–423 · play 433–461 · bolt 477–503 */}
+        {/* Waveform (15 bars, step 5, centred vertically on y=71) */}
         {wH.map((h, i) => (
-          <rect key={i} x={330 + i * 5.5} y={62 + (14 - h) / 2} width="3.5" height={h} rx="1.5"
+          <rect key={i} x={318 + i * 5} y={71 - h / 2} width="3" height={h} rx="1.5"
             fill={ink} opacity={i < 13 ? 0.55 : 0.18} />
         ))}
 
+        {/* Duration */}
+        <text x="423" y="74" fontFamily="JetBrains Mono" fontSize="9" fill={ink} opacity="0.82" textAnchor="end">3:24</text>
+
         {/* Play circle */}
-        <circle cx="462" cy="71" r="15" fill="transparent" stroke={ink} strokeWidth="0.8" />
-        <polygon points="457,65 457,77 469,71" fill={ink} />
+        <circle cx="447" cy="71" r="14" fill="transparent" stroke={ink} strokeWidth="0.8" />
+        <polygon points="442,65 442,77 454,71" fill={ink} />
 
         {/* Bolt button — highlighted */}
-        <rect x="484" y="59" width="26" height="24" rx="12" fill="rgba(255,59,31,0.10)" stroke={hi} strokeWidth="1.2" />
-        <text x="497" y="75" fontFamily="Inter" fontSize="13" fill={hi} textAnchor="middle">⚡</text>
+        <rect x="477" y="58" width="26" height="26" rx="13" fill="rgba(255,59,31,0.10)" stroke={hi} strokeWidth="1.2" />
+        <text x="490" y="75" fontFamily="Inter" fontSize="13" fill={hi} textAnchor="middle">⚡</text>
 
         {/* Dashed arrow from bolt to menu */}
-        <line x1="497" y1="84" x2="497" y2="112" stroke={hi} strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
-        <polygon points="493,110 497,117 501,110" fill={hi} opacity="0.5" />
+        <line x1="490" y1="86" x2="490" y2="112" stroke={hi} strokeWidth="1" strokeDasharray="3 3" opacity="0.5" />
+        <polygon points="486,110 490,117 494,110" fill={hi} opacity="0.5" />
 
         {/* ── Bolt menu panel (y 116–218) ── */}
         <rect x="20" y="116" width="500" height="100" rx="7" fill="transparent" stroke={rule} strokeWidth="0.8" />
