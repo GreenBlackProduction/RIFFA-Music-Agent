@@ -1896,34 +1896,40 @@ export function StudioPage() {
               </div>
             )}
 
-            <div
-              className={`builder-step${songParamsLocked ? " builder-step--locked" : ""}`}
-              aria-disabled={songParamsLocked}
-            >
-              <strong>{t("studio.song.step2Label")}</strong>
-              <span className="muted">{t("studio.song.step2Desc")}</span>
-              {renderChipRow(uiVocalTypes, "vocal")}
-              {songParamsLocked && (
-                <span className="lock-hint">{t("studio.song.lockHint")}</span>
-              )}
-            </div>
+            {/* Тип вокала + Тембр имеют смысл только когда в треке есть вокал.
+               При «без текста» (lyricsMode === instrumental) — скрываем. */}
+            {state.lyricsMode !== "instrumental" && (
+              <>
+                <div
+                  className={`builder-step${songParamsLocked ? " builder-step--locked" : ""}`}
+                  aria-disabled={songParamsLocked}
+                >
+                  <strong>{t("studio.song.step2Label")}</strong>
+                  <span className="muted">{t("studio.song.step2Desc")}</span>
+                  {renderChipRow(uiVocalTypes, "vocal")}
+                  {songParamsLocked && (
+                    <span className="lock-hint">{t("studio.song.lockHint")}</span>
+                  )}
+                </div>
 
-            <div
-              className={`builder-step${songParamsLocked ? " builder-step--locked" : ""}`}
-              aria-disabled={songParamsLocked}
-            >
-              <strong>{t("studio.song.step3Label")}</strong>
-              <span className="muted">{t("studio.song.step3Desc")}</span>
-              {renderChipRow(uiTimbres, "timbre", true)}
-              {state.timbre === "custom" && (
-                <input
-                  className="inline-input"
-                  placeholder="Например: sultry whisper, powerful belt, raspy rock"
-                  value={state.customTimbre}
-                  onChange={(e) => update("customTimbre", e.target.value)}
-                />
-              )}
-            </div>
+                <div
+                  className={`builder-step${songParamsLocked ? " builder-step--locked" : ""}`}
+                  aria-disabled={songParamsLocked}
+                >
+                  <strong>{t("studio.song.step3Label")}</strong>
+                  <span className="muted">{t("studio.song.step3Desc")}</span>
+                  {renderChipRow(uiTimbres, "timbre", true)}
+                  {state.timbre === "custom" && (
+                    <input
+                      className="inline-input"
+                      placeholder="Например: sultry whisper, powerful belt, raspy rock"
+                      value={state.customTimbre}
+                      onChange={(e) => update("customTimbre", e.target.value)}
+                    />
+                  )}
+                </div>
+              </>
+            )}
           </div>
         )}
 
