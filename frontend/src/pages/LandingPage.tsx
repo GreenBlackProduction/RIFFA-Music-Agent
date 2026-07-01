@@ -265,7 +265,16 @@ export function LandingPage() {
     });
     root.querySelectorAll<HTMLElement>(".agent-left").forEach((el) => { el.classList.add("reveal-left"); io.observe(el); });
     root.querySelectorAll<HTMLElement>(".agent-right").forEach((el) => { el.classList.add("reveal-right"); io.observe(el); });
-    return () => io.disconnect();
+    // Safety net: content must never stay invisible. If the observer hasn't
+    // revealed an element within 2.5s (fast scroll, flaky IO, tab restore),
+    // force it visible so no marketing section can render blank.
+    const failSafe = setTimeout(() => {
+      root.querySelectorAll<HTMLElement>(".reveal, .reveal-left, .reveal-right").forEach((el) => {
+        if (!el.classList.contains("visible")) el.classList.add("visible");
+      });
+      io.disconnect();
+    }, 2500);
+    return () => { clearTimeout(failSafe); io.disconnect(); };
   }, []);
 
   if (!isLoading && user && !EDIT_MODE) return <Navigate to="/studio" replace />;
@@ -444,7 +453,7 @@ export function LandingPage() {
       <section id="process" className="process-section" data-edit="process" style={{ background: c.bg, color: c.ink, borderColor: c.rule }}>
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">02</span> · как работает</div>
+            <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">03</span> · как работает</div>
             <h2 style={{ color: "rgb(220, 99, 40)" }}>Всего три шага до твоего первого трека, около 2–4 минут.</h2>
             <div className="right"></div>
           </div>
@@ -534,7 +543,7 @@ export function LandingPage() {
       <section id="pricing" className="pricing-section" data-edit="pricing" style={{ background: c.bg, color: c.ink, borderColor: "rgba(255,255,255,0.18)" }}>
         <div className="wrap">
           <div className="section-head" style={{ borderColor: c.rule, color: c.ink }}>
-            <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">03</span> · тарифы</div>
+            <div className="section-tag" style={{ color: c.ink, fontSize: "19px" }}><span className="num">06</span> · тарифы</div>
             <h2 style={{ maxWidth: "769px", color: "rgb(220, 99, 40)" }}>Прозрачная цена — оплата картой РФ/СНГ, USD, Telegram Stars.</h2>
             <div className="right" style={{ fontSize: "15px", lineHeight: "1.3" }}>токены без срока</div>
           </div>
