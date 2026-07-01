@@ -377,7 +377,7 @@ export function LandingPage() {
           <div className="hero-split">
             <div>
               <h1 className="hero-headline" data-edit="hero-title" style={{ color: "rgb(209, 98, 42)", fontSize: "95px", whiteSpace: "pre-line" }}>
-                Создай <span style={{ color: "#232323" }}>свой</span> <span style={{ fontSize: "107px", color: "rgb(15, 93, 71)" }}>Аудиохит!</span>
+                Создай <span style={{ color: "#232323" }}>свой</span> <span style={{ fontSize: "107px", color: "rgb(15, 93, 71)", wordBreak: "keep-all" }}>Аудио<wbr/>хит!</span>
               </h1>
               <div className="hero-actions" style={{ marginTop: "36px" }}>
                 <button className="btn-primary" style={{ background: c.accent, color: "#E9E5DA", height: 52, padding: "0 32px", fontSize: "13px", letterSpacing: "1.5px" }} onClick={go("/studio")}>{t.ctaMain}</button>
