@@ -1,6 +1,5 @@
 """Generation endpoints — queues Arq tasks and returns generation_id + ws_url."""
 
-import random
 import re as _re_naming
 import secrets
 import uuid
@@ -706,51 +705,6 @@ async def _next_version(
     return int(existing or 0) + start
 
 
-def _remix_agent_params(agent_mp: dict[str, Any]) -> dict[str, Any]:
-    """Light remix: keep genre+mood, shuffle techniques/instruments, jitter BPM ±10 %.
-
-    The point is to produce a track that's recognisably the same family as the
-    source but not a clone — different drum pattern, different lead sound,
-    nudged tempo. We intentionally don't touch genre or mood: those are the
-    user's "I want more like this" signal.
-    """
-    if not isinstance(agent_mp, dict):
-        return {}
-
-    remixed = dict(agent_mp)
-
-    # Shuffle techniques: keep up to 3 from source.
-    techniques = remixed.get("techniques")
-    if isinstance(techniques, list) and len(techniques) > 1:
-        sample_size = min(3, max(1, len(techniques) - 1))
-        remixed["techniques"] = random.sample(techniques, sample_size)
-
-    # Shuffle key_instruments: keep up to 5, drop 1-2 randomly.
-    key_instruments = remixed.get("key_instruments")
-    if isinstance(key_instruments, list) and len(key_instruments) > 2:
-        sample_size = max(2, len(key_instruments) - random.randint(1, 2))
-        remixed["key_instruments"] = random.sample(key_instruments, sample_size)
-
-    # BPM jitter: extract the first integer from "112 BPM" / "70-80 BPM" and
-    # shift it ±10 %, then write back as "<bpm> BPM".
-    bpm_str = str(remixed.get("suggested_bpm") or "").strip()
-    if bpm_str:
-        import re
-        match = re.search(r"\d+", bpm_str)
-        if match:
-            base = int(match.group())
-            shift = random.uniform(-0.10, 0.10)
-            new_bpm = max(40, int(round(base * (1 + shift))))
-            remixed["suggested_bpm"] = f"{new_bpm} BPM"
-
-    # Drop subgenre about half the time — forces the prompt engineer to pick
-    # a fresh angle within the parent genre.
-    if "subgenre" in remixed and random.random() < 0.5:
-        remixed.pop("subgenre", None)
-
-    return remixed
-
-
 @router.post(
     "/similar/{generation_id}",
     response_model=GenerateResponse,
@@ -764,11 +718,15 @@ async def generate_similar(
     session: AsyncSession = Depends(db_session),
     settings: Settings = Depends(get_settings),
 ) -> GenerateResponse:
-    """Launch a fresh song/instrumental musically similar to ``generation_id``.
+    """Launch a fresh song/instrumental in the direction of ``generation_id``.
 
-    The source must be a published (Radio) track so we don't leak private
-    libraries. Cost equals a regular song/instrumental. The new generation
-    lands in *the caller's* library — not the original author's.
+    The source brief is cloned VERBATIM — genre, subgenre, mood, instruments,
+    techniques, BPM and the full agent prompt data all carry over, so the new
+    track keeps the original's direction. Track-to-track variation comes from
+    the style builder's dynamic salt and the GPT enricher's sampling, not from
+    mangling the brief. The source must be the caller's own track or a
+    published (Radio) one. Cost equals a regular song/instrumental; the new
+    generation lands in *the caller's* library.
     """
     try:
         src_gid = uuid.UUID(generation_id)
@@ -816,18 +774,24 @@ async def generate_similar(
     )
 
     src_params = dict(src.params or {})
-    src_agent_mp = src_params.get("agent_music_params") or {}
-    remixed_mp = _remix_agent_params(src_agent_mp)
+    # Clone the brief verbatim — the old "light remix" (±10 % BPM jitter,
+    # dropped subgenre, shuffled instruments) drifted results away from the
+    # original's direction; salt + enricher sampling already vary the take.
+    cloned_mp = dict(src_params.get("agent_music_params") or {})
 
     # New params re-use the same agent envelope so the existing worker pipeline
-    # (tasks/__init__.py::run_generation) picks up genre+mood+remixed knobs.
+    # (tasks/__init__.py::run_generation) picks up the cloned brief.
     new_params: dict[str, Any] = {
         "description": src_params.get("description") or src.prompt or "",
         "genre": src.genre or "",
         "custom_genre": src_params.get("custom_genre", ""),
         "mood": src.mood or "",
         "tempo": src.tempo or "",
-        "agent_music_params": remixed_mp,
+        "agent_music_params": cloned_mp,
+        # The agent's research/prompt text is part of the brief — carry it
+        # over so the style builder keeps the full original direction.
+        "agent_prompt": src_params.get("agent_prompt", ""),
+        "agent_research_notes": src_params.get("agent_research_notes", ""),
         # text_mode=ai so the model writes fresh lyrics — copying the original
         # would defeat the "similar but new" goal.
         "text_mode": "ai" if new_type == GenerationType.song else "none",
@@ -851,9 +815,9 @@ async def generate_similar(
     new_title = format_track_name(artist, f"{src_short} Vers{version}")
 
     # Populate genre/mood/tempo — fall back to agent_music_params if src fields are blank.
-    bpm_str = str(remixed_mp.get("suggested_bpm") or "").strip()
-    genre_val = (src.genre or remixed_mp.get("genre") or "")[:64]
-    mood_val = (src.mood or remixed_mp.get("mood") or "")[:32]
+    bpm_str = str(cloned_mp.get("suggested_bpm") or "").strip()
+    genre_val = (src.genre or cloned_mp.get("genre") or "")[:64]
+    mood_val = (src.mood or cloned_mp.get("mood") or "")[:32]
     tempo_val = (src.tempo or bpm_str or "")[:32]
 
     gen, created = await _create_generation(
@@ -866,90 +830,6 @@ async def generate_similar(
         mood=mood_val,
         tempo=tempo_val,
         vocal=src.vocal or "" if new_type == GenerationType.song else "",
-    )
-    await session.commit()
-    if created:
-        await _enqueue(settings.redis_url, str(gen.id))
-    return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
-
-
-@router.post(
-    "/retake/{generation_id}",
-    response_model=GenerateResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-@limiter.limit("20/minute")
-async def generate_retake(
-    generation_id: str,
-    request: Request,
-    user: User = Depends(current_user),
-    session: AsyncSession = Depends(db_session),
-    settings: Settings = Depends(get_settings),
-) -> GenerateResponse:
-    """Fresh take of the caller's OWN track: identical brief (and lyrics for
-    songs), no remix — unlike /similar, params are copied verbatim. Take-to-take
-    variation comes from the style builder's dynamic salt and the GPT enricher's
-    sampling, so the result is the same song idea with a different arrangement.
-    """
-    try:
-        src_gid = uuid.UUID(generation_id)
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="bad generation_id"
-        ) from exc
-
-    src = (
-        await session.execute(select(Generation).where(Generation.id == src_gid))
-    ).scalar_one_or_none()
-    if src is None or src.deleted_at is not None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="track not found")
-
-    # Retake reuses the full private brief (incl. lyrics) — owner only.
-    if src.user_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="retake is available only for your own tracks",
-        )
-    if src.type not in (GenerationType.song, GenerationType.instrumental):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="retake supports only song / instrumental sources",
-        )
-
-    new_params: dict[str, Any] = dict(src.params or {})
-    new_params.pop("similar_source_generation_id", None)
-    new_params["retake_source_generation_id"] = generation_id
-    # Same words, new take: reuse the exact lyrics the source ended up with.
-    if src.type == GenerationType.song:
-        src_lyrics = str(
-            (src.result or {}).get("lyrics") or new_params.get("lyrics") or ""
-        ).strip()
-        if src_lyrics:
-            new_params["lyrics"] = src_lyrics
-            new_params["text_mode"] = "custom"
-
-    artist = _resolve_artist(user)
-    src_short = _extract_short_title(src.title or "трек")
-    version = await _next_version(
-        session,
-        user_id=user.id,
-        gen_type=src.type,
-        base_name=src_short,
-        marker="Vers",
-        start=2,
-    )
-    new_title = format_track_name(artist, f"{src_short} Vers{version}")
-
-    gen, created = await _create_generation(
-        session,
-        user,
-        src.type,
-        params=new_params,
-        title=new_title,
-        genre=src.genre or "",
-        mood=src.mood or "",
-        tempo=src.tempo or "",
-        vocal=src.vocal or "",
     )
     await session.commit()
     if created:

@@ -540,22 +540,14 @@ export function convertToWav(params: {
   });
 }
 
-/** Generate a track that's musically similar to an existing one — used from
- *  the player's bolt menu when listening to someone else's radio track.
- *  Backend reads the source generation's params, applies a light remix,
- *  and launches a fresh song/instrumental. Costs the same as a normal
- *  generation; results land in the user's own library. */
+/** Generate a track in the direction of an existing one — the backend clones
+ *  the source brief verbatim (genre, subgenre, mood, instruments, BPM, agent
+ *  prompt data) and launches a fresh song/instrumental with new lyrics.
+ *  Variation comes from the backend's dynamic salt + enricher sampling.
+ *  Costs the same as a normal generation; results land in the user's own
+ *  library. */
 export function generateSimilar(generationId: string): Promise<GenerateResponse> {
   return apiFetch(`/api/v1/generate/similar/${encodeURIComponent(generationId)}`, {
-    method: "POST",
-  });
-}
-
-/** Fresh take of the user's OWN track — identical brief and lyrics, no remix.
- *  Variation comes from the backend's dynamic salt + enricher sampling.
- *  Owner-only, song/instrumental sources; costs the same as a normal generation. */
-export function generateRetake(generationId: string): Promise<GenerateResponse> {
-  return apiFetch(`/api/v1/generate/retake/${encodeURIComponent(generationId)}`, {
     method: "POST",
   });
 }

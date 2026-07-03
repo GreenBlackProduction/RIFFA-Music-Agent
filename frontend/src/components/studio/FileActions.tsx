@@ -50,9 +50,6 @@ interface Props {
   onRename?: (next: string) => void | Promise<unknown>;
   /** Generate a similar track from this one. When omitted the menu hides the option. */
   onSimilar?: () => void | Promise<unknown>;
-  /** Re-generate the same brief (fresh take, no remix). Owner-only — radio
-   *  rows never wire this callback, which hides the option there for free. */
-  onRetake?: () => void | Promise<unknown>;
   /** Edit genre / mood / tempo tags. When omitted the menu hides the option. */
   onEditTags?: (tags: { genre: string; mood: string; tempo: string }) => void | Promise<unknown>;
   /** Current tag values used to pre-fill the edit form. */
@@ -85,7 +82,6 @@ export function FileActions({
   shareKind = "library",
   onRename,
   onSimilar,
-  onRetake,
   onEditTags,
   currentGenre = "",
   currentMood = "",
@@ -459,15 +455,6 @@ export function FileActions({
                     onClick={() => { setMenuOpen(false); void onSimilar(); }}
                   >
                     ⚡&nbsp; {t("fileActions.generateSimilar", { defaultValue: "Сгенерировать похожий" })}
-                  </button>
-                )}
-                {onRetake && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => { setMenuOpen(false); void onRetake(); }}
-                  >
-                    🎲&nbsp; {t("fileActions.generateRetake", { defaultValue: "Ещё вариант" })}
                   </button>
                 )}
                 {onEditTags && (
