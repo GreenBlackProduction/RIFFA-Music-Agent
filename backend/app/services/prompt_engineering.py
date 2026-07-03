@@ -58,6 +58,57 @@ def _normalize(value: str) -> str:
     return value.strip().lower()
 
 
+_VOCAL_LEAK_RE = None  # compiled lazily below
+
+
+def _cap_text(text: str, limit: int) -> str:
+    """Trim to ``limit`` chars at the last phrase/word boundary — never mid-word."""
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    for sep in (". ", "; ", ", ", " "):
+        pos = cut.rfind(sep)
+        if pos > limit * 0.6:
+            return cut[:pos].rstrip(" .,;:-—")
+    return cut.rstrip(" .,;:-—")
+
+
+def cap_style_len(style: str, limit: int = 990) -> str:
+    """Cap a (GPT-enriched) style string to Suno's limit at a phrase boundary.
+
+    The GPT enricher occasionally returns 2000+ chars; suno.py then silently
+    hard-cuts at 1000 losing the tail mid-sentence. Trim here, loudly.
+    """
+    if len(style) <= limit:
+        return style
+    from loguru import logger
+    trimmed = _cap_text(style, limit)
+    logger.warning(
+        "style over Suno limit: {} chars -> trimmed to {}", len(style), len(trimmed)
+    )
+    return trimmed
+
+
+def _drop_vocal_phrases(parts: list[str]) -> list[str]:
+    """Remove vocal-descriptor filler on instrumental tracks.
+
+    Genre presets and mood profiles carry phrases like "layered vocals" that
+    directly contradict an instrumental brief (seen live: an instrumental
+    reference track opened with "layered vocals" while "no vocals" sat at the
+    truncated tail). Keeps everything that doesn't mention singing.
+    """
+    global _VOCAL_LEAK_RE
+    if _VOCAL_LEAK_RE is None:
+        import re
+        _VOCAL_LEAK_RE = re.compile(
+            r"vocal|voice|voix|sing|sung|choir|chant|falsetto|acapella|a cappella|"
+            r"вокал|голос|поёт|пени[ея]|хор",
+            re.IGNORECASE,
+        )
+    return [p for p in parts if not _VOCAL_LEAK_RE.search(p)]
+
+
 def build_suno_style(
     params: SongParams,
     *,
@@ -67,29 +118,33 @@ def build_suno_style(
 ) -> tuple[str, float, float]:
     """Build Suno V5.5 (style, weight, constraint).
 
-    Unified pipeline for both agent and form paths. Steps:
+    Unified pipeline for both agent and form paths. BUDGET-AWARE assembly:
+    the reference brief (subgenre, style_prompt, instruments, techniques,
+    constraints, vocal, BPM) forms a PRIORITY block that opens the style and
+    always survives the 1000-char cap; preset/mood/era/salt texture is FILLER
+    appended only while budget remains. Previously the reference was appended
+    last and was the first thing the trim cut off — generic preset salad won.
 
-    1. Genre preset lookup → sample 70-90% fragments, shuffle.
-    2. Small ±0.05 jitter on weight/constraint.
-    3. Deep mood influence (description + vocals + instruments + production).
-    4. Tempo description from BPM-anchored profiles.
-    4.5. ERA OVERLAY (NEW) — production, instruments, vibe from the decade.
-    5. Vocal gender phrase.
-    6. Iconic context combinations (genre, mood, tempo) triple-nudges.
-    7. Dynamic salt — genre-biased selection with anti-repeat via user_id.
-    7.5. AGENT TECHNIQUES (NEW) — explicit techniques from the agent.
-    7.6. AGENT CONSTRAINTS (NEW) — hard constraints from the agent.
-    8. ``style_prompt`` as highest authority (agent research + description).
-    9. Assemble + trim to 1000 chars.
+    Extra rules:
+      * rich brief (style_prompt/techniques/key_instruments present) → random
+        "dynamic salt" is skipped and preset fragments are capped, so the
+        reference doesn't compete with filler;
+      * instrumental (vocal == no_vocal) → vocal-descriptor filler is dropped
+        ("layered vocals" must never contradict "no vocals");
+      * reference brief (style_prompt) → styleWeight >= 0.95 and
+        weirdnessConstraint <= 0.15, so Suno follows the text instead of
+        improvising;
+      * for_cover skips the full-length structure nudge.
 
     Pass an explicit ``rng`` for tests. Pass ``user_id`` for anti-repetition.
     """
     rng = rng or random.Random()
 
+    rich_brief = bool(params.style_prompt or params.techniques or params.key_instruments)
+
     # Canonicalise the genre so near-misses / agent free-text ("Progressive Rock",
     # "lo-fi", RU spellings) still land on a rich preset instead of the bare-word
-    # fallback. Mirrors the mood canonicalisation in Step 3. No confident match → ""
-    # → keep the raw word (build still works, just without the preset's richness).
+    # fallback. No confident match → "" → keep the raw word.
     from app.services.genre_canonical import canonical_genre as _canonical_genre
     raw_genre_key = params.custom_genre or params.genre
     genre_key = _canonical_genre(raw_genre_key) or raw_genre_key
@@ -100,135 +155,146 @@ def build_suno_style(
         weight = float(preset.get("weight", 0.80))
         constraint = float(preset.get("constraint", 0.35))
     else:
-        # Unknown genre: fall back to the genre word itself, modest defaults.
         base_style = (genre_key or "music").lower()
         weight = 0.80
         constraint = 0.40
 
-    # Step 1: shuffle 70-90% of comma-separated fragments
+    # ── PRIORITY block — opens the style, guaranteed budget ──────────────
+    priority: list[str] = []
+    if params.subgenre:
+        priority.append(params.subgenre.strip())
+    if params.style_prompt:
+        # Reference brief gets up to 550 chars so filler still adds texture.
+        priority.append(_cap_text(params.style_prompt, 550))
+    if params.key_instruments:
+        instruments_phrase = ", ".join(i.strip() for i in params.key_instruments[:8] if i)
+        if instruments_phrase:
+            priority.append(f"featuring {instruments_phrase}")
+    for tech in params.techniques[:4]:
+        priority.append(tech.strip())
+    if params.constraints:
+        priority.append(params.constraints.strip())
+    # Hard facts: vocal mode and BPM are never filler.
+    if params.vocal in {"male", "female"}:
+        priority.append(f"{params.vocal} vocals, {params.vocal} vocal delivery")
+    elif params.vocal == "no_vocal":
+        priority.append("instrumental only, no vocals")
+    if params.suggested_bpm:
+        priority.append(f"around {params.suggested_bpm}")
+
+    # ── FILLER — texture that fills remaining budget, cut first ─────────
+    filler: list[str] = []
+
+    # Preset fragments (fewer when the brief is rich — reference leads).
     fragments = [f.strip() for f in base_style.split(",") if f.strip()]
     if len(fragments) > 4:
-        sample_size = max(int(len(fragments) * rng.uniform(0.7, 0.9)), 5)
-        sample_size = min(sample_size, len(fragments))
-        fragments = rng.sample(fragments, sample_size)
+        if rich_brief:
+            fragments = rng.sample(fragments, min(4, len(fragments)))
+        else:
+            sample_size = max(int(len(fragments) * rng.uniform(0.7, 0.9)), 5)
+            sample_size = min(sample_size, len(fragments))
+            fragments = rng.sample(fragments, sample_size)
         rng.shuffle(fragments)
-    style_parts: list[str] = list(fragments)
+    filler.extend(fragments)
 
-    # Step 2: small jitter
+    # Small jitter on the numeric knobs.
     weight = max(0.70, min(1.0, weight + rng.uniform(-0.05, 0.05)))
     constraint = max(0.10, min(0.60, constraint + rng.uniform(-0.05, 0.05)))
 
-    # Step 3: deep mood influence (canonicalise so freeform agent moods still match)
+    # Mood influence (canonicalise freeform agent moods).
     from app.services.mood_canonical import canonical_mood as _canonical_mood
     raw_mood = _normalize(params.mood)
     mood_key = _canonical_mood(raw_mood) or raw_mood
     mood_data = MOOD_PROFILES.get(mood_key)
     if mood_data:
-        style_parts.append(mood_data["description"])
+        filler.append(mood_data["description"])
         if params.vocal and params.vocal != "no_vocal":
-            style_parts.append(mood_data["vocals"])
-        style_parts.append(mood_data["instruments"])
-        style_parts.append(mood_data["production"])
+            filler.append(mood_data["vocals"])
+        filler.append(mood_data["instruments"])
+        filler.append(mood_data["production"])
         weight = min(1.0, weight + float(mood_data.get("weight_modifier", 0.0)))
         constraint = max(
             0.0,
             min(1.0, constraint + float(mood_data.get("constraint_modifier", 0.0))),
         )
 
-    # Step 4: tempo description
+    # Tempo texture (the hard BPM number already sits in priority).
     tempo_key = _normalize(params.tempo)
     tempo_data = TEMPO_PROFILES.get(tempo_key)
     if tempo_data:
-        style_parts.append(tempo_data["description"])
-    # BPM hint from agent overrides / supplements
-    if params.suggested_bpm:
-        style_parts.append(f"around {params.suggested_bpm}")
+        filler.append(tempo_data["description"])
 
-    # Step 4.5: era overlay (production, instruments, vibe from decade)
+    # Era overlay.
     if params.era:
         era_data = ERA_MODIFIERS.get(params.era)
         if era_data:
-            style_parts.append(era_data["production"])
-            style_parts.append(era_data["vibe"])
-            # Genre×era signature gear (e.g. 1990s Techno → TR-909/TB-303) takes
-            # priority over the generic era kit; fall back to it otherwise (70%).
+            filler.append(era_data["production"])
+            filler.append(era_data["vibe"])
             ge_instr = GENRE_ERA_INSTRUMENTS.get(genre_key, {}).get(params.era)
             if ge_instr:
-                style_parts.append(ge_instr)
+                filler.append(ge_instr)
             elif rng.random() > 0.3:
-                style_parts.append(era_data["instruments"])
+                filler.append(era_data["instruments"])
             weight = min(1.0, weight + 0.02)
 
-    # Step 5: vocal gender phrase
-    if params.vocal in {"male", "female"}:
-        style_parts.append(f"{params.vocal} vocals, {params.vocal} voice, {params.vocal} vocal delivery")
-    elif params.vocal == "no_vocal":
-        style_parts.append("instrumental only, no vocals")
-
-    # Step 6: iconic context bumps
+    # Iconic context bumps.
     ctx_key = (genre_key, mood_key, tempo_key)
     ctx_data = CONTEXT_COMBINATIONS.get(ctx_key)
     if ctx_data:
-        style_parts.append(ctx_data["additional"])
+        filler.append(ctx_data["additional"])
         weight = min(1.0, weight + float(ctx_data.get("weight_boost", 0.0)))
 
-    # Step 7: dynamic salt — genre-biased anti-repeat selection
-    if user_id is not None:
-        try:
-            from app.services.anti_repeat import record_generation, select_dynamic_elements as _select
-            picks = _select(user_id, genre_key, DYNAMIC_ELEMENTS, GENRE_TECHNIQUE_BIAS, rng)
-            style_parts.extend(picks)
-            # Record this generation so future calls avoid these elements
-            record_generation(user_id, genre_key, mood_key, tempo_key, picks)
-        except ImportError:
-            # Fallback: simple random selection
+    # Dynamic salt — SKIPPED for rich briefs: the reference must not compete
+    # with random texture.
+    if not rich_brief:
+        if user_id is not None:
+            try:
+                from app.services.anti_repeat import record_generation, select_dynamic_elements as _select
+                picks = _select(user_id, genre_key, DYNAMIC_ELEMENTS, GENRE_TECHNIQUE_BIAS, rng)
+                filler.extend(picks)
+                record_generation(user_id, genre_key, mood_key, tempo_key, picks)
+            except ImportError:
+                pool = list(DYNAMIC_ELEMENTS.keys())
+                for category in rng.sample(pool, min(rng.randint(2, 3), len(pool))):
+                    filler.append(rng.choice(DYNAMIC_ELEMENTS[category]))
+        else:
             pool = list(DYNAMIC_ELEMENTS.keys())
-            num_dynamic = rng.randint(2, 3)
-            for category in rng.sample(pool, min(num_dynamic, len(pool))):
-                style_parts.append(rng.choice(DYNAMIC_ELEMENTS[category]))
-    else:
-        # No user tracking — simple random (backward compatible)
-        pool = list(DYNAMIC_ELEMENTS.keys())
-        num_dynamic = rng.randint(2, 3)
-        for category in rng.sample(pool, min(num_dynamic, len(pool))):
-            style_parts.append(rng.choice(DYNAMIC_ELEMENTS[category]))
+            for category in rng.sample(pool, min(rng.randint(2, 3), len(pool))):
+                filler.append(rng.choice(DYNAMIC_ELEMENTS[category]))
 
-    # Step 7.4: agent subgenre (most specific genre signal — e.g. Last.fm tags
-    # "post-hardcore, progressive metal"). LEADS the style so the specific scene
-    # beats the broad genre preset and survives the 1000-char trim.
-    if params.subgenre:
-        style_parts.insert(0, params.subgenre.strip())
-
-    # Step 7.45: agent key_instruments (NEW — explicit instrument lineup from research)
-    if params.key_instruments:
-        instruments_phrase = ", ".join(i.strip() for i in params.key_instruments[:8] if i)
-        if instruments_phrase:
-            style_parts.append(f"featuring {instruments_phrase}")
-
-    # Step 7.5: agent-specified techniques (NEW — explicit, not random)
-    if params.techniques:
-        for tech in params.techniques[:4]:  # max 4 to avoid bloat
-            style_parts.append(tech.strip())
-
-    # Step 7.6: hard constraints from agent (NEW)
-    if params.constraints:
-        style_parts.append(params.constraints.strip())
-
-    # Step 8: user override / agent prompt has the highest authority
-    if params.style_prompt:
-        style_parts.append(params.style_prompt.strip())
-
-    # Step 8.7: nudge Suno toward a full-length, multi-section track — thin
-    # prompts yield 30-second snippets, an explicit structure cue lengthens them.
-    # Skipped for covers: the uploaded audio already defines length and structure,
-    # so this cue only fights the source.
+    # Structure nudge (kept for non-covers; cheap and useful, lowest priority).
     if not for_cover:
-        style_parts.append("full-length multi-section arrangement, intro build development and outro")
+        filler.append("full-length multi-section arrangement, intro build development and outro")
 
-    # Step 9: assemble + trim to Suno V5.5 limit
-    raw = ", ".join(p for p in style_parts if p)
-    if len(raw) > 1000:
-        raw = raw[:997].rstrip(", ") + "..."
+    # Instrumental guard: no vocal descriptors may leak in from filler.
+    if params.vocal == "no_vocal":
+        filler = _drop_vocal_phrases(filler)
+
+    # ── Budget assembly: priority first, filler while it fits ───────────
+    LIMIT = 1000
+    seen: set[str] = set()
+    parts: list[str] = []
+    for p in priority:
+        p = p.strip().strip(",")
+        if p and p.lower() not in seen:
+            seen.add(p.lower())
+            parts.append(p)
+    raw = ", ".join(parts)
+    if len(raw) > LIMIT:  # a huge reference alone — trim at phrase boundary
+        raw = _cap_text(raw, LIMIT)
+    else:
+        for f in filler:
+            f = f.strip().strip(",")
+            if not f or f.lower() in seen:
+                continue
+            if len(raw) + 2 + len(f) > LIMIT:
+                continue  # skip pieces that don't fit; try shorter ones
+            seen.add(f.lower())
+            raw = f"{raw}, {f}" if raw else f
+    # Reference brief → obey the text: high style weight, low weirdness.
+    if params.style_prompt:
+        weight = max(weight, 0.95)
+        constraint = min(constraint, 0.15)
 
     return raw, round(weight, 2), round(constraint, 2)
 

@@ -434,7 +434,10 @@ class SunoClient:
         #   customMode=false                       → prompt (≤500) + uploadUrl only;
         #                                            style/title MUST be empty.
         # See https://docs.sunoapi.org/suno-api/upload-and-cover-audio
-        clean_style = _strip_artist_names(style)[:1000]
+        clean_style = _strip_artist_names(style)
+        if len(clean_style) > 1000:
+            logger.warning("suno: style over 1000 chars ({}) — hard-truncated", len(clean_style))
+            clean_style = clean_style[:1000]
         clean_title = title[:100]
 
         if instrumental:

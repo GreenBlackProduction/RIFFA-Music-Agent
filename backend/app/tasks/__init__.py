@@ -23,7 +23,7 @@ from app.db.models.wallet import WalletTransaction
 from app.services.lyrics import make_lyrics_client
 from app.services.nanobanana import NanoBananaError, make_nanobanana_client
 from app.services.notifications import notify_generation_done
-from app.services.prompt_engineering import SongParams, build_suno_style, vocal_gender
+from app.services.prompt_engineering import SongParams, build_suno_style, cap_style_len, vocal_gender
 from app.services.track_naming import compose_track_title, resolve_artist, strip_artist_references
 from app.services.suno import SunoError, SunoPending, make_suno_client
 from app.services.mirror import mirror_generation_result
@@ -382,7 +382,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 agent_research_notes=agent_research,
                 preset_style_hint=preset_style,
             )
-            style = _ensure_rich_style(style, preset_style)
+            style = cap_style_len(_ensure_rich_style(style, preset_style))
 
             _dump_payload(gen_id, "song", {
                 "title": gen.title,
@@ -464,7 +464,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 agent_prompt=params.get("agent_prompt", ""),
                 preset_style_hint=preset_style,
             )
-            style = _ensure_rich_style(style, preset_style)
+            style = cap_style_len(_ensure_rich_style(style, preset_style))
 
             _dump_payload(gen_id, "instrumental", {
                 "title": title,
@@ -795,7 +795,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 agent_research_notes=agent_research,
                 preset_style_hint=preset_style,
             )
-            style = _ensure_rich_style(style, preset_style)
+            style = cap_style_len(_ensure_rich_style(style, preset_style))
 
             _dump_payload(gen_id, "occasion", {
                 "title": gen.title,
