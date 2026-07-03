@@ -264,6 +264,7 @@ class SunoClient:
         vocal_gender: str | None = None,
         style_weight: float | None = None,
         weirdness_constraint: float | None = None,
+        negative_tags: str | None = None,
         progress_cb: ProgressCb | None = None,
     ) -> SunoResult:
         clean_style = _strip_artist_names(style)[:1000]
@@ -282,6 +283,10 @@ class SunoClient:
             payload["styleWeight"] = max(0.0, min(1.0, style_weight))
         if weirdness_constraint is not None:
             payload["weirdnessConstraint"] = max(0.0, min(1.0, weirdness_constraint))
+        if negative_tags:
+            # "Music styles or traits to exclude" — the ONLY reliable exclusion
+            # channel; negations inside `style` text attract what they negate.
+            payload["negativeTags"] = negative_tags[:200]
 
         if progress_cb:
             progress_cb({"step": "submitting"})
@@ -426,6 +431,7 @@ class SunoClient:
         style_weight: float | None = None,
         weirdness_constraint: float | None = None,
         audio_weight: float | None = None,
+        negative_tags: str | None = None,
         progress_cb: ProgressCb | None = None,
     ) -> SunoResult:
         # Suno /generate/upload-cover parameter rules
@@ -486,6 +492,8 @@ class SunoClient:
         # (assembled by the caller) from dragging the cover away from the original.
         if audio_weight is not None:
             payload["audioWeight"] = max(0.0, min(1.0, audio_weight))
+        if negative_tags:
+            payload["negativeTags"] = negative_tags[:200]
 
         if progress_cb:
             progress_cb({"step": "submitting"})

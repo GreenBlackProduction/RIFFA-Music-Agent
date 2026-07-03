@@ -86,17 +86,23 @@ Hard rules:
   specific prompt. Echoing a thin request as a thin one-line output is the CRITICAL FAILURE
   described above and is never acceptable for a full track.
   * Go BELOW 400 chars ONLY when the user EXPLICITLY restricts the arrangement
-    (e.g. "drums only", "just a bassline", "no synths", "no other instruments"). Then be
-    surgical: name the instrument(s), forbid everything not requested, state the rhythmic
-    feel and mix character. NO filler genre boilerplate.
+    (e.g. "drums only", "just a bassline"). Then be surgical: describe ONLY the requested
+    instrument(s), the rhythmic feel and mix character. NO filler genre boilerplate.
   * DEFAULT for any normal genre/mood/tempo request (this is the common case): 500-1200 chars
     covering subgenre, named instrumentation, rhythm section + concrete BPM, mood arc, vocal
     character (if vocals), texture, and mix. Use this whenever the user just names a vibe,
     genre, or reference — do NOT go shorter just because they wrote a single sentence.
   * Rich brief or complex multi-reference request: 1500-4500 chars with clearly grouped
     sections (Instrumentation / Rhythm / Texture / Vocals / Dynamics / Mix references / Mood arc).
-- Respect explicit exclusions: if the user says "no vocals", "drums only", "no synths",
-  state these as hard constraints in the prompt ("instrumental", "no synths", "no vocals", etc.).
+- NEVER write negations in the style text ("no synths", "without guitars", "avoid X") —
+  text-to-music models treat negated words as ATTRACTORS: "no synths" in the text makes
+  Suno ADD synths. Exclusions arrive as a separate "HARD EXCLUSIONS" input line and go to
+  Suno through a dedicated negativeTags API parameter. Your job: never mention the excluded
+  instruments/traits AT ALL, and describe an arrangement that leaves them no room (synths
+  excluded → name an all-organic palette: live drums, electric bass, guitars, acoustic keys).
+  SOLE exception: the instrumental directive "instrumental, no vocals" is allowed.
+- Positive-only restrictions ("drums only", "just a bassline") → describe exactly those
+  instruments and nothing else.
 - Describe a COMPLETE multi-section arrangement (intro → development → climax → outro) so
   Suno renders a FULL-LENGTH track — never a short loop or a 30-second snippet.
 - If a subgenre / reference scene is given (e.g. "post-hardcore, progressive metal"), LEAD with
@@ -110,6 +116,10 @@ Hard rules:
 - Return ONLY the prompt itself — nothing before or after.
 
 Style guidance for content:
+- VARIETY MANDATE: do not reach for the same stock palette on every request — "Rhodes +
+  TR-808 + Juno pads" repeated across briefs is a failure. Pick instruments AUTHENTIC to
+  the exact subgenre/era named in the input, and when several palettes fit, pick the less
+  obvious one. Two prompts for different requests should never read interchangeably.
 - Lead with the SUBGENRE (not the broad genre) and 1-2 anchor descriptors.
 - Then instrumentation by SPECIFIC NAME — never just "guitar"/"synth"/"drums".
 - Then rhythm with explicit BPM and groove feel (half-time, syncopation, swing).
@@ -292,6 +302,7 @@ class LyricsClient:
         agent_prompt: str = "",
         agent_research_notes: str = "",
         preset_style_hint: str = "",
+        negative_tags: str = "",
         max_length: int = 5000,
     ) -> str:
         """Adaptive Suno music-style prompt builder.
@@ -327,6 +338,11 @@ class LyricsClient:
             bits.append(f"Genre research (use this verbatim for instrument/era details): {agent_research_notes}")
         if agent_prompt:
             bits.append(f"Assistant brief: {agent_prompt}")
+        if negative_tags:
+            bits.append(
+                "HARD EXCLUSIONS (sent to Suno separately as negativeTags — do NOT mention "
+                f"these in your text at all, not even as 'no X'): {negative_tags}"
+            )
 
         if not bits:
             return ""
@@ -340,7 +356,7 @@ class LyricsClient:
                     {"role": "system", "content": _SYS_ENRICH_MUSIC},
                     {"role": "user", "content": user_msg},
                 ],
-                temperature=0.55,
+                temperature=0.75,
                 max_tokens=1500,
             )
             enriched = (resp.choices[0].message.content or "").strip()

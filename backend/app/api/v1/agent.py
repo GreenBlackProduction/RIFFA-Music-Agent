@@ -143,10 +143,14 @@ def _coerce_music_params(raw: Any) -> dict[str, Any]:
         val = raw.get(field, "")
         result[field] = str(val).strip()[:128] if val else ""
     # List fields
-    for field in ("key_instruments", "techniques"):
+    for field in ("key_instruments", "techniques", "negative_tags"):
         val = raw.get(field)
+        if isinstance(val, str):
+            # GPT sometimes emits a comma-joined string instead of a list.
+            val = [v.strip() for v in val.split(",") if v.strip()]
         if isinstance(val, list):
-            result[field] = [str(x).strip()[:80] for x in val[:6] if x]
+            limit = 8 if field == "negative_tags" else 6
+            result[field] = [str(x).strip()[:80] for x in val[:limit] if x]
         else:
             result[field] = []
     return result
@@ -258,7 +262,8 @@ STEP D — Branch on the user's reply.
     what to add. Finalize on the next turn.
   • User adds specific tweaks ("но без вокала", "только быстрее",
     "женский вокал") → apply the tweak to inferred params and finalize
-    on this same turn (done=true).
+    on this same turn (done=true). Exclusions ("без X") go to
+    `negative_tags`, never as "no X" text.
 
 LINK RECOVERY — if user pastes a Spotify/YouTube/etc URL after your
 "not sure" reply, treat it as authoritative artist confirmation. Restart
@@ -337,8 +342,17 @@ REQUIRED FIELDS (when done=true for music modules):
   empty for music modules.
 
 OPTIONAL:
-- `constraints`: ONLY if user excluded something ("no synths", "drums
-  only"). Otherwise empty.
+- `negative_tags`: list of things the user wants EXCLUDED, as plain
+  English nouns WITHOUT negation words — ["synthesizers", "electronic
+  drums", "autotune", "female vocals"]. This maps to Suno's negativeTags
+  API param — the ONLY channel that reliably removes something.
+  CRITICAL: NEVER write negations ("no synths", "without drums", "без
+  синтезаторов") into ANY text field (constraints, prompt, research
+  notes) — text-to-music treats negated words as attractors and ADDS
+  them. «без синтезаторов» → negative_tags: ["synthesizers"].
+- `constraints`: POSITIVE-ONLY hard requirements ("drums only",
+  "acoustic instruments only", "solo piano"). Never "no X" — that goes
+  to negative_tags. Otherwise empty.
 - `custom_genre`: ONLY for genre fusions that no preset captures.
 
 VALIDATION before setting done=true: count populated REQUIRED fields.
@@ -402,6 +416,31 @@ When the user comes back to "Дополнить бриф" and changes a paramete
 move that field from "assumed" to "explicit" in the next note. After
 several refinements the note shrinks to "Запущу X. Всё согласовано." —
 that's the success state.
+
+═══════════════════════════════════════════════════════════════════════
+REFINEMENT AFTER A GENERATION — corrections are surgical, not a rebuild
+═══════════════════════════════════════════════════════════════════════
+When the user comes back after hearing a result with corrections
+(«инструментал совсем без синтезаторов, ровная бочка, интересная бас
+партия», «медленнее и мрачнее», «вокал слишком резкий») — this is a
+REFINEMENT, the highest-priority signal you get. Rules:
+
+1. KEEP every music_params field from your previous brief that the user
+   did NOT correct — same genre, same key_instruments they liked, same
+   era/bpm. Do NOT re-infer from scratch: a rebuilt brief that ignores
+   the previous take is exactly the «получил то же самое» failure.
+2. Every exclusion → `negative_tags` (English nouns: «без синтезаторов»
+   → "synthesizers"). Remove the excluded items from key_instruments /
+   techniques / prompt text too — mentioning them ANYWHERE re-attracts
+   them.
+3. Every positive wish → the FRONT of key_instruments/techniques with
+   concrete wording: «ровная бочка» → "steady four-on-the-floor kick
+   drum" (techniques), «интересная бас партия» → "prominent melodic
+   bassline with fills" (key_instruments first position).
+4. Finalize on the SAME turn (done=true) — the user already waited for
+   one generation; don't restart the interview. In `intent.note` name
+   exactly what changed: «Убрал синтезаторы, сделал ровную бочку и
+   выделил бас — остальное как в прошлый раз.»
 
 ═══════════════════════════════════════════════════════════════════════
 ANTI-LOOP RULE — stop asking when you have enough
@@ -987,7 +1026,7 @@ a music description. Ленивый prompt = безликий трек. Дета
   ХОРОШО: «garage rock revival, fuzzed-out baritone guitar riff, pounding
     four-on-the-floor drums, overdriven bass, raw unpolished production,
     shout-along gang vocals in chorus, aggressive energy, live room
-    reverb, 160 BPM, no ballads»
+    reverb, 160 BPM»
 
 PARAMETER ADHERENCE (строго):
 • Предвыбранные в UI параметры (genre/mood/tempo/vocal) — это ЯВНЫЙ выбор
@@ -995,7 +1034,11 @@ PARAMETER ADHERENCE (строго):
   Если genre=«Lo-fi» → пиши «lofi», не «downtempo electronic».
 • «без вокала» / «instrumental» → добавь «instrumental, no vocals» в НАЧАЛО prompt.
 • «male vocals» → male vocal characteristics, не female и не опускай.
-• Все явные exclusion'ы пользователя → добавь как constraints в prompt.
+• Все явные exclusion'ы пользователя → ТОЛЬКО в `music_params.negative_tags`
+  (английские существительные без отрицаний: «без синтезаторов» →
+  ["synthesizers"]). НИКОГДА не пиши «no X» / «without X» в prompt или
+  constraints — текстовое отрицание работает как магнит и ДОБАВЛЯЕТ X.
+  Единственное исключение: «instrumental, no vocals» для инструментала.
 
 ═══════════════════════════════════════════════════════════════════════
 GUIDING PRINCIPLES
@@ -1110,7 +1153,8 @@ Output protocol — you MUST return raw JSON (no markdown fences, no extra keys)
     "era": "<decade for production style: 1970s, 1980s, 1990s, 2000s, 2010s, 2020s, or empty>",
     "key_instruments": ["<list specific instruments by name>"],
     "techniques": ["<specific production/playing techniques, max 4>"],
-    "constraints": "<hard constraints: 'no synths', 'drums only', etc. or empty>",
+    "constraints": "<POSITIVE-only hard requirements: 'drums only', 'solo piano', etc. or empty — never 'no X'>",
+    "negative_tags": ["<things to EXCLUDE as plain English nouns, e.g. 'synthesizers', 'autotune' — no negation words>"],
     "suggested_bpm": "<BPM range or exact BPM, e.g. '112 BPM', '70-80 BPM', or empty>"
   },
   "research_notes": "<when done=true and genre is obscure: 2-5 sentences in English
@@ -1168,8 +1212,10 @@ Hard rules:
 - When done=false: `summary`, `prompt` must be empty strings, `intent` must be null.
 - When done=true: `reply` is a brief friendly handoff, NOT a question. `summary`,
   `prompt`, and `intent` MUST all be filled.
-- Honor explicit user exclusions in `prompt` ("без вокала" → "no vocals,
-  instrumental"; "только ударные" → "drums only, no other instruments").
+- Explicit user exclusions go to `music_params.negative_tags`, NEVER into
+  `prompt` text as "no X" (text negation attracts what it negates). Positive
+  restrictions stay positive in `prompt`: "только ударные" → "drums only".
+  Sole exception: "instrumental, no vocals" for instrumental tracks.
 - Use English for `prompt`, `genre`, `mood`, `tempo` values — Suno understands
   English best.
 - For cover_song set confidence=low and explain the user must upload an audio

@@ -52,6 +52,7 @@ class SongParams:
     key_instruments: list[str] = field(default_factory=list)  # explicit instruments from agent research
     constraints: str = ""       # hard constraints from agent ("no synths", etc.)
     suggested_bpm: str = ""     # BPM hint from agent
+    negative_tags: list[str] = field(default_factory=list)  # exclusions → Suno negativeTags param
 
 
 def _normalize(value: str) -> str:
@@ -109,14 +110,120 @@ def _drop_vocal_phrases(parts: list[str]) -> list[str]:
     return [p for p in parts if not _VOCAL_LEAK_RE.search(p)]
 
 
+def _drop_negated_phrases(parts: list[str], negatives: list[str]) -> list[str]:
+    """Drop filler phrases that mention anything the user excluded.
+
+    Genre presets carry fragments like "synthesized sounds" that directly
+    fight a "synthesizers" negativeTag — the text re-attracts what the tag
+    removes. Stems are matched loosely (synthesizers → "synth" also catches
+    "synthesized", "synth pads")."""
+    stems: list[str] = []
+    for tag in negatives:
+        for word in tag.lower().split():
+            if "synth" in word:
+                stems.append("synth")
+                continue
+            if word.endswith("s") and not word.endswith("ss"):
+                word = word[:-1]
+            if len(word) >= 4:
+                stems.append(word)
+    if not stems:
+        return parts
+    return [p for p in parts if not any(st in p.lower() for st in stems)]
+
+
+_NEGATION_RE = None  # compiled lazily
+
+# Common Russian exclusion objects → English negativeTags (Suno wants English).
+_RU_NEG_MAP = (
+    ("синтезатор", "synthesizers"),
+    ("синтов", "synthesizers"),
+    ("синты", "synthesizers"),
+    ("вокал", "vocals"),
+    ("голос", "vocals"),
+    ("барабан", "drums"),
+    ("ударн", "drums"),
+    ("гитар", "guitars"),
+    ("электрон", "electronic elements"),
+    ("автотюн", "autotune"),
+    ("пиан", "piano"),
+    ("скрип", "strings"),
+    ("струнн", "strings"),
+    ("духов", "brass"),
+)
+
+
+def _translate_negative(obj: str) -> str:
+    low = obj.lower()
+    for stem, en in _RU_NEG_MAP:
+        if stem in low:
+            return en
+    return obj
+
+
+def extract_negatives(text: str, *, keep_vocal_text: bool = False) -> tuple[str, list[str]]:
+    """Pull negation phrases ("no synths", "без синтезаторов") OUT of style text.
+
+    Text-to-music models treat negated words as positive attractors — "no
+    synths" in the style string literally injects the token "synths" and makes
+    synths MORE likely. Suno has a dedicated ``negativeTags`` param for
+    exclusions, so we strip negations from the text and return them as tags.
+
+    Returns ``(cleaned_text, tags)``. With ``keep_vocal_text=True`` vocal
+    negations ("no vocals") stay in the text (Suno honours that specific
+    phrase and it backs up the ``instrumental`` flag) but are still tagged.
+    """
+    global _NEGATION_RE, _VOCAL_LEAK_RE
+    if not text:
+        return text, []
+    import re
+    if _NEGATION_RE is None:
+        _NEGATION_RE = re.compile(
+            r"(?:\b(?:no|without|avoid|never use|not?\s+includ\w*)\s+"
+            r"|\b(?:без|никаких|никакого|никакой|не\s+(?:использовать|добавля\w+|нужн\w+))\s+)"
+            r"([a-zа-яё0-9][a-zа-яё0-9'’\- ]{1,50}?)(?=\s*(?:[,.;:!)\n]|$))",
+            re.IGNORECASE,
+        )
+    if _VOCAL_LEAK_RE is None:
+        _drop_vocal_phrases([])  # compile the vocal regex
+    tags: list[str] = []
+    spans: list[tuple[int, int]] = []
+    for m in _NEGATION_RE.finditer(text):
+        obj = m.group(1).strip(" .,;:-—")
+        if not obj:
+            continue
+        if keep_vocal_text and _VOCAL_LEAK_RE.search(obj):
+            tags.append(_translate_negative(obj))
+            continue  # phrase stays in the text
+        tags.append(_translate_negative(obj))
+        spans.append(m.span())
+    if spans:
+        chunks: list[str] = []
+        last = 0
+        for start, end in spans:
+            chunks.append(text[last:start])
+            last = end
+        chunks.append(text[last:])
+        text = "".join(chunks)
+        text = re.sub(r"\s*,\s*(?=[,.;])", "", text)
+        text = re.sub(r",\s*,+", ", ", text)
+        text = re.sub(r"\s+,", ",", text)
+        text = re.sub(r"\s{2,}", " ", text)
+        text = re.sub(r"(^|[.;]\s*),\s*", r"\1", text).strip(" ,;")
+    # dedupe, keep order
+    seen: set[str] = set()
+    uniq = [t for t in tags if not (t.lower() in seen or seen.add(t.lower()))]
+    return text, uniq
+
+
 def build_suno_style(
     params: SongParams,
     *,
     rng: random.Random | None = None,
     user_id: int | None = None,
     for_cover: bool = False,
-) -> tuple[str, float, float]:
-    """Build Suno V5.5 (style, weight, constraint).
+) -> tuple[str, float, float, str]:
+    """Build Suno V5.5 (style, weight, constraint, negative_tags).
 
     Unified pipeline for both agent and form paths. BUDGET-AWARE assembly:
     the reference brief (subgenre, style_prompt, instruments, techniques,
@@ -134,7 +241,10 @@ def build_suno_style(
       * reference brief (style_prompt) → styleWeight >= 0.95 and
         weirdnessConstraint <= 0.15, so Suno follows the text instead of
         improvising;
-      * for_cover skips the full-length structure nudge.
+      * for_cover skips the full-length structure nudge;
+      * negations are NEVER left in the style text — extract_negatives pulls
+        them out of constraints/style_prompt and they come back as the 4th
+        return value (comma-joined string for Suno's ``negativeTags``).
 
     Pass an explicit ``rng`` for tests. Pass ``user_id`` for anti-repetition.
     """
@@ -159,21 +269,30 @@ def build_suno_style(
         weight = 0.80
         constraint = 0.40
 
+    # ── Negations never stay in style text — collect them for negativeTags ─
+    negatives: list[str] = [t.strip() for t in params.negative_tags if t and t.strip()]
+    style_prompt, neg = extract_negatives(params.style_prompt, keep_vocal_text=True)
+    negatives.extend(neg)
+    constraints, neg = extract_negatives(params.constraints)
+    negatives.extend(neg)
+    if params.vocal == "no_vocal":
+        negatives.append("vocals")
+
     # ── PRIORITY block — opens the style, guaranteed budget ──────────────
     priority: list[str] = []
     if params.subgenre:
         priority.append(params.subgenre.strip())
-    if params.style_prompt:
+    if style_prompt:
         # Reference brief gets up to 550 chars so filler still adds texture.
-        priority.append(_cap_text(params.style_prompt, 550))
+        priority.append(_cap_text(style_prompt, 550))
     if params.key_instruments:
         instruments_phrase = ", ".join(i.strip() for i in params.key_instruments[:8] if i)
         if instruments_phrase:
             priority.append(f"featuring {instruments_phrase}")
     for tech in params.techniques[:4]:
         priority.append(tech.strip())
-    if params.constraints:
-        priority.append(params.constraints.strip())
+    if constraints:
+        priority.append(constraints.strip())
     # Hard facts: vocal mode and BPM are never filler.
     if params.vocal in {"male", "female"}:
         priority.append(f"{params.vocal} vocals, {params.vocal} vocal delivery")
@@ -210,7 +329,10 @@ def build_suno_style(
         filler.append(mood_data["description"])
         if params.vocal and params.vocal != "no_vocal":
             filler.append(mood_data["vocals"])
-        filler.append(mood_data["instruments"])
+        # Fixed per-mood instrument sets made generations sound same-y; skip
+        # them whenever the agent already named the instruments.
+        if not params.key_instruments:
+            filler.append(mood_data["instruments"])
         filler.append(mood_data["production"])
         weight = min(1.0, weight + float(mood_data.get("weight_modifier", 0.0)))
         constraint = max(
@@ -244,23 +366,23 @@ def build_suno_style(
         filler.append(ctx_data["additional"])
         weight = min(1.0, weight + float(ctx_data.get("weight_boost", 0.0)))
 
-    # Dynamic salt — SKIPPED for rich briefs: the reference must not compete
-    # with random texture.
-    if not rich_brief:
-        if user_id is not None:
-            try:
-                from app.services.anti_repeat import record_generation, select_dynamic_elements as _select
-                picks = _select(user_id, genre_key, DYNAMIC_ELEMENTS, GENRE_TECHNIQUE_BIAS, rng)
-                filler.extend(picks)
-                record_generation(user_id, genre_key, mood_key, tempo_key, picks)
-            except ImportError:
-                pool = list(DYNAMIC_ELEMENTS.keys())
-                for category in rng.sample(pool, min(rng.randint(2, 3), len(pool))):
-                    filler.append(rng.choice(DYNAMIC_ELEMENTS[category]))
-        else:
+    # Dynamic salt — rich briefs get ONE budget-protected pick (variety
+    # between takes without competing with the reference); plain briefs 2-3.
+    salt_count = 1 if rich_brief else rng.randint(2, 3)
+    if user_id is not None:
+        try:
+            from app.services.anti_repeat import record_generation, select_dynamic_elements as _select
+            picks = _select(user_id, genre_key, DYNAMIC_ELEMENTS, GENRE_TECHNIQUE_BIAS, rng)[:salt_count]
+            filler.extend(picks)
+            record_generation(user_id, genre_key, mood_key, tempo_key, picks)
+        except ImportError:
             pool = list(DYNAMIC_ELEMENTS.keys())
-            for category in rng.sample(pool, min(rng.randint(2, 3), len(pool))):
+            for category in rng.sample(pool, min(salt_count, len(pool))):
                 filler.append(rng.choice(DYNAMIC_ELEMENTS[category]))
+    else:
+        pool = list(DYNAMIC_ELEMENTS.keys())
+        for category in rng.sample(pool, min(salt_count, len(pool))):
+            filler.append(rng.choice(DYNAMIC_ELEMENTS[category]))
 
     # Structure nudge (kept for non-covers; cheap and useful, lowest priority).
     if not for_cover:
@@ -269,6 +391,10 @@ def build_suno_style(
     # Instrumental guard: no vocal descriptors may leak in from filler.
     if params.vocal == "no_vocal":
         filler = _drop_vocal_phrases(filler)
+
+    # Excluded-instrument guard: filler must not mention negativeTags terms.
+    if negatives:
+        filler = _drop_negated_phrases(filler, negatives)
 
     # ── Budget assembly: priority first, filler while it fits ───────────
     LIMIT = 1000
@@ -296,7 +422,13 @@ def build_suno_style(
         weight = max(weight, 0.95)
         constraint = min(constraint, 0.15)
 
-    return raw, round(weight, 2), round(constraint, 2)
+    # Exclusions → comma-joined string for Suno's negativeTags param.
+    seen_neg: set[str] = set()
+    neg_tags = ", ".join(
+        t for t in negatives if not (t.lower() in seen_neg or seen_neg.add(t.lower()))
+    )[:200].rstrip(" ,")
+
+    return raw, round(weight, 2), round(constraint, 2), neg_tags
 
 
 def vocal_gender(vocal: str) -> str | None:
@@ -317,5 +449,6 @@ __all__ = [
     "TEMPO_PROFILES",
     "SongParams",
     "build_suno_style",
+    "extract_negatives",
     "vocal_gender",
 ]

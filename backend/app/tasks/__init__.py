@@ -23,11 +23,29 @@ from app.db.models.wallet import WalletTransaction
 from app.services.lyrics import make_lyrics_client
 from app.services.nanobanana import NanoBananaError, make_nanobanana_client
 from app.services.notifications import notify_generation_done
-from app.services.prompt_engineering import SongParams, build_suno_style, cap_style_len, vocal_gender
+from app.services.prompt_engineering import (
+    SongParams,
+    build_suno_style,
+    cap_style_len,
+    extract_negatives,
+    vocal_gender,
+)
 from app.services.track_naming import compose_track_title, resolve_artist, strip_artist_references
 from app.services.suno import SunoError, SunoPending, make_suno_client
 from app.services.mirror import mirror_generation_result
 from app.services.wallet import InsufficientBalance, credit_tokens, deduct_tokens
+
+
+def _merge_negative_tags(base: str, extra: list[str]) -> str:
+    """Merge extra exclusion tags into the comma-joined negativeTags string."""
+    parts = [p.strip() for p in base.split(",") if p.strip()]
+    seen = {p.lower() for p in parts}
+    for t in extra:
+        t = t.strip()
+        if t and t.lower() not in seen:
+            parts.append(t)
+            seen.add(t.lower())
+    return ", ".join(parts)[:200].rstrip(" ,")
 
 # ---------------------------------------------------------------------------
 # Logging setup — duplicate to file for easy tailing
@@ -360,9 +378,10 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 key_instruments=agent_mp.get("key_instruments", []),
                 constraints=agent_mp.get("constraints", ""),
                 suggested_bpm=agent_mp.get("suggested_bpm", ""),
+                negative_tags=agent_mp.get("negative_tags") or [],
                 style_prompt=(agent_research + "\n" + agent_prompt_text).strip(),
             )
-            preset_style, weight, constraint = build_suno_style(
+            preset_style, weight, constraint, negative_tags = build_suno_style(
                 song_params,
                 user_id=gen.user_id,
             )
@@ -381,8 +400,13 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 agent_prompt=agent_prompt_text,
                 agent_research_notes=agent_research,
                 preset_style_hint=preset_style,
+                negative_tags=negative_tags,
             )
             style = cap_style_len(_ensure_rich_style(style, preset_style))
+            # Safety net: negations that survived into the final style text
+            # act as attractors — move them into negativeTags.
+            style, _leaked_neg = extract_negatives(style, keep_vocal_text=True)
+            negative_tags = _merge_negative_tags(negative_tags, _leaked_neg)
 
             _dump_payload(gen_id, "song", {
                 "title": gen.title,
@@ -392,6 +416,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 "vocal_gender": vocal_gender(params.get("vocal", "")),
                 "style_weight": weight,
                 "weirdness_constraint": constraint,
+                "negative_tags": negative_tags,
             })
             await _publish(ctx, gen_id, {"status": "processing", "step": "music"})
             suno_result = await suno.generate_music(
@@ -402,6 +427,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 vocal_gender=vocal_gender(params.get("vocal", "")),
                 style_weight=weight,
                 weirdness_constraint=constraint,
+                negative_tags=negative_tags or None,
                 progress_cb=progress_cb,
             )
             result = {
@@ -438,9 +464,10 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 key_instruments=agent_mp.get("key_instruments", []),
                 constraints=agent_mp.get("constraints", ""),
                 suggested_bpm=agent_mp.get("suggested_bpm", ""),
+                negative_tags=agent_mp.get("negative_tags") or [],
                 style_prompt=(agent_research + "\n" + agent_prompt_text).strip(),
             )
-            preset_style, weight, constraint = build_suno_style(
+            preset_style, weight, constraint, negative_tags = build_suno_style(
                 song_params,
                 user_id=gen.user_id,
             )
@@ -463,8 +490,11 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 approved_lyrics="",
                 agent_prompt=params.get("agent_prompt", ""),
                 preset_style_hint=preset_style,
+                negative_tags=negative_tags,
             )
             style = cap_style_len(_ensure_rich_style(style, preset_style))
+            style, _leaked_neg = extract_negatives(style, keep_vocal_text=True)
+            negative_tags = _merge_negative_tags(negative_tags, _leaked_neg)
 
             _dump_payload(gen_id, "instrumental", {
                 "title": title,
@@ -472,6 +502,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 "instrumental": True,
                 "style_weight": weight,
                 "weirdness_constraint": constraint,
+                "negative_tags": negative_tags,
             })
             suno_result = await suno.generate_music(
                 prompt="",
@@ -480,6 +511,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 instrumental=True,
                 style_weight=weight,
                 weirdness_constraint=constraint,
+                negative_tags=negative_tags or None,
                 progress_cb=progress_cb,
             )
             result = {
@@ -577,7 +609,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 # User's free-text style brief keeps highest authority, if any.
                 style_prompt=params.get("style", "").strip(),
             )
-            final_style, _w, _c = build_suno_style(
+            final_style, _w, _c, cover_negative_tags = build_suno_style(
                 cover_song_params,
                 user_id=gen.user_id,
                 for_cover=True,
@@ -599,6 +631,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 "instrumental": is_instrumental,
                 "vocal_gender": params.get("vocal_gender"),
                 "audio_weight": params.get("audio_weight", _COVER_AUDIO_WEIGHT_DEFAULT),
+                "negative_tags": cover_negative_tags,
             })
             suno_result = await suno.generate_cover(
                 upload_url=upload_url,
@@ -610,6 +643,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 style_weight=params.get("style_weight"),
                 weirdness_constraint=params.get("weirdness_constraint"),
                 audio_weight=params.get("audio_weight", _COVER_AUDIO_WEIGHT_DEFAULT),
+                negative_tags=cover_negative_tags or None,
                 progress_cb=progress_cb,
             )
             result = {
@@ -775,9 +809,10 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 key_instruments=agent_mp.get("key_instruments", []),
                 constraints=agent_mp.get("constraints", ""),
                 suggested_bpm=agent_mp.get("suggested_bpm", ""),
+                negative_tags=agent_mp.get("negative_tags") or [],
                 style_prompt=(agent_research + "\n" + agent_prompt_text).strip(),
             )
-            preset_style, weight, constraint = build_suno_style(
+            preset_style, weight, constraint, negative_tags = build_suno_style(
                 song_params, user_id=gen.user_id
             )
 
@@ -794,8 +829,11 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 agent_prompt=agent_prompt_text,
                 agent_research_notes=agent_research,
                 preset_style_hint=preset_style,
+                negative_tags=negative_tags,
             )
             style = cap_style_len(_ensure_rich_style(style, preset_style))
+            style, _leaked_neg = extract_negatives(style, keep_vocal_text=True)
+            negative_tags = _merge_negative_tags(negative_tags, _leaked_neg)
 
             _dump_payload(gen_id, "occasion", {
                 "title": gen.title,
@@ -805,6 +843,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 "vocal_gender": vocal_gender(params.get("vocal", "")),
                 "style_weight": weight,
                 "weirdness_constraint": constraint,
+                "negative_tags": negative_tags,
             })
             await _publish(ctx, gen_id, {"status": "processing", "step": "music"})
             suno_result = await suno.generate_music(
@@ -815,6 +854,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 vocal_gender=vocal_gender(params.get("vocal", "")),
                 style_weight=weight,
                 weirdness_constraint=constraint,
+                negative_tags=negative_tags or None,
                 progress_cb=progress_cb,
             )
             result = {
