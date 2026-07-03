@@ -9,6 +9,7 @@ import {
   deleteGeneration,
   renameGeneration,
   generateSimilar,
+  generateRetake,
   updateGenerationTags,
   fetchTrash,
   purgeTrash,
@@ -185,6 +186,13 @@ export function LibraryCard() {
 
   const similarMutation = useMutation({
     mutationFn: (generationId: string) => generateSimilar(generationId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
+    },
+  });
+
+  const retakeMutation = useMutation({
+    mutationFn: (generationId: string) => generateRetake(generationId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
     },
@@ -446,6 +454,13 @@ export function LibraryCard() {
                 onSimilar={
                   it.generationId
                     ? () => similarMutation.mutate(it.generationId)
+                    : undefined
+                }
+                onRetake={
+                  it.generationId &&
+                  it.isOwn !== false &&
+                  (it.type === "song" || it.type === "instrumental")
+                    ? () => retakeMutation.mutate(it.generationId)
                     : undefined
                 }
                 onEditTags={

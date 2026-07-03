@@ -551,6 +551,15 @@ export function generateSimilar(generationId: string): Promise<GenerateResponse>
   });
 }
 
+/** Fresh take of the user's OWN track — identical brief and lyrics, no remix.
+ *  Variation comes from the backend's dynamic salt + enricher sampling.
+ *  Owner-only, song/instrumental sources; costs the same as a normal generation. */
+export function generateRetake(generationId: string): Promise<GenerateResponse> {
+  return apiFetch(`/api/v1/generate/retake/${encodeURIComponent(generationId)}`, {
+    method: "POST",
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Upload API — presigned URLs for cover song source files
 // ---------------------------------------------------------------------------

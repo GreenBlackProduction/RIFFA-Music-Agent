@@ -873,6 +873,90 @@ async def generate_similar(
     return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
 
 
+@router.post(
+    "/retake/{generation_id}",
+    response_model=GenerateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+@limiter.limit("20/minute")
+async def generate_retake(
+    generation_id: str,
+    request: Request,
+    user: User = Depends(current_user),
+    session: AsyncSession = Depends(db_session),
+    settings: Settings = Depends(get_settings),
+) -> GenerateResponse:
+    """Fresh take of the caller's OWN track: identical brief (and lyrics for
+    songs), no remix — unlike /similar, params are copied verbatim. Take-to-take
+    variation comes from the style builder's dynamic salt and the GPT enricher's
+    sampling, so the result is the same song idea with a different arrangement.
+    """
+    try:
+        src_gid = uuid.UUID(generation_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="bad generation_id"
+        ) from exc
+
+    src = (
+        await session.execute(select(Generation).where(Generation.id == src_gid))
+    ).scalar_one_or_none()
+    if src is None or src.deleted_at is not None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="track not found")
+
+    # Retake reuses the full private brief (incl. lyrics) — owner only.
+    if src.user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="retake is available only for your own tracks",
+        )
+    if src.type not in (GenerationType.song, GenerationType.instrumental):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="retake supports only song / instrumental sources",
+        )
+
+    new_params: dict[str, Any] = dict(src.params or {})
+    new_params.pop("similar_source_generation_id", None)
+    new_params["retake_source_generation_id"] = generation_id
+    # Same words, new take: reuse the exact lyrics the source ended up with.
+    if src.type == GenerationType.song:
+        src_lyrics = str(
+            (src.result or {}).get("lyrics") or new_params.get("lyrics") or ""
+        ).strip()
+        if src_lyrics:
+            new_params["lyrics"] = src_lyrics
+            new_params["text_mode"] = "custom"
+
+    artist = _resolve_artist(user)
+    src_short = _extract_short_title(src.title or "трек")
+    version = await _next_version(
+        session,
+        user_id=user.id,
+        gen_type=src.type,
+        base_name=src_short,
+        marker="Vers",
+        start=2,
+    )
+    new_title = format_track_name(artist, f"{src_short} Vers{version}")
+
+    gen, created = await _create_generation(
+        session,
+        user,
+        src.type,
+        params=new_params,
+        title=new_title,
+        genre=src.genre or "",
+        mood=src.mood or "",
+        tempo=src.tempo or "",
+        vocal=src.vocal or "",
+    )
+    await session.commit()
+    if created:
+        await _enqueue(settings.redis_url, str(gen.id))
+    return GenerateResponse(generation_id=str(gen.id), ws_url=_ws_url(request, str(gen.id)))
+
+
 # ---------------------------------------------------------------------------
 # Upload presigned URL endpoint (temporary workaround for upload router issue)
 # ---------------------------------------------------------------------------
