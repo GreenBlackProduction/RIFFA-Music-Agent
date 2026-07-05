@@ -18,16 +18,14 @@ import {
 } from "@/lib/api/client";
 import "./AgentChat.css";
 
-// ─── Session persistence (localStorage, TTL 1 hour) ───────────────────────
-// Единый ключ независимо от модуля: агент помнит диалог при переходе
-// между страницами / модулями. Module передаётся только как hint бэкенду
-// для первого приветствия — если есть сохранённая история, оно пропускается.
+// ─── Session persistence (localStorage, TTL 24 hours, per-user) ───────────
+// Ключ включает userId — переписка привязана к аккаунту и не утекает
+// при sign-out. Без userId сессия не сохраняется (неавторизованный).
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;  // 24 часа
-const UNIFIED_SESSION_KEY = "riffa_agent_unified_v1";
 
-function sessionKey(_module: string) {
-  return UNIFIED_SESSION_KEY;
+function sessionKey(userId: string) {
+  return `riffa_agent_unified_v1:${userId}`;
 }
 
 interface SavedAgentSession {
@@ -43,13 +41,13 @@ interface SavedAgentSession {
   savedAt: number;
 }
 
-function loadAgentSession(module: string): SavedAgentSession | null {
+function loadAgentSession(userId: string): SavedAgentSession | null {
   try {
-    const raw = localStorage.getItem(sessionKey(module));
+    const raw = localStorage.getItem(sessionKey(userId));
     if (!raw) return null;
     const s: SavedAgentSession = JSON.parse(raw);
     if (Date.now() - (s.savedAt ?? 0) > SESSION_TTL_MS) {
-      localStorage.removeItem(sessionKey(module));
+      localStorage.removeItem(sessionKey(userId));
       return null;
     }
     return s;
@@ -58,14 +56,14 @@ function loadAgentSession(module: string): SavedAgentSession | null {
   }
 }
 
-function saveAgentSession(module: string, data: Omit<SavedAgentSession, "savedAt">) {
+function saveAgentSession(userId: string, data: Omit<SavedAgentSession, "savedAt">) {
   try {
-    localStorage.setItem(sessionKey(module), JSON.stringify({ ...data, savedAt: Date.now() }));
+    localStorage.setItem(sessionKey(userId), JSON.stringify({ ...data, savedAt: Date.now() }));
   } catch { /* storage full / unavailable */ }
 }
 
-function clearAgentSession(module: string) {
-  localStorage.removeItem(sessionKey(module));
+function clearAgentSession(userId: string) {
+  localStorage.removeItem(sessionKey(userId));
 }
 
 // ─── Wizard chips ──────────────────────────────────────────────────────────
@@ -257,6 +255,7 @@ const IconWarn = () => (
 // ─── Props / result types ──────────────────────────────────────────────────
 
 export interface AgentChatProps {
+  userId: string;
   onComplete?: (result: AgentResult) => void;
   onCancel: () => void;
   onLaunch?: (result: AgentResult) => void | Promise<void>;
@@ -293,6 +292,7 @@ interface UiMessage {
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function AgentChat({
+  userId,
   onComplete,
   onCancel,
   onLaunch,
@@ -427,9 +427,10 @@ export function AgentChat({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, thinking, done]);
 
-  // ── restore saved session (runs before bootstrap) ──
+  // ── restore saved session (runs on mount and when userId resolves) ──
   useEffect(() => {
-    const saved = loadAgentSession(module);
+    if (!userId) return;
+    const saved = loadAgentSession(userId);
     if (saved?.messages?.length) {
       setMessages(saved.messages);
       const hist = saved.history ?? [];
@@ -449,13 +450,12 @@ export function AgentChat({
       }
       bootedRef.current = true; // skip greeting — session already has messages
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userId]);
 
   // ── auto-save session on every message change ──
   useEffect(() => {
     if (messages.length === 0) return;
-    saveAgentSession(module, {
+    saveAgentSession(userId, {
       messages,
       history,
       wizardPhase,
@@ -471,7 +471,7 @@ export function AgentChat({
 
   // ── bootstrap ──
   useEffect(() => {
-    if (bootedRef.current) return;
+    if (!userId || bootedRef.current) return;
     bootedRef.current = true;
     const seed = (initialAnswer ?? "").trim();
     if (agentInitiates && !seed) {
@@ -503,8 +503,7 @@ export function AgentChat({
       appendUserMessage(seed);
       void classifyAndRoute(seed);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [agentInitiates]);
+  }, [userId, agentInitiates]);
 
   // ── Local wizard helpers ──
 
@@ -632,8 +631,14 @@ export function AgentChat({
 
     const scriptable =
       cls.module === "song" || cls.module === "instrumental" || cls.module === "sound_effect";
+    // GPT flow for everything the chip wizard cannot hold:
+    //  • artist references — the GPT agent grounds them via web research and
+    //    copies instruments/production into the brief; the wizard kept only
+    //    tags/BPM and produced generic results (2026-07-05 audit);
+    //  • exclusions («без синтезаторов») → music_params.negative_tags;
+    //  • named instruments/production details → key_instruments/techniques.
     const needsGpt =
-      cls.too_vague || (cls.artist_ref && !hasReference);
+      cls.too_vague || cls.artist_ref || !!cls.has_exclusions || !!cls.has_instrument_details;
 
     if (scriptable && !needsGpt) {
       enterScriptedWizard();
@@ -880,12 +885,20 @@ export function AgentChat({
     setHistory(nextHistory);
     historyRef.current = nextHistory;
 
+    // Only pass params the user actually confirmed — inventing defaults here
+    // ("male", "energetic") silently overrode the user's brief. Unset fields
+    // are the agent's call, and it must say so in its assumptions note.
     const p = wizardParams.current;
+    const bits: string[] = [];
+    if (p.customGenre || p.genre) bits.push(`жанр=${p.customGenre || p.genre}`);
+    if (p.mood) bits.push(`настроение=${p.mood}`);
+    if (p.tempo) bits.push(`темп=${p.tempo}`);
+    if (p.vocal) bits.push(`вокал=${p.vocal}`);
     const finalizeMsg =
-      `Финализируй. Все параметры собраны: ` +
-      (p.customGenre || p.genre ? `жанр=${p.customGenre || p.genre}, ` : "") +
-      `настроение=${p.mood || "energetic"}, темп=${p.tempo || "medium"}, вокал=${p.vocal || "male"}. ` +
-      `Текст утверждён (custom). Запускай с done=true.`;
+      `Финализируй бриф (done=true). ` +
+      (bits.length ? `Подтверждённые пользователем параметры: ${bits.join(", ")}. ` : "") +
+      `Остальные параметры выбери сам из контекста беседы и отметь их как свои допущения. ` +
+      (p.lyrics ? `Текст песни утверждён пользователем (text_mode=custom).` : "");
 
     await sendInternal(finalizeMsg, nextHistory, { isFinalize: true });
   }
@@ -1097,6 +1110,13 @@ export function AgentChat({
       return;
     }
 
+    // Exclusions / instrument details can't live in wizard slots — hand the
+    // message to the GPT agent, which maps them to negative_tags/instruments.
+    if (cls.has_exclusions || cls.has_instrument_details) {
+      await sendInternal(text, historyRef.current, { alreadyAppended: true });
+      return;
+    }
+
     const p = wizardParams.current;
     const ref = cls.reference && (cls.reference.artist || cls.reference.title) ? cls.reference : null;
     let changed = false;
@@ -1297,7 +1317,7 @@ export function AgentChat({
       setHistory(finalHistory);
       historyRef.current = finalHistory;
 
-      if (resp.done && resp.prompt) {
+      if (resp.done && (resp.prompt || resp.intent)) {
         // Merge wizard-collected lyrics into intent params
         const intent = resp.intent ?? null;
         if (intent && wizardParams.current.lyrics) {
@@ -1806,7 +1826,7 @@ export function AgentChat({
               type="button"
               className="agent-chat__new"
               onClick={() => {
-                clearAgentSession(module);
+                clearAgentSession(userId);
                 setMessages([]);
                 setHistory([]);
                 historyRef.current = [];

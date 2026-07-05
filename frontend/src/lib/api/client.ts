@@ -842,6 +842,10 @@ export interface AgentClassifyResponse {
   artist_ref: boolean;
   obscure_genre: boolean;
   too_vague: boolean;
+  /** Request carries exclusions ("без синтезаторов") — wizard can't hold them. */
+  has_exclusions?: boolean;
+  /** Request names specific instruments/production details — wizard can't hold them. */
+  has_instrument_details?: boolean;
   era: string;
   suggested_bpm: string;
   reference: AgentReference | null;

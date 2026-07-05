@@ -642,7 +642,8 @@ Cannot do:
 Triggers: «сделай кавер», «make a cover», «перепеть», «cover of X».
 Action: set module=cover_song, confidence=low. In `reply` tell the user
 to switch to the Cover module and upload the source mp3 / m4a / wav
-first. Don't pretend to launch it.
+first. Don't pretend to launch it. Still give suggestions, e.g.
+["Как загрузить файл?", "Сделать трек с нуля"].
 
 ────────────────────────────────────────────────────────────────────────
 **cover_art** — Nano Banana image, 1024×1024 square
@@ -1201,7 +1202,8 @@ Intent structure (only when done=true):
     "description": "<short user-facing label, ≤500 chars; for sound_effect this
       becomes the literal SFX prompt; for occasion it's the recipient/context>",
     "text_mode": "ai" | "custom" | "none",
-    "lyrics": "<only if user pasted their own text>",
+    "lyrics": "<final approved lyrics: the user's own pasted text OR your drafted
+      text AFTER the user approved it (LYRICS DRAFTING STEP E). Empty otherwise>",
     "genre": "<English label, e.g. 'Pop', 'Rock', 'Lo-fi', 'Ambient'>",
     "custom_genre": "<free text only if no preset matches>",
     "mood": "<English label, e.g. 'Happy', 'Melancholic', 'Energetic'>",
@@ -1415,7 +1417,12 @@ def _splice_after_first_bullet(summary: str, new_line: str) -> str:
     return f"{new_line}\n{summary}"
 
 
-_INSTRUMENTAL_MARKERS = (
+# Unambiguous vocal-negation markers — safe to scan in the agent's own
+# reply/summary. Bare "инструментал"/"instrumental" is NOT here: normal song
+# briefs legitimately say "инструментальные партии" / "rich instrumental,
+# layered vocals", and forcing those to module=instrumental silently killed
+# the vocals (found in the 2026-07-05 audit).
+_INSTRUMENTAL_STRICT_MARKERS = (
     "без вокала",
     "без голоса",
     "без слов",
@@ -1427,52 +1434,67 @@ _INSTRUMENTAL_MARKERS = (
     "no vocals",
     "no vocal",
     "instrumental only",
-    "instrumental,",
     "instrumental track",
+)
+
+# Bare genre-level markers — trusted ONLY in intent.params.description (the
+# module-bound label), never in prose fields.
+_INSTRUMENTAL_DESC_MARKERS = _INSTRUMENTAL_STRICT_MARKERS + (
     "инструментал",
+    "instrumental",
 )
 
 
-def _looks_instrumental(*texts: str) -> bool:
-    blob = " ".join(t.lower() for t in texts if t)
-    return any(marker in blob for marker in _INSTRUMENTAL_MARKERS)
+def _looks_instrumental(description: str, *prose_texts: str) -> bool:
+    desc = (description or "").lower()
+    if any(marker in desc for marker in _INSTRUMENTAL_DESC_MARKERS):
+        return True
+    blob = " ".join(t.lower() for t in prose_texts if t)
+    return any(marker in blob for marker in _INSTRUMENTAL_STRICT_MARKERS)
 
 
-_SFX_MARKERS = (
+# Unambiguous SFX markers — safe anywhere (reply/summary/prompt).
+_SFX_STRICT_MARKERS = (
     "звуковой эффект",
     "звуковые эффекты",
     "звук эффект",
     "sound effect",
     "sound-effect",
     "sfx",
+    "звуковая текстура",
+    "impact sound",
+    "intro sting",
+    "ringtone",
+)
+
+# Context markers — a normal track brief often contains these words in prose
+# («взрывная энергия», «атмосфера звука города», «в стиле Стинга»), so they
+# are trusted ONLY inside intent.params.description, which for sound_effect
+# IS the literal SFX brief.
+_SFX_DESC_MARKERS = _SFX_STRICT_MARKERS + (
     " звук ",  # space-bounded so we don't match "звуковая дорожка"
-    "звука",
     "звук хора",
     "звук дождя",
     "звук моря",
     "звук ветра",
     "звук удара",
     "звук уведомления",
-    "звуковая текстура",
     "эмбиент звук",
-    "ringtone",
-    "impact sound",
     "one-shot",
-    "стинг",
-    "intro sting",
+    "whoosh",
     "взрыв",
     "выстрел",
     "хлопок",
-    "whoosh",
 )
 
 
-def _looks_sound_effect(*texts: str) -> bool:
+def _looks_sound_effect(description: str, *prose_texts: str) -> bool:
     """Detect that the user is asking for a short SFX rather than a track."""
-    blob = " ".join((t.lower() if t else "") for t in texts)
-    # Pad with spaces so " звук " marker matches at boundaries.
-    blob = f" {blob} "
-    return any(marker in blob for marker in _SFX_MARKERS)
+    desc = f" {(description or '').lower()} "
+    if any(marker in desc for marker in _SFX_DESC_MARKERS):
+        return True
+    blob = f" {' '.join((t.lower() if t else '') for t in prose_texts)} "
+    return any(marker in blob for marker in _SFX_STRICT_MARKERS)
 
 
 _COVER_ART_MARKERS = (
@@ -1488,6 +1510,9 @@ _COVER_ART_MARKERS = (
 
 
 def _looks_cover_art(*texts: str) -> bool:
+    """Scan description + summary ONLY — the agent's reply legitimately offers
+    «потом можешь сделать обложку» as a follow-up on music briefs, and that
+    must not force the whole launch to cover_art."""
     blob = " ".join((t.lower() if t else "") for t in texts)
     return any(marker in blob for marker in _COVER_ART_MARKERS)
 
@@ -1551,7 +1576,9 @@ def _coerce_intent(
 
     # Hard SFX override — "звуковой эффект Х" must NEVER route to
     # instrumental/song. SFX is a different generator and a wrong route
-    # costs the user tokens for a useless result.
+    # costs the user tokens for a useless result. Context markers («звук
+    # дождя», «взрыв») count only inside description; prose fields need
+    # the unambiguous «звуковой эффект»/sfx wording.
     if module_val in ("song", "instrumental", "occasion") and _looks_sound_effect(
         description, reply_text, summary_text, prompt_text
     ):
@@ -1564,8 +1591,9 @@ def _coerce_intent(
         text_mode = "none"
 
     # Hard cover_art override — "обложка" wins over "сделай трек".
+    # Reply is NOT scanned: the agent often offers cover art as a follow-up.
     if module_val in ("song", "instrumental", "occasion", "sound_effect") and _looks_cover_art(
-        description, reply_text, summary_text
+        description, summary_text
     ):
         logger.info(
             "[AGENT] forcing module=cover_art — cover-art markers detected "
@@ -1577,9 +1605,10 @@ def _coerce_intent(
 
     # Hard instrumental override — protects against GPT slipping on the
     # module flag when the brief is clearly instrumental. Runs LAST so
-    # sound_effect / cover_art win first.
+    # sound_effect / cover_art win first. The English `prompt` is NOT
+    # scanned — song prompts legitimately contain "instrumental" prose.
     if module_val in ("song", "occasion") and _looks_instrumental(
-        description, reply_text, summary_text, prompt_text
+        description, reply_text, summary_text
     ):
         logger.info(
             "[AGENT] forcing module=instrumental — instrumental markers "
@@ -2111,6 +2140,19 @@ def _postprocess_agent_reply(
     # Cap prompt at Suno's music limit (5000) just in case.
     if len(prompt) > 5000:
         prompt = prompt[:5000].rsplit(" ", 1)[0]
+    # `prompt` is deprecated but the frontend still gates the launch button on
+    # it — synthesize one from music_params so a model that skipped the legacy
+    # field doesn't silently lose the whole brief.
+    if done and not prompt:
+        fallback_bits = [
+            music_params.get("subgenre") or music_params.get("custom_genre") or music_params.get("genre") or "",
+            ", ".join(music_params.get("key_instruments") or []),
+            music_params.get("mood", ""),
+            music_params.get("suggested_bpm", ""),
+        ]
+        prompt = short_prompt or ", ".join(b for b in fallback_bits if b)
+        if prompt:
+            logger.warning("[AGENT] done=true without `prompt` — synthesized fallback")
     # short_prompt fallback: distill from the full prompt if GPT omitted it.
     if done and not short_prompt and prompt:
         short_prompt = prompt[:220].rsplit(" ", 1)[0]
@@ -2298,7 +2340,9 @@ user already stated. Output ONLY raw JSON (no markdown, no extra keys), exactly:
   "artist_ref": <true if the user named a specific artist/band/song/producer>,
   "reference_query": "<if artist_ref: the 'Artist - Song' or artist name to look up, else ''>",
   "obscure_genre": <true if the genre is niche and needs research>,
-  "too_vague": <true if the request is too vague to route (e.g. "что-то прикольное", "сделай красиво")>
+  "too_vague": <true if the request is too vague to route (e.g. "что-то прикольное", "сделай красиво")>,
+  "has_exclusions": <true if the user EXCLUDES anything: "без синтезаторов", "no synths", "никаких барабанов", "без автотюна">,
+  "has_instrument_details": <true if the user names specific instruments, parts, or production details beyond genre/mood/tempo: "ровная бочка", "интересная бас партия", "с саксофоном", "tape saturation", "жирный бас">
 }
 
 MODULE ROUTING (pick exactly one):
@@ -2350,6 +2394,12 @@ class AgentClassifyResponse(BaseModel):
     artist_ref: bool = False
     obscure_genre: bool = False
     too_vague: bool = False
+    # Signals that the request carries requirements the scripted wizard cannot
+    # hold (exclusions → negative_tags; named instruments/production details →
+    # key_instruments/techniques). The frontend routes these to the GPT flow —
+    # the wizard would silently drop them (2026-07-05 audit).
+    has_exclusions: bool = False
+    has_instrument_details: bool = False
     # Reference-track enrichment — real BPM/genre/era/mood from Deezer or Perplexity.
     era: str = ""
     suggested_bpm: str = ""
@@ -2540,6 +2590,8 @@ async def agent_classify(
         artist_ref=bool(parsed.get("artist_ref", False)),
         obscure_genre=bool(parsed.get("obscure_genre", False)),
         too_vague=bool(parsed.get("too_vague", False)),
+        has_exclusions=bool(parsed.get("has_exclusions", False)),
+        has_instrument_details=bool(parsed.get("has_instrument_details", False)),
         era=era,
         suggested_bpm=suggested_bpm,
         reference=reference,
