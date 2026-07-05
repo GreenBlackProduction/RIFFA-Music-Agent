@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 _OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 _MODEL = "perplexity/sonar"
-_MAX_TOKENS = 800
+_MAX_TOKENS = 1000
 _TIMEOUT = 15.0
 
 _RESEARCH_PROMPT = (
@@ -31,10 +31,18 @@ _RESEARCH_PROMPT = (
     '{"matched":"<who you think it is and why>","confidence":<0.0-1.0>,'
     '"ambiguous":<true if the name could be several different artists>,'
     '"genre":"","subgenres":[],"era":"<e.g. 2010s>","bpm_range":"<e.g. 90-110 BPM>",'
-    '"mood":[],"key_instruments":[],"production_style":"",'
+    '"mood":[],'
+    '"key_instruments":["<4-8 SPECIFIC instruments/sound sources with descriptors, '
+    'e.g. detuned analog synth pads, chopped vocal samples, live breakbeat drums>"],'
+    '"vocal_style":"<lead vocal character: timbre, delivery, processing — or \'instrumental\'>",'
+    '"production_style":"<mixing/production fingerprint: e.g. tape-saturated lo-fi, '
+    'cavernous reverb, sidechained sub-bass>",'
+    '"signature":"<1-2 sentences: what makes this artist instantly recognizable — '
+    'the concrete sonic trademarks, not biography>",'
     '"similar_artists":[],"note":"<if NOT sure which artist, say so plainly>"}\n'
-    "If you cannot reliably identify the artist, set confidence below 0.6 and "
-    "ambiguous:true. Reference: "
+    "Ground every field in the artist's ACTUAL discography found in the search — "
+    "not in name-based guesses. If you cannot reliably identify the artist, set "
+    "confidence below 0.6 and ambiguous:true. Reference: "
 )
 
 # Simple in-process TTL cache (key → (result, expires_at)).
@@ -114,6 +122,11 @@ async def research_reference(query: str, *, settings: Settings) -> dict | None:
         "bpm": bpm,
         "tags": tags,
         "similar": [str(s) for s in (data.get("similar_artists") or []) if s][:6],
+        # These three were requested from Perplexity but previously DROPPED
+        # here — the deepest part of the research never reached the agent.
+        "instruments": [str(i) for i in (data.get("key_instruments") or []) if i][:8],
+        "vocal_style": str(data.get("vocal_style") or "").strip(),
+        "signature": str(data.get("signature") or "").strip(),
         "production": str(data.get("production_style") or "").strip(),
         "note": str(data.get("note") or "").strip(),
         "source": "perplexity",

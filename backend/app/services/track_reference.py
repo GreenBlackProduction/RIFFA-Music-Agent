@@ -189,12 +189,35 @@ async def fetch_lastfm_tags(
     return cleaned
 
 
+# In-process TTL cache — the agent now re-grounds the reference on EVERY chat
+# turn (so the facts survive until the finalize turn), which would otherwise
+# re-hit Deezer/Last.fm each time.
+_resolve_cache: dict[str, tuple[dict | None, float]] = {}
+_RESOLVE_CACHE_TTL = 3600.0
+
+
 async def resolve_reference(raw: str, *, lastfm_api_key: str = "") -> dict | None:
     """Resolve a link or "artist - song" string to ``{artist,title,bpm,year,era,
     genre,tempo,tags,source}`` via Deezer (+ Last.fm tags), or ``None``."""
     raw = (raw or "").strip()
     if not raw:
         return None
+
+    import time as _time
+    ck = re.sub(r"\s+", " ", raw.lower())
+    cached, exp = _resolve_cache.get(ck, (None, 0.0))
+    if _time.monotonic() < exp:
+        return cached
+
+    result = await _resolve_reference_uncached(raw, lastfm_api_key=lastfm_api_key)
+    # Negative results get a short TTL — a flaky Deezer timeout must not blank
+    # the reference for a whole hour.
+    ttl = _RESOLVE_CACHE_TTL if result else 60.0
+    _resolve_cache[ck] = (result, _time.monotonic() + ttl)
+    return result
+
+
+async def _resolve_reference_uncached(raw: str, *, lastfm_api_key: str = "") -> dict | None:
 
     async with httpx.AsyncClient(timeout=_TIMEOUT, headers={"User-Agent": "RIFFA/1.0"}) as client:
         track_id: int | None = None

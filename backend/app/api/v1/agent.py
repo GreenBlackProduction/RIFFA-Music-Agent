@@ -182,6 +182,12 @@ as absolute:
     were in Russian. NEVER drift back to Russian.
   • The only exception is the user's own quoted words inside a draft (lyrics,
     user-supplied artist names, etc.) — keep those verbatim.
+  • REFERENCE DATA / web-search facts arrive in English. When you describe an
+    artist or a style to the user (in `reply`, `summary`, `intent.note`),
+    TRANSLATE those facts into the locked language — never paste English
+    sentences or English tag lists into a Russian reply. Artist names, band
+    names and genre proper nouns (e.g. "UK garage", "lo-fi") stay as is;
+    everything else must be in the locked language.
   • Machine-readable fields (`prompt`, `genre`, `mood`, `tempo`, `vocal`,
     `key_instruments`, `techniques`, `era`, `research_notes`) stay in English
     regardless of language lock — those feed Suno, not the user.
@@ -1245,16 +1251,24 @@ def _build_user_context(req: AgentChatRequest) -> str:
     return "\n".join(bits)
 
 
-def _detect_reply_language(messages: list[ChatMessage]) -> str:
+def _detect_reply_language(messages: list[ChatMessage], ui_lang: str = "") -> str:
     """Decide which language the agent must use for the next reply.
 
-    Strategy: look at the user's LATEST message — that's the strongest signal.
-    Fall back to the dominant language across recent user turns. We compare
-    Cyrillic vs Latin character counts on the alphabetic chars only, so
-    punctuation, numbers, emojis don't skew it.
+    The SITE LANGUAGE SETTING (``ui_lang``, sent by the frontend) is
+    authoritative: a user who set the interface to Russian must never get an
+    English reply just because they pasted a Latin artist name or a Spotify
+    URL — that content-based flip was a recurring owner complaint. Content
+    detection (Cyrillic vs Latin counts) is only the fallback for unknown
+    ``ui_lang`` values.
 
     Returns: "English" or "Russian".
     """
+    lang = (ui_lang or "").strip().lower()
+    if lang.startswith("ru"):
+        return "Russian"
+    if lang.startswith("en"):
+        return "English"
+
     user_msgs = [m.content for m in messages if m.role == "user"][-5:]
     if not user_msgs:
         return "Russian"
@@ -1688,7 +1702,11 @@ async def _stream_agent_completion(
 _REF_GROUNDING_RULE = (
     "REFERENCE GROUNDING: if a system note labelled 'REFERENCE DATA' is present, treat it as "
     "authoritative — base genre / era / tempo / key_instruments / research_notes on those facts "
-    "and never invent a different style. If a note labelled 'REFERENCE LOOKUP: no reliable data' "
+    "and never invent a different style. On the FINALIZE turn (done=true) this is mandatory: "
+    "copy the note's key instruments into music_params.key_instruments, its production/signature "
+    "facts into research_notes and techniques, its BPM into suggested_bpm — the downstream prompt "
+    "engineer sees ONLY music_params/research_notes, so any fact you leave out of them is lost. "
+    "If a note labelled 'REFERENCE LOOKUP: no reliable data' "
     "is present, do NOT fabricate that artist's sound — keep done=false and ask the user to "
     "describe the style or name a specific track. Never confabulate a niche or ambiguous artist "
     "from memory."
@@ -1711,25 +1729,45 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
     """
     from app.services.artist_research import research_reference
 
-    last_user = next((m.content for m in reversed(windowed) if getattr(m, "role", "") == "user"), "")
-    text = (last_user or "").strip()
-    if len(text) < 4 or not _REF_HINT_RE.search(text):
+    # Scan the WHOLE window, newest first — previously only the LAST user
+    # message was checked, so on the finalize turn («собирай бриф») the
+    # reference facts vanished from context and the model built music_params
+    # from hazy general knowledge (owner complaint: correct first description,
+    # then a brief that sounds nothing like the artist). Lookups are TTL-cached
+    # downstream, so re-grounding every turn is cheap.
+    user_msgs = [
+        str(getattr(m, "content", "") or "")
+        for m in windowed
+        if getattr(m, "role", "") == "user"
+    ]
+    if not user_msgs:
         return ""
 
-    url_query = (detect_reference_url(text) or "").strip()
-    name_query = ""
+    # URL reference: take the newest link anywhere in the conversation.
+    url_query = ""
+    for msg_text in reversed(user_msgs):
+        u = (detect_reference_url(msg_text) or "").strip()
+        if u:
+            url_query = u
+            break
 
+    name_query = ""
     if not url_query:
-        # Cheap extraction of a plain artist/song name from free text.
+        recent = [t.strip() for t in user_msgs[-8:] if len(t.strip()) >= 4 and _REF_HINT_RE.search(t)]
+        if not recent:
+            return ""
+        excerpt = "\n".join(f"- {t[:300]}" for t in recent)
+        # Cheap extraction of the most recently named artist/song reference.
         try:
             ex = await client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": (
-                        "Extract the ONE real music artist, band, producer or song the user names "
-                        'as a style reference. Respond JSON {"q":"<name>"}, or {"q":""} if they '
-                        "name no real artist/song.")},
-                    {"role": "user", "content": text[:500]},
+                        "Below are the user's recent messages from a music-brief chat, oldest "
+                        "first. Extract the ONE real music artist, band, producer or song the "
+                        "user most recently named as a style reference. Respond JSON "
+                        '{"q":"<name>"}, or {"q":""} if no real artist/song is named anywhere.')},
+                    {"role": "user", "content": excerpt[:1500]},
                 ],
                 temperature=0,
                 max_tokens=40,
@@ -1801,6 +1839,12 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
         tags_list = pdata.get("tags") or []
         if tags_list:
             bits.append(f"tags: {', '.join(tags_list[:6])}")
+        if pdata.get("instruments"):
+            bits.append(f"key instruments: {', '.join(pdata['instruments'])}")
+        if pdata.get("vocal_style"):
+            bits.append(f"vocal style: {pdata['vocal_style']}")
+        if pdata.get("signature"):
+            bits.append(f"signature sound: {pdata['signature']}")
         if pdata.get("similar"):
             bits.append(f"similar artists: {', '.join(pdata['similar'][:4])}")
         if pdata.get("production"):
@@ -1857,6 +1901,10 @@ async def agent_chat(
     if not body.messages:
         return AgentChatResponse(
             reply=(
+                "Hi! I'm RIFFA Agent — I'll help you build a prompt for our "
+                "AI studio. Tell me in a couple of words what you want to make: "
+                "a track, an instrumental, cover art or a sound effect?"
+                if (body.lang or "").lower().startswith("en") else
                 "Привет! Я RIFFA Agent — помогу собрать промпт для нашей "
                 "AI-студии. Расскажи в двух словах, что хочется сделать: "
                 "трек, инструментал, обложку или эффект?"
@@ -1877,7 +1925,7 @@ async def agent_chat(
     # Sliding window — only the last 40 turns go to GPT (keeps context tight
     # and token cost predictable for long chats).
     windowed = body.messages[-40:]
-    reply_lang = _detect_reply_language(windowed)
+    reply_lang = _detect_reply_language(windowed, ui_lang=body.lang)
     chat_messages: list[dict[str, str]] = [
         {"role": "system", "content": _SYS_AGENT},
         {
@@ -2142,6 +2190,10 @@ async def agent_chat_stream(
     if not body.messages:
         canned = AgentChatResponse(
             reply=(
+                "Hi! I'm RIFFA Agent — I'll help you build a prompt for our "
+                "AI studio. Tell me in a couple of words what you want to make: "
+                "a track, an instrumental, cover art or a sound effect?"
+                if (body.lang or "").lower().startswith("en") else
                 "Привет! Я RIFFA Agent — помогу собрать промпт для нашей "
                 "AI-студии. Расскажи в двух словах, что хочется сделать: "
                 "трек, инструментал, обложку или эффект?"
@@ -2168,7 +2220,7 @@ async def agent_chat_stream(
 
     client = AsyncOpenAI(api_key=api_key, base_url=settings.openai_base_url)
     windowed = body.messages[-40:]
-    reply_lang = _detect_reply_language(windowed)
+    reply_lang = _detect_reply_language(windowed, ui_lang=body.lang)
     chat_messages: list[dict[str, str]] = [
         {"role": "system", "content": _SYS_AGENT},
         {
