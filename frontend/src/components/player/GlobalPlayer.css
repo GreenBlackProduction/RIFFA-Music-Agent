@@ -457,13 +457,25 @@
   flex-shrink: 0;
 }
 .gp-queue-title {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-weight: 500;
 }
-.gp-queue-meta { font-family: var(--font-mono); font-size: 10px; opacity: 0.40; flex-shrink: 0; }
+/* Artist + title have priority: the huge shrink factor makes the meta column
+   collapse first, so genre/mood/BPM only show when there's room left. */
+.gp-queue-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  opacity: 0.40;
+  flex: 0 999999 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .gp-queue-playing { font-size: 11px; color: var(--hi); flex-shrink: 0; }
 
 /* ── Responsive ───────────────────────────────────────────────── */
