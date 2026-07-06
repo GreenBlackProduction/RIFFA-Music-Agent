@@ -51,7 +51,10 @@ _CACHE_TTL = 3600.0  # 1 hour — artist data doesn't change quickly
 
 
 def _cache_key(query: str) -> str:
-    return re.sub(r"\s+", " ", query.strip().lower())
+    # Punctuation-insensitive: «Azar - Strato» and «Azar strato» must hit the
+    # same entry — different keys gave the agent two conflicting fact sets
+    # (BPM 95 vs 82) within one conversation.
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]+", " ", query.strip().lower())).strip()
 
 
 def _bpm_range_midpoint(bpm_range: str) -> float:
@@ -110,13 +113,17 @@ async def research_reference(query: str, *, settings: Settings) -> dict | None:
     subgenres = [str(s) for s in (data.get("subgenres") or []) if s]
     mood = [str(m) for m in (data.get("mood") or []) if m]
     tags = list(dict.fromkeys(subgenres + mood))[:10]  # deduplicated, capped
+    # Never DROP the found genre: canonical_genre("") for unmapped labels like
+    # "Hip-Hop/Rap" was blanking the strongest fact in the reference note, and
+    # the agent then improvised a genre of its own (2026-07-06 Azar Strato chat).
+    genre_val = canonical_genre(genre_raw) or genre_raw or (subgenres[0] if subgenres else "")
 
     result = {
         "artist": str(data.get("matched") or query),
         "title": "",
         "confidence": confidence,
         "ambiguous": ambiguous,
-        "genre": canonical_genre(genre_raw),
+        "genre": genre_val,
         "era": str(data.get("era") or "").strip(),
         "tempo": bpm_to_tempo(bpm) if bpm else "",
         "bpm": bpm,
