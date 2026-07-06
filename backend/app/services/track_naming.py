@@ -29,6 +29,34 @@ _ARTIST_REFERENCE_RE = re.compile(
 )
 
 
+_INLINE_ARTIST_CLAUSE_RE = re.compile(
+    r"\b(?:inspired by|in the (?:style|vein) of|in style of|sounding like|"
+    r"similar to|reminiscent of|à la|a la|like)\s+"
+    r"[A-ZА-ЯЁ][\w'’.\-]*(?:\s+[A-ZА-ЯЁ][\w'’.\-]*){0,3}",
+)
+
+
+def strip_inline_artist_clause(text: str) -> str:
+    """Remove a MID-TEXT "inspired by <Artist Name>" clause, keeping the rest.
+
+    ``strip_artist_references`` cuts from the marker to the END of the string —
+    right for trailing title clauses, destructive for prose like
+    "hip-hop track inspired by Azar Strato, featuring aggressive kick drums"
+    (seen live 2026-07-06 in the agent's English prompt). Here only the clause
+    itself is dropped; the comma-separated tail survives.
+    """
+    if not text:
+        return text
+    cleaned = _INLINE_ARTIST_CLAUSE_RE.sub("", text)
+    if cleaned == text:
+        return text
+    cleaned = re.sub(r"\s*,\s*(?=[,.;])", "", cleaned)
+    cleaned = re.sub(r",\s*,+", ", ", cleaned)
+    cleaned = re.sub(r"\s+,", ",", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
+    return cleaned.strip(" ,;")
+
+
 def strip_artist_references(text: str) -> str:
     """Drop trailing 'inspired by X / in the style of Y / feat. Z' clauses.
 

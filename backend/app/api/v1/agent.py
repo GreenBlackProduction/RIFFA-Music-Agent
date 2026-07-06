@@ -2153,6 +2153,9 @@ def _postprocess_agent_reply(
     # Cap prompt at Suno's music limit (5000) just in case.
     if len(prompt) > 5000:
         prompt = prompt[:5000].rsplit(" ", 1)[0]
+    if done and prompt:
+        from app.services.track_naming import strip_inline_artist_clause
+        prompt = strip_inline_artist_clause(prompt)
     # `prompt` must be ENGLISH — it seeds the style head that goes to Suno
     # verbatim. A Russian prompt («Инструментал в стиле X — жёсткая бочка…»)
     # slipped through live on 2026-07-06 and opened the final Suno style.

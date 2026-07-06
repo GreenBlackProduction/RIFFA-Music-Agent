@@ -30,7 +30,12 @@ from app.services.prompt_engineering import (
     extract_negatives,
     vocal_gender,
 )
-from app.services.track_naming import compose_track_title, resolve_artist, strip_artist_references
+from app.services.track_naming import (
+    compose_track_title,
+    resolve_artist,
+    strip_artist_references,
+    strip_inline_artist_clause,
+)
 from app.services.suno import SunoError, SunoPending, make_suno_client
 from app.services.mirror import mirror_generation_result
 from app.services.wallet import InsufficientBalance, credit_tokens, deduct_tokens
@@ -53,7 +58,8 @@ def _style_head_text(*parts: str) -> str:
             continue
         cyr = sum(1 for c in part if "\u0400" <= c <= "\u04ff")
         if cyr <= len(part) * 0.15:
-            out.append(part)
+            # English text can still smuggle "inspired by <Artist>" mid-clause.
+            out.append(strip_inline_artist_clause(part))
     return "\n".join(out)
 
 
@@ -450,6 +456,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             # act as attractors — move them into negativeTags.
             style, _leaked_neg = extract_negatives(style, keep_vocal_text=True)
             negative_tags = _merge_negative_tags(negative_tags, _leaked_neg)
+            style = strip_inline_artist_clause(style)
 
             _dump_payload(gen_id, "song", {
                 "title": gen.title,
@@ -539,6 +546,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             style = cap_style_len(_ensure_rich_style(style, preset_style))
             style, _leaked_neg = extract_negatives(style, keep_vocal_text=True)
             negative_tags = _merge_negative_tags(negative_tags, _leaked_neg)
+            style = strip_inline_artist_clause(style)
 
             _dump_payload(gen_id, "instrumental", {
                 "title": title,
@@ -880,6 +888,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             style = cap_style_len(_ensure_rich_style(style, preset_style))
             style, _leaked_neg = extract_negatives(style, keep_vocal_text=True)
             negative_tags = _merge_negative_tags(negative_tags, _leaked_neg)
+            style = strip_inline_artist_clause(style)
 
             _dump_payload(gen_id, "occasion", {
                 "title": gen.title,
