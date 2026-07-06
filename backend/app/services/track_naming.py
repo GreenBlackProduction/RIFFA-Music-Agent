@@ -32,7 +32,16 @@ _ARTIST_REFERENCE_RE = re.compile(
 _INLINE_ARTIST_CLAUSE_RE = re.compile(
     r"\b(?:inspired by|in the (?:style|vein) of|in style of|sounding like|"
     r"similar to|reminiscent of|à la|a la|like)\s+"
-    r"[A-ZА-ЯЁ][\w'’.\-]*(?:\s+[A-ZА-ЯЁ][\w'’.\-]*){0,3}",
+    r"[A-ZА-ЯЁ][\w'’.\-]*(?:\s+(?:of|the|and|de|la|le|van|von)\s+[A-ZА-ЯЁ][\w'’.\-]*|\s+[A-ZА-ЯЁ][\w'’.\-]*){0,4}",
+)
+
+# GPT paraphrases endlessly («echoing the style of X», «capturing the sound of
+# X», «channeling the spirit of X») — catch the generic "<verb> the <quality>
+# of <Proper Name>" shape instead of enumerating every verb.
+_STYLE_OF_CLAUSE_RE = re.compile(
+    r"(?:\b(?:echoing|capturing|evoking|channeling|recalling|mirroring|emulating)\s+)?"
+    r"\b(?:in\s+)?the\s+(?:style|sound|vibe|spirit|manner|vein|aesthetic|essence)s?\s+of\s+"
+    r"[A-ZА-ЯЁ][\w'’.\-]*(?:\s+(?:of|the|and|de|la|le|van|von)\s+[A-ZА-ЯЁ][\w'’.\-]*|\s+[A-ZА-ЯЁ][\w'’.\-]*){0,4}",
 )
 
 
@@ -48,6 +57,7 @@ def strip_inline_artist_clause(text: str) -> str:
     if not text:
         return text
     cleaned = _INLINE_ARTIST_CLAUSE_RE.sub("", text)
+    cleaned = _STYLE_OF_CLAUSE_RE.sub("", cleaned)
     if cleaned == text:
         return text
     cleaned = re.sub(r"\s*,\s*(?=[,.;])", "", cleaned)

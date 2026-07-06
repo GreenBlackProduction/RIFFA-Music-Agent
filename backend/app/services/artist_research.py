@@ -143,6 +143,7 @@ async def research_reference(query: str, *, settings: Settings) -> dict | None:
         "tempo": bpm_to_tempo(bpm) if bpm else "",
         "bpm": bpm,
         "tags": tags,
+        "moods": mood[:5],
         "similar": [str(s) for s in (data.get("similar_artists") or []) if s][:6],
         # These three were requested from Perplexity but previously DROPPED
         # here — the deepest part of the research never reached the agent.

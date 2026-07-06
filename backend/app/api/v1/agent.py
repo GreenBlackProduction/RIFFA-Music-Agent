@@ -1651,6 +1651,7 @@ async def _stream_agent_completion(
     chosen_model: str,
     reply_lang: str,
     user_id: int | None = None,
+    ref_facts: dict | None = None,
 ) -> AsyncIterator[bytes]:
     """SSE generator: streams reply deltas + a final structured event.
 
@@ -1718,6 +1719,7 @@ async def _stream_agent_completion(
     final = _postprocess_agent_reply(
         accumulated, body, chosen_model, reply_lang,
         user_id=user_id, latency_ms=int((perf_counter() - _t0) * 1000),
+        ref_facts=ref_facts,
     )
     yield (
         b"event: complete\n"
@@ -1757,15 +1759,17 @@ _REF_GROUNDING_RULE = (
 _REF_HINT_RE = re.compile(r"[A-Za-z]{2,}|[А-ЯЁ][а-яё]+")
 
 
-async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: Settings) -> str:
+async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: Settings) -> tuple[str, dict | None]:
     """Ground a user-named artist/song reference with real catalogue data.
 
     • URL (Spotify/YT/Deezer) → Deezer (exact BPM/genre/era/Last.fm tags).
     • Plain artist name       → Perplexity web-search (handles niche / non-English
       artists; falls back to relevance-gated Deezer if no OpenRouter key).
 
-    Returns a system note for the model, or "".
-    Fails safe — any error/timeout returns "" so the turn proceeds unchanged.
+    Returns ``(system_note, facts_dict | None)``. The note goes to the model;
+    the facts are code-merged into music_params at finalize (deterministic
+    grounding — the model kept drifting from the note). Fails safe — any
+    error/timeout returns ("", None) so the turn proceeds unchanged.
     """
     from app.services.artist_research import research_reference
 
@@ -1781,7 +1785,7 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
         if getattr(m, "role", "") == "user"
     ]
     if not user_msgs:
-        return ""
+        return "", None
 
     # URL reference: take the newest link anywhere in the conversation.
     url_query = ""
@@ -1795,7 +1799,7 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
     if not url_query:
         recent = [t.strip() for t in user_msgs[-8:] if len(t.strip()) >= 4 and _REF_HINT_RE.search(t)]
         if not recent:
-            return ""
+            return "", None
         excerpt = "\n".join(f"- {t[:300]}" for t in recent)
         # Cheap extraction of the most recently named artist/song reference.
         try:
@@ -1815,10 +1819,10 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
             )
             name_query = (json.loads(ex.choices[0].message.content or "{}").get("q") or "").strip()
         except Exception:
-            return ""
+            return "", None
 
     if not url_query and not name_query:
-        return ""
+        return "", None
 
     # ── URL path: Deezer (exact BPM) ────────────────────────────────────────
     if url_query:
@@ -1829,7 +1833,7 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
         except Exception:
             data = None
         if not data:
-            return f"REFERENCE LOOKUP: no reliable catalogue data found for «{url_query}»."
+            return f"REFERENCE LOOKUP: no reliable catalogue data found for «{url_query}».", None
         bits = [f"{k}: {data[k]}" for k in ("artist", "genre", "era", "tempo") if data.get(k)]
         tags = ", ".join(data.get("tags") or [])
         if tags:
@@ -1841,7 +1845,7 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
             "in THESE facts, do not invent a different style): "
             + "; ".join(bits)
             + f". (matched: {data.get('artist')} — {data.get('title')})"
-        )
+        ), data
 
     # ── Name path: Perplexity web-search ────────────────────────────────────
     pdata = None
@@ -1865,7 +1869,7 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
                 f"REFERENCE LOOKUP: web search found a candidate for «{name_query}» but confidence "
                 f"is low ({confidence:.0%}) or the name is ambiguous. Candidate: {note}. "
                 "DO NOT invent a style. Ask the user to confirm or provide a direct link."
-            )
+            ), None
 
         bits: list[str] = []
         if pdata.get("genre"):
@@ -1879,6 +1883,8 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
         tags_list = pdata.get("tags") or []
         if tags_list:
             bits.append(f"tags: {', '.join(tags_list[:6])}")
+        if pdata.get("moods"):
+            bits.append(f"mood: {', '.join(pdata['moods'][:4])}")
         if pdata.get("instruments"):
             bits.append(f"key instruments: {', '.join(pdata['instruments'])}")
         if pdata.get("vocal_style"):
@@ -1898,7 +1904,7 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
             + f". (matched artist: {pdata.get('artist')}"
             + (f" — {pdata.get('reason')}" if pdata.get("reason") else "")
             + ")"
-        )
+        ), pdata
 
     # ── Fallback: relevance-gated Deezer ────────────────────────────────────
     try:
@@ -1910,7 +1916,7 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
 
     if not data:
         logger.info("AGENT ref-ground: «{}» → NO DATA (model will be told to ask)", name_query)
-        return f"REFERENCE LOOKUP: no reliable catalogue data found for «{name_query}». Ask the user to confirm or provide a direct link."
+        return f"REFERENCE LOOKUP: no reliable catalogue data found for «{name_query}». Ask the user to confirm or provide a direct link.", None
 
     bits = [f"{k}: {data[k]}" for k in ("artist", "genre", "era", "tempo") if data.get(k)]
     tags = ", ".join(data.get("tags") or [])
@@ -1923,7 +1929,7 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
         "in THESE facts, do not invent a different style): "
         + "; ".join(bits)
         + f". (matched: {data.get('artist')} — {data.get('title')})"
-    )
+    ), data
 
 
 @router.post("/chat", response_model=AgentChatResponse)
@@ -1999,8 +2005,9 @@ async def agent_chat(
         )
 
     chat_messages.append({"role": "system", "content": _REF_GROUNDING_RULE})
+    ref_facts: dict | None = None
     try:
-        ref_note = await _reference_facts(windowed, client, settings)
+        ref_note, ref_facts = await _reference_facts(windowed, client, settings)
         if ref_note:
             chat_messages.append({"role": "system", "content": ref_note})
     except Exception as exc:
@@ -2034,7 +2041,7 @@ async def agent_chat(
 
     return _postprocess_agent_reply(
         raw, body, chosen_model, reply_lang,
-        user_id=user.id, latency_ms=_latency_ms,
+        user_id=user.id, latency_ms=_latency_ms, ref_facts=ref_facts,
     )
 
 
@@ -2080,6 +2087,62 @@ def _log_agent_turn(
     logger.info("AGENT_TURN {}", json.dumps(payload, ensure_ascii=False))
 
 
+def _ground_params_in_facts(
+    mp: dict[str, Any], facts: dict[str, Any], user_blob: str
+) -> dict[str, Any]:
+    """Deterministically merge web-researched reference facts into the brief.
+
+    The prompt rules tell the model to copy the REFERENCE DATA note into
+    music_params, but live payloads kept drifting (mood «atmospheric» for a
+    gritty underground artist, invented palettes). Code enforces the facts:
+    factual fields fill empty slots, researched instruments merge BEHIND the
+    user's explicit wishes, and a mood that contradicts the researched moods
+    is replaced — unless the user literally asked for that mood themselves.
+    """
+    mp = dict(mp)
+    if facts.get("genre") and not mp.get("genre"):
+        mp["genre"] = str(facts["genre"]).strip()[:128]
+    tags = [str(t).strip() for t in (facts.get("tags") or []) if str(t).strip()]
+    if tags and not mp.get("subgenre"):
+        mp["subgenre"] = tags[0][:128]
+    if facts.get("era") and not mp.get("era"):
+        mp["era"] = str(facts["era"]).strip()[:128]
+    if not mp.get("suggested_bpm") and float(facts.get("bpm") or 0) > 0:
+        mp["suggested_bpm"] = f"{int(float(facts['bpm']))} BPM"
+
+    moods = [str(m).strip().lower() for m in (facts.get("moods") or []) if str(m).strip()]
+    cur_mood = str(mp.get("mood") or "").strip().lower()
+    if moods:
+        if not cur_mood:
+            mp["mood"] = moods[0][:128]
+        elif not any(cur_mood in m or m in cur_mood for m in moods):
+            # The model drifted off the researched moods. Facts win — unless
+            # the user explicitly asked for this mood in the conversation.
+            if cur_mood not in user_blob:
+                logger.info(
+                    "[AGENT] mood drift corrected: model={!r} -> facts={!r}", cur_mood, moods[0]
+                )
+                mp["mood"] = moods[0][:128]
+
+    f_instr = [str(i).strip()[:80] for i in (facts.get("instruments") or []) if str(i).strip()]
+    if f_instr:
+        merged = [str(x) for x in (mp.get("key_instruments") or [])]
+        seen = {x.lower() for x in merged}
+        for item in f_instr:
+            if item.lower() not in seen and len(merged) < 8:
+                merged.append(item)
+                seen.add(item.lower())
+        mp["key_instruments"] = merged
+
+    production = str(facts.get("production") or "").strip()
+    if production:
+        tech = [str(t) for t in (mp.get("techniques") or [])]
+        if len(tech) < 4 and not any(production.lower() in t.lower() for t in tech):
+            tech.append(production[:80])
+            mp["techniques"] = tech[:4]
+    return mp
+
+
 def _postprocess_agent_reply(
     raw: str,
     body: AgentChatRequest,
@@ -2088,6 +2151,7 @@ def _postprocess_agent_reply(
     *,
     user_id: int | None = None,
     latency_ms: int | None = None,
+    ref_facts: dict | None = None,
 ) -> AgentChatResponse:
     """Parse + validate + safety-net the raw JSON reply from GPT.
 
@@ -2127,6 +2191,18 @@ def _postprocess_agent_reply(
     short_prompt = str(parsed.get("short_prompt", "")).strip() if done else ""
     music_params = _coerce_music_params(parsed.get("music_params")) if done else {}
     research_notes = str(parsed.get("research_notes", "")).strip()[:2000] if done else ""
+
+    # Deterministic reference grounding: web-researched facts are code-merged
+    # into the brief — the model alone kept drifting (wrong mood, invented
+    # palette) despite the REFERENCE DATA note.
+    if done and ref_facts and float(ref_facts.get("confidence") or 1.0) >= 0.8:
+        _user_blob = " ".join(
+            m.content.lower() for m in body.messages if m.role == "user"
+        )[-2000:]
+        music_params = _ground_params_in_facts(music_params, ref_facts, _user_blob)
+        _sig = str(ref_facts.get("signature") or "").strip()
+        if _sig and _sig.lower()[:60] not in research_notes.lower():
+            research_notes = (research_notes + " " + _sig).strip()[:2000]
 
     # SAFETY NET: if the agent set done=true but ALL music_params strings are
     # empty (it ignored the rule above), log a warning and fill the bare
@@ -2320,8 +2396,9 @@ async def agent_chat_stream(
         )
 
     chat_messages.append({"role": "system", "content": _REF_GROUNDING_RULE})
+    ref_facts: dict | None = None
     try:
-        ref_note = await _reference_facts(windowed, client, settings)
+        ref_note, ref_facts = await _reference_facts(windowed, client, settings)
         if ref_note:
             chat_messages.append({"role": "system", "content": ref_note})
     except Exception as exc:
@@ -2329,7 +2406,10 @@ async def agent_chat_stream(
 
     chosen_model = _pick_model(body.messages)
     return StreamingResponse(
-        _stream_agent_completion(body, client, chat_messages, chosen_model, reply_lang, user_id=user.id),
+        _stream_agent_completion(
+            body, client, chat_messages, chosen_model, reply_lang,
+            user_id=user.id, ref_facts=ref_facts,
+        ),
         media_type="text/event-stream",
         # Disable nginx buffering — without this the proxy holds chunks
         # until the connection closes, defeating the whole point of streaming.
