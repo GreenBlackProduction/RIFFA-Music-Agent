@@ -2153,6 +2153,14 @@ def _postprocess_agent_reply(
     # Cap prompt at Suno's music limit (5000) just in case.
     if len(prompt) > 5000:
         prompt = prompt[:5000].rsplit(" ", 1)[0]
+    # `prompt` must be ENGLISH — it seeds the style head that goes to Suno
+    # verbatim. A Russian prompt («Инструментал в стиле X — жёсткая бочка…»)
+    # slipped through live on 2026-07-06 and opened the final Suno style.
+    if done and prompt:
+        _cyr = sum(1 for c in prompt if "\u0400" <= c <= "\u04ff")
+        if _cyr > len(prompt) * 0.3:
+            logger.warning("[AGENT] done=true with Cyrillic `prompt` — dropping, synthesizing English fallback")
+            prompt = ""
     # `prompt` is deprecated but the frontend still gates the launch button on
     # it — synthesize one from music_params so a model that skipped the legacy
     # field doesn't silently lose the whole brief.
@@ -2160,12 +2168,15 @@ def _postprocess_agent_reply(
         fallback_bits = [
             music_params.get("subgenre") or music_params.get("custom_genre") or music_params.get("genre") or "",
             ", ".join(music_params.get("key_instruments") or []),
+            ", ".join(music_params.get("techniques") or []),
             music_params.get("mood", ""),
             music_params.get("suggested_bpm", ""),
         ]
-        prompt = short_prompt or ", ".join(b for b in fallback_bits if b)
+        synthesized = ", ".join(b for b in fallback_bits if b)
+        _sp_cyr = sum(1 for c in short_prompt if "\u0400" <= c <= "\u04ff")
+        prompt = synthesized or (short_prompt if _sp_cyr <= len(short_prompt) * 0.3 else "")
         if prompt:
-            logger.warning("[AGENT] done=true without `prompt` — synthesized fallback")
+            logger.warning("[AGENT] done=true without usable `prompt` — synthesized fallback")
     # short_prompt fallback: distill from the full prompt if GPT omitted it.
     if done and not short_prompt and prompt:
         short_prompt = prompt[:220].rsplit(" ", 1)[0]
@@ -2475,13 +2486,21 @@ async def agent_classify(
     vocal = str(parsed.get("vocal", "")).strip().lower()
     vocal = vocal if vocal in _VALID_VOCAL else ""
 
+    raw_genre_text = str(parsed.get("genre", "")).strip()
     slots = AgentClassifySlots(
-        genre=canonical_genre(str(parsed.get("genre", "")).strip()),
+        genre=canonical_genre(raw_genre_text),
         mood=canonical_mood(str(parsed.get("mood", "")).strip().lower()),
         tempo=tempo,
         vocal=vocal,
         topic=str(parsed.get("topic", "")).strip()[:500],
     )
+
+    # Self-learning style base: an unknown genre phrase (no static preset, not
+    # blendable) gets researched in the background so the preset is ready by
+    # the time the wizard finishes and the generation starts.
+    if raw_genre_text and not slots.genre:
+        from app.services.genre_learned import prewarm_genre
+        asyncio.get_event_loop().create_task(prewarm_genre(raw_genre_text, settings))
 
     # ── Reference-track enrichment ──────────────────────────────────────────
     # URL (Spotify / YouTube / Deezer link) → Deezer (exact BPM, fast, free).

@@ -10,6 +10,7 @@ from app.db.models.generation import (
 from app.db.models.payment import Payment, PaymentProvider, PaymentStatus
 from app.db.models.promocode import Promocode, PromocodeUsage
 from app.db.models.referral import Referral
+from app.db.models.learned_genre import LearnedGenre
 from app.db.models.review import Review
 from app.db.models.user import User
 from app.db.models.wallet import WalletTransaction
@@ -26,6 +27,7 @@ __all__ = [
     "PromocodeUsage",
     "RadioVote",
     "Referral",
+    "LearnedGenre",
     "Review",
     "User",
     "WalletTransaction",

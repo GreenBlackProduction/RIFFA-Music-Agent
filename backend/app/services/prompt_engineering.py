@@ -222,6 +222,7 @@ def build_suno_style(
     rng: random.Random | None = None,
     user_id: int | None = None,
     for_cover: bool = False,
+    learned_presets: dict[str, dict] | None = None,
 ) -> tuple[str, float, float, str]:
     """Build Suno V5.5 (style, weight, constraint, negative_tags).
 
@@ -256,9 +257,31 @@ def build_suno_style(
     # "lo-fi", RU spellings) still land on a rich preset instead of the bare-word
     # fallback. No confident match → "" → keep the raw word.
     from app.services.genre_canonical import canonical_genre as _canonical_genre
+    from app.services.genre_blend import blend_genre_preset as _blend
+
+    def _resolve_preset(raw: str) -> dict:
+        """Preset for a raw genre phrase: static → learned (web-researched) →
+        blended hybrid ("dub jazz" = Dub-adjacent fragments + Jazz) → {}."""
+        if not raw:
+            return {}
+        key = _canonical_genre(raw)
+        if key:
+            return GENRE_STYLES.get(key, {})
+        if learned_presets:
+            lp = learned_presets.get(raw.strip().lower())
+            if lp and lp.get("style"):
+                return lp
+        return _blend(raw) or {}
+
     raw_genre_key = params.custom_genre or params.genre
     genre_key = _canonical_genre(raw_genre_key) or raw_genre_key
-    preset = GENRE_STYLES.get(genre_key, {})
+
+    # Subgenre preset OUTRANKS the parent genre for the base texture: «dub
+    # jazz» must not be flattened onto the generic Jazz preset. Era/context/
+    # anti-repeat lookups below keep using the parent genre_key as before.
+    preset = _resolve_preset(params.subgenre) if params.subgenre else {}
+    if not preset.get("style"):
+        preset = _resolve_preset(raw_genre_key)
 
     if preset.get("style"):
         base_style = preset["style"]

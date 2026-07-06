@@ -36,6 +36,27 @@ from app.services.mirror import mirror_generation_result
 from app.services.wallet import InsufficientBalance, credit_tokens, deduct_tokens
 
 
+def _style_head_text(*parts: str) -> str:
+    """English-only text for the style head (``SongParams.style_prompt``).
+
+    The style opens with this text and goes to Suno verbatim. Russian briefs
+    («Инструментал в стиле Azar Strato — жёсткая бочка…») must NOT land here:
+    Suno reads Cyrillic poorly and RU artist constructions dodge the name
+    stripper (seen live 2026-07-06 — the final style opened with that exact
+    line). The Cyrillic brief still reaches the GPT enricher via
+    description/agent_prompt, which translates it into English descriptors.
+    """
+    out: list[str] = []
+    for part in parts:
+        part = (part or "").strip()
+        if not part:
+            continue
+        cyr = sum(1 for c in part if "\u0400" <= c <= "\u04ff")
+        if cyr <= len(part) * 0.15:
+            out.append(part)
+    return "\n".join(out)
+
+
 def _merge_negative_tags(base: str, extra: list[str]) -> str:
     """Merge extra exclusion tags into the comma-joined negativeTags string."""
     parts = [p.strip() for p in base.split(",") if p.strip()]
@@ -331,6 +352,27 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
         ).scalar_one_or_none()
     track_artist: str = resolve_artist(_user_obj) if _user_obj else "RIFFA"
 
+    # Self-learning genre base: unknown genre phrases (no static preset, not
+    # blendable) get researched once via Perplexity, persisted to
+    # learned_genres and handed to build_suno_style. Fail-safe + cached.
+    _mp_for_genres = params.get("agent_music_params") or {}
+    learned_genre_presets: dict[str, dict[str, Any]] = {}
+    try:
+        from app.services.genre_learned import resolve_learned_presets
+        async with session_factory() as _gl_session:
+            learned_genre_presets = await resolve_learned_presets(
+                _gl_session,
+                settings,
+                [
+                    str(_mp_for_genres.get("subgenre") or ""),
+                    str(_mp_for_genres.get("custom_genre") or params.get("custom_genre") or ""),
+                    str(_mp_for_genres.get("genre") or params.get("genre") or ""),
+                ],
+            )
+            await _gl_session.commit()
+    except Exception as _gl_exc:
+        logger.warning("learned-genre resolve failed for gen {}: {}", gen_id, _gl_exc)
+
     try:
         if gen.type == GenerationType.song:
             await _publish(ctx, gen_id, {"status": "processing", "step": "lyrics"})
@@ -379,11 +421,12 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 constraints=agent_mp.get("constraints", ""),
                 suggested_bpm=agent_mp.get("suggested_bpm", ""),
                 negative_tags=agent_mp.get("negative_tags") or [],
-                style_prompt=(agent_research + "\n" + agent_prompt_text).strip(),
+                style_prompt=_style_head_text(agent_research, agent_prompt_text),
             )
             preset_style, weight, constraint, negative_tags = build_suno_style(
                 song_params,
                 user_id=gen.user_id,
+                learned_presets=learned_genre_presets,
             )
 
             # GPT-4o composes the adaptive Suno music prompt; falls back to preset on failure.
@@ -465,11 +508,12 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 constraints=agent_mp.get("constraints", ""),
                 suggested_bpm=agent_mp.get("suggested_bpm", ""),
                 negative_tags=agent_mp.get("negative_tags") or [],
-                style_prompt=(agent_research + "\n" + agent_prompt_text).strip(),
+                style_prompt=_style_head_text(agent_research, agent_prompt_text),
             )
             preset_style, weight, constraint, negative_tags = build_suno_style(
                 song_params,
                 user_id=gen.user_id,
+                learned_presets=learned_genre_presets,
             )
             if not gen.title:
                 short_title = (params.get("description", "") or "Instrumental")[:60]
@@ -613,6 +657,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 cover_song_params,
                 user_id=gen.user_id,
                 for_cover=True,
+                learned_presets=learned_genre_presets,
             )
             # style_weight / weirdness_constraint stay as chosen in the UI — we
             # only enriched the textual style, not the user's balance sliders.
@@ -810,10 +855,11 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 constraints=agent_mp.get("constraints", ""),
                 suggested_bpm=agent_mp.get("suggested_bpm", ""),
                 negative_tags=agent_mp.get("negative_tags") or [],
-                style_prompt=(agent_research + "\n" + agent_prompt_text).strip(),
+                style_prompt=_style_head_text(agent_research, agent_prompt_text),
             )
             preset_style, weight, constraint, negative_tags = build_suno_style(
-                song_params, user_id=gen.user_id
+                song_params, user_id=gen.user_id,
+                learned_presets=learned_genre_presets,
             )
 
             await _publish(ctx, gen_id, {"status": "processing", "step": "enriching_music"})
