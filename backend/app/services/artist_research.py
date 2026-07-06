@@ -28,23 +28,27 @@ _TIMEOUT = 15.0
 _RESEARCH_PROMPT = (
     "You are a music researcher. Search the web for the artist/track reference below "
     "and return ONLY raw JSON (no markdown, no code fences), exactly these keys:\n"
-    '{"matched":"<canonical artist name ONLY, e.g. \'Boards of Canada\' — no biography, no explanation>",'
+    '{"matched":"<canonical artist name ONLY — no biography, no explanation>",'
     '"match_reason":"<one short sentence: who they are and why you are confident>",'
     '"confidence":<0.0-1.0>,'
     '"ambiguous":<true if the name could be several different artists>,'
-    '"genre":"","subgenres":[],"era":"<e.g. 2010s>","bpm_range":"<e.g. 90-110 BPM>",'
+    '"genre":"","subgenres":["<ordered MOST-DEFINING first: the first entry must be '
+    'how reviews/listeners primarily label this artist>"],'
+    '"era":"<e.g. 2010s>","bpm_range":"<e.g. 90-110 BPM>",'
     '"mood":[],'
-    '"key_instruments":["<4-8 SPECIFIC instruments/sound sources with descriptors, '
-    'e.g. detuned analog synth pads, chopped vocal samples, live breakbeat drums>"],'
+    '"key_instruments":["<4-8 instruments/sound sources ACTUALLY HEARD in this '
+    "artist's tracks, each with a sound descriptor>\"],"
     '"vocal_style":"<lead vocal character: timbre, delivery, processing — or \'instrumental\'>",'
-    '"production_style":"<mixing/production fingerprint: e.g. tape-saturated lo-fi, '
-    'cavernous reverb, sidechained sub-bass>",'
+    '"production_style":"<this artist\'s mixing/production fingerprint>",'
     '"signature":"<1-2 sentences: what makes this artist instantly recognizable — '
     'the concrete sonic trademarks, not biography>",'
     '"similar_artists":[],"note":"<if NOT sure which artist, say so plainly>"}\n'
-    "Ground every field in the artist's ACTUAL discography found in the search — "
-    "not in name-based guesses. If you cannot reliably identify the artist, set "
-    "confidence below 0.6 and ambiguous:true. Reference: "
+    "CRITICAL: ground every field in what the search actually says about this "
+    "artist's releases and sound — reviews, tags, credits. Do NOT fill fields from "
+    "generic genre knowledge and NEVER invent instrumentation: if the sources don't "
+    "describe the instrumentation/production, return an empty list/string for that "
+    "field. If you cannot reliably identify the artist, set confidence below 0.6 "
+    "and ambiguous:true. Reference: "
 )
 
 # Simple in-process TTL cache (key → (result, expires_at)).

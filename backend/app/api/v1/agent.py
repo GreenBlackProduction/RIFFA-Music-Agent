@@ -1731,7 +1731,10 @@ async def _stream_agent_completion(
 _REF_GROUNDING_RULE = (
     "REFERENCE GROUNDING: if a system note labelled 'REFERENCE DATA' is present, treat it as "
     "authoritative — base genre / era / tempo / key_instruments / research_notes on those facts "
-    "and never invent a different style. THE NOTE OUTRANKS YOUR OWN EARLIER MESSAGES: if a "
+    "and never invent a different style. The note's tags are ordered MOST-DEFINING FIRST: lead "
+    "the brief with the first tags and never promote a minor trailing tag (e.g. 'lo-fi') into "
+    "the main style over the leading ones — underground aggressive hip-hop and lo-fi hip-hop "
+    "are different briefs. THE NOTE OUTRANKS YOUR OWN EARLIER MESSAGES: if a "
     "description you gave earlier in this chat conflicts with the note, your earlier text was "
     "wrong — explicitly correct yourself and adopt the note's facts. Never defend or repeat "
     "your previous version. When the user pastes reference information that matches the note, "
