@@ -173,9 +173,11 @@ function UsersPanel({
               </tr>
             </thead>
             <tbody>
-              {data.users.map((u) => (
+              {data.users.map((u, i) => (
                 <tr key={u.id} className="admin-table__row--clickable" onClick={() => onSelectUser(u)}>
-                  <td className="admin-table__id">{u.id}</td>
+                  {/* Порядковый номер, не DB id — у id большие дыры от удалённых
+                      аккаунтов (#91 при 28 юзерах); реальный id виден в деталях. */}
+                  <td className="admin-table__id">{i + 1}</td>
                   <td className="admin-table__name">
                     <strong>{u.display_name}</strong>
                     <small>

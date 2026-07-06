@@ -227,6 +227,7 @@ export function LibraryCard() {
         cover: i.coverUrl ?? undefined,
         meta: [typeLabel(i.type), i.genre, i.mood, formatBpm(i.tempo)].filter(Boolean).join(" · "),
         isOwn: i.isOwn !== false,
+        rating: i.liked ? ("like" as const) : null,
         canRadio: RADIO_TYPES.has(i.type) && i.isOwn !== false,
         isMusicType: MUSIC_TYPES.has(i.type),
         isPublic: i.isPublic,
@@ -240,6 +241,7 @@ export function LibraryCard() {
       cover: item.coverUrl ?? undefined,
       meta: [typeLabel(item.type), item.genre, item.mood, formatBpm(item.tempo)].filter(Boolean).join(" · "),
       isOwn: item.isOwn !== false,
+      rating: item.liked ? ("like" as const) : null,
       canRadio: RADIO_TYPES.has(item.type) && item.isOwn !== false,
       isMusicType: MUSIC_TYPES.has(item.type),
       isPublic: item.isPublic,
@@ -395,7 +397,18 @@ export function LibraryCard() {
               )}
 
               <div className="file-item__info">
-                <strong className="file-item__title">{it.title}</strong>
+                <strong className="file-item__title">
+                  {it.title}
+                  {it.liked && (
+                    <span
+                      className="file-item__liked"
+                      title={t("library.filterLiked", { defaultValue: "Понравился вам" })}
+                      aria-label={t("library.filterLiked", { defaultValue: "Понравился вам" })}
+                    >
+                      ♥
+                    </span>
+                  )}
+                </strong>
                 <span className="file-item__meta">
                   {[typeLabel(it.type), it.genre, it.mood, formatBpm(it.tempo), it.duration].filter(Boolean).join(" · ")}
                 </span>

@@ -313,6 +313,11 @@ export function AgentChat({
   const isEn = (i18nInst.resolvedLanguage ?? "ru").startsWith("en");
   const [thinkingStatus, setThinkingStatus] = useState(isEn ? "Thinking…" : "Думаю…");
   const [thinkingElapsed, setThinkingElapsed] = useState(0);
+  // True while the SSE stream is still open AFTER the visible reply finished
+  // typing — the model is generating the structured brief tail (summary,
+  // music_params, intent), which used to look like dead silence to the user.
+  const [assembling, setAssembling] = useState(false);
+  const assembleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [needsAuth, setNeedsAuth] = useState(false);
@@ -1241,6 +1246,11 @@ export function AgentChat({
               ]);
               streamedSomething = true;
             }
+            // Re-arm the "assembling the brief" hint: it fires only when the
+            // stream stays open with no new reply text for 1.2s (the JSON
+            // tail with the brief is being generated).
+            if (assembleTimer.current) clearTimeout(assembleTimer.current);
+            assembleTimer.current = setTimeout(() => setAssembling(true), 1200);
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === placeholderId ? { ...m, text: m.text + ev.delta } : m,
@@ -1338,6 +1348,11 @@ export function AgentChat({
       setNeedsAuth(is401);
       setError(is401 ? "Войдите в аккаунт чтобы использовать агента" : message);
     } finally {
+      if (assembleTimer.current) {
+        clearTimeout(assembleTimer.current);
+        assembleTimer.current = null;
+      }
+      setAssembling(false);
       setThinking(false);
       stopThinking();
     }
@@ -1932,6 +1947,17 @@ export function AgentChat({
             </div>
           );
         })}
+
+        {assembling && !thinking && (
+          <div className="agent-bubble agent-bubble--agent agent-bubble--thinking">
+            <div className="agent-thinking">
+              <span className="agent-typing"><span /><span /><span /></span>
+              <span className="agent-thinking__status">
+                {isEn ? "Assembling the brief and parameters…" : "Собираю бриф и параметры…"}
+              </span>
+            </div>
+          </div>
+        )}
 
         {thinking && (
           <div className="agent-bubble agent-bubble--agent agent-bubble--thinking">

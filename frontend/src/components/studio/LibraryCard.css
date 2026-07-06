@@ -233,3 +233,11 @@
     font-size: 22px;
   }
 }
+
+/* ── Liked heart on the track row — persistent visual for Generation.rating ── */
+.file-item__liked {
+  margin-left: 6px;
+  color: var(--hi, #ff3b1f);
+  font-size: 12px;
+  vertical-align: 1px;
+}

@@ -147,7 +147,7 @@ async def list_users(
 
     rows = (
         await session.execute(
-            base.order_by(User.id.desc()).offset(offset).limit(limit)
+            base.order_by(User.id.asc()).offset(offset).limit(limit)
         )
     ).scalars().all()
 

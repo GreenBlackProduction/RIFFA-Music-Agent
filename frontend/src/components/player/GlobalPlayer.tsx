@@ -130,6 +130,7 @@ export function GlobalPlayer() {
   const currentAuthor = usePlayer((s) => s.current?.author ?? "");
   const currentMeta = usePlayer((s) => s.current?.meta ?? "");
   const currentSource = usePlayer((s) => s.current?.source ?? null);
+  const currentStoredRating = usePlayer((s) => s.current?.rating ?? null);
   const currentCover = usePlayer((s) => s.current?.cover ?? null);
   const currentCanRadio = usePlayer((s) => s.current?.canRadio ?? false);
   const currentIsMusicType = usePlayer((s) => s.current?.isMusicType ?? false);
@@ -628,7 +629,10 @@ export function GlobalPlayer() {
 
   if (!currentId || !currentUrl) return null;
 
-  const rating = ratings[currentId] ?? null;
+  // Session clicks win; otherwise seed from the server-stored rating carried
+  // in the queue item — a like must not vanish after reload (owner bug
+  // 2026-07-06: like set, later invisible, only the liked-filter found it).
+  const rating = ratings[currentId] ?? currentStoredRating;
   const genId = extractGenId(currentId);
   // radioSet синхронизируется при play(), так что является источником
   // истины для текущего состояния. Если current.isPublic явно задан и

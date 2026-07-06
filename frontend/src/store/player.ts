@@ -15,6 +15,9 @@ export interface PlayerTrack {
   isPublic?: boolean;
   /** Suno audio_id — required for WAV conversion and extend from the player. */
   audioId?: string;
+  /** Stored rating from the server (Generation.rating) — seeds the thumbs so
+   *  a like set earlier doesn't visually vanish after reload. */
+  rating?: "like" | "dislike" | null;
   /** Откуда трек: библиотека, радио, последние генерации, шаринг. */
   source?: "library" | "radio" | "studio" | "share";
 }
