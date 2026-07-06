@@ -290,7 +290,8 @@ export function LibraryCard() {
         </div>
       </header>
 
-      {/* Фильтры — дропдауны */}
+      {/* Фильтры — три дропдауна рядом, под выбором типа файла:
+          настроение · жанр · новизна (внутри неё — «Понравились вам») */}
       {filter !== "trash" && (
         <div className="library-filters-bar">
           {uniqueMoods.length > 0 && (
@@ -313,20 +314,22 @@ export function LibraryCard() {
               {uniqueGenres.map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
           )}
-          <button
-            type="button"
-            className={`filter-chip${likedOnly ? " filter-chip--active" : ""}`}
-            onClick={() => setLikedOnly((v) => !v)}
-          >
-            {t("library.filterLiked", { defaultValue: "Понравились вам" })}
-          </button>
           <select
             className="library-select library-select--sort"
-            value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")}
+            value={likedOnly ? "liked" : sortOrder}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "liked") {
+                setLikedOnly(true);
+              } else {
+                setLikedOnly(false);
+                setSortOrder(v as "newest" | "oldest");
+              }
+            }}
           >
             <option value="newest">{t("library.sortNewest", { defaultValue: "Сначала новые" })}</option>
             <option value="oldest">{t("library.sortOldest", { defaultValue: "Сначала старые" })}</option>
+            <option value="liked">{t("library.filterLiked", { defaultValue: "Понравились вам" })}</option>
           </select>
         </div>
       )}

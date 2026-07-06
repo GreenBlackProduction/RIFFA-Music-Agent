@@ -177,9 +177,26 @@ export default function App() {
       <Suspense>
         <Routes>
           <Route path="/" element={<Navigate to="/studio" replace />} />
-          <Route path="/studio" element={<StudioPage />} />
+          {/* App working pages are auth-only: anonymous visitors coming from
+              the landings or search must land on /login, not an empty studio.
+              /radio and /guide stay public on purpose (SEO + listening funnel). */}
+          <Route
+            path="/studio"
+            element={
+              <RequireAuth>
+                <StudioPage />
+              </RequireAuth>
+            }
+          />
           <Route path="/radio" element={<RadioPage />} />
-          <Route path="/agent" element={<AgentPage />} />
+          <Route
+            path="/agent"
+            element={
+              <RequireAuth>
+                <AgentPage />
+              </RequireAuth>
+            }
+          />
           <Route path="/guide" element={<GuidePage />} />
           <Route
             path="/library"
@@ -189,7 +206,14 @@ export default function App() {
               </RequireAuth>
             }
           />
-          <Route path="/profile" element={<ProfilePage />} />
+          <Route
+            path="/profile"
+            element={
+              <RequireAuth>
+                <ProfilePage />
+              </RequireAuth>
+            }
+          />
           <Route
             path="/admin"
             element={
