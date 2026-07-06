@@ -1855,7 +1855,7 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
         ambiguous = bool(pdata.get("ambiguous", False))
 
         if confidence < 0.8 or ambiguous:
-            note = pdata.get("note") or pdata.get("artist") or name_query
+            note = pdata.get("note") or pdata.get("reason") or pdata.get("artist") or name_query
             logger.info("AGENT ref-ground (perplexity): «{}» low confidence={:.2f} ambiguous={} → ask user",
                         name_query, confidence, ambiguous)
             return (
@@ -1892,7 +1892,9 @@ async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: S
             "REFERENCE DATA (looked up via Perplexity web-search — GROUND research_notes and "
             "music_params in THESE facts, do not invent a different style): "
             + "; ".join(bits)
-            + f". (matched artist: {pdata.get('artist')})"
+            + f". (matched artist: {pdata.get('artist')}"
+            + (f" — {pdata.get('reason')}" if pdata.get("reason") else "")
+            + ")"
         )
 
     # ── Fallback: relevance-gated Deezer ────────────────────────────────────

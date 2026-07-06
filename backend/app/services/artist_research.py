@@ -28,7 +28,9 @@ _TIMEOUT = 15.0
 _RESEARCH_PROMPT = (
     "You are a music researcher. Search the web for the artist/track reference below "
     "and return ONLY raw JSON (no markdown, no code fences), exactly these keys:\n"
-    '{"matched":"<who you think it is and why>","confidence":<0.0-1.0>,'
+    '{"matched":"<canonical artist name ONLY, e.g. \'Boards of Canada\' — no biography, no explanation>",'
+    '"match_reason":"<one short sentence: who they are and why you are confident>",'
+    '"confidence":<0.0-1.0>,'
     '"ambiguous":<true if the name could be several different artists>,'
     '"genre":"","subgenres":[],"era":"<e.g. 2010s>","bpm_range":"<e.g. 90-110 BPM>",'
     '"mood":[],'
@@ -118,8 +120,17 @@ async def research_reference(query: str, *, settings: Settings) -> dict | None:
     # the agent then improvised a genre of its own (2026-07-06 Azar Strato chat).
     genre_val = canonical_genre(genre_raw) or genre_raw or (subgenres[0] if subgenres else "")
 
+    # Perplexity sometimes dumps a whole biography into "matched" despite the
+    # prompt — the chat then shows an English dossier instead of a name
+    # (2026-07-06 Azar Strato). Keep the name, move the prose to match_reason.
+    artist_name = str(data.get("matched") or query).strip()
+    if len(artist_name) > 60:
+        head = re.split(r"[,(]", artist_name)[0].strip()
+        artist_name = head if 0 < len(head) <= 60 else artist_name[:60].rstrip()
+
     result = {
-        "artist": str(data.get("matched") or query),
+        "artist": artist_name,
+        "reason": str(data.get("match_reason") or "").strip(),
         "title": "",
         "confidence": confidence,
         "ambiguous": ambiguous,
