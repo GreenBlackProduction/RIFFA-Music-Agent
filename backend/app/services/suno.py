@@ -30,6 +30,17 @@ _ARTIST_NAMES: frozenset[str] = frozenset({
     "bad bunny", "j balvin", "daddy yankee", "shakira",
     "elton john", "freddie mercury", "john lennon", "paul mccartney",
     "rick astley", "britney spears", "christina aguilera",
+    # Producers/beatmakers — GPT enrichment reaches for these to describe a
+    # genre's "sonic signature" even though the ban never named them
+    # explicitly (fixed in the prompt too). Live failure 2026-07-13: "Metro
+    # Boomin style" survived the clause-stripping regexes entirely (no
+    # trigger phrase, no hyphen) and Suno hard-rejected the generation.
+    "metro boomin", "mike will made it", "zaytoven", "pierre bourne",
+    "dj mustard", "southside", "wheezy", "murda beatz", "young chop",
+    "timbaland", "dr. dre", "dr dre", "pharrell", "rick rubin", "max martin",
+    "quincy jones", "brian eno", "nigel godrich", "jack antonoff",
+    "finneas", "hit-boy", "boi-1da", "20 syl", "madlib", "j dilla",
+    "flying lotus", "diplo", "skrillex", "zedd", "kygo",
 })
 
 

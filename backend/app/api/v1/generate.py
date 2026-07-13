@@ -779,10 +779,30 @@ async def generate_similar(
     # original's direction; salt + enricher sampling already vary the take.
     cloned_mp = dict(src_params.get("agent_music_params") or {})
 
+    # cover_song sources never populate description/agent_prompt/
+    # agent_music_params — CoverSongRequest has none of those fields. The
+    # user's actual brief for a cover lives in `params.style` (the free-text
+    # field typed in the Cover module, e.g. "мощный бит на ударных без
+    # дополнительных инструментов"). Without this fallback, "similar" from a
+    # cover carried over ONLY genre/mood/tempo and produced a near-generic
+    # track with no connection to what the user actually asked for.
+    fallback_description = src_params.get("description") or src.prompt or ""
+    if not fallback_description and src.type == GenerationType.cover_song:
+        fallback_description = str(src_params.get("style") or "").strip()
+
+    # Cover's vocal choice lives in `vocal_gender` (m/f/None) — `src.vocal`
+    # is never set for cover_song (the create-cover endpoint doesn't pass it),
+    # so a cover's chosen vocal gender was silently dropped by "similar" too.
+    fallback_vocal = src.vocal or ""
+    if not fallback_vocal and src.type == GenerationType.cover_song:
+        fallback_vocal = {"m": "male", "f": "female"}.get(
+            str(src_params.get("vocal_gender") or ""), ""
+        )
+
     # New params re-use the same agent envelope so the existing worker pipeline
     # (tasks/__init__.py::run_generation) picks up the cloned brief.
     new_params: dict[str, Any] = {
-        "description": src_params.get("description") or src.prompt or "",
+        "description": fallback_description,
         "genre": src.genre or "",
         "custom_genre": src_params.get("custom_genre", ""),
         "mood": src.mood or "",
@@ -795,7 +815,7 @@ async def generate_similar(
         # text_mode=ai so the model writes fresh lyrics — copying the original
         # would defeat the "similar but new" goal.
         "text_mode": "ai" if new_type == GenerationType.song else "none",
-        "vocal": src.vocal or "" if new_type == GenerationType.song else "",
+        "vocal": fallback_vocal if new_type == GenerationType.song else "",
         "similar_source_generation_id": generation_id,
     }
 

@@ -44,6 +44,19 @@ _STYLE_OF_CLAUSE_RE = re.compile(
     r"[A-ZА-ЯЁ][\w'’.\-]*(?:\s+(?:of|the|and|de|la|le|van|von)\s+[A-ZА-ЯЁ][\w'’.\-]*|\s+[A-ZА-ЯЁ][\w'’.\-]*){0,4}",
 )
 
+# The adjectival form GPT also reaches for — name FIRST, suffixed onto it
+# ("Metro Boomin-style trap beat", "Aphex Twin-esque textures"). Suno hard-
+# rejects the whole generation when one of these slips through (live failure
+# 2026-07-13: "Aggressive Metro Boomin-style trap beat" -> SunoError "tags
+# contain artist name metro boomin"), so this is a wasted-generation bug, not
+# just a cosmetic one. Trade-off: also strips non-artist proper nouns used the
+# same way ("Berlin-style techno") — accepted, matching this module's existing
+# empty-over-invented bias.
+_NAME_STYLE_SUFFIX_RE = re.compile(
+    r"\b[A-ZА-ЯЁ][\w'’]*(?:\s+[A-ZА-ЯЁ][\w'’]*){0,2}-"
+    r"(?:style|esque|inspired|influenced|type)\b",
+)
+
 
 def strip_inline_artist_clause(text: str) -> str:
     """Remove a MID-TEXT "inspired by <Artist Name>" clause, keeping the rest.
@@ -58,6 +71,7 @@ def strip_inline_artist_clause(text: str) -> str:
         return text
     cleaned = _INLINE_ARTIST_CLAUSE_RE.sub("", text)
     cleaned = _STYLE_OF_CLAUSE_RE.sub("", cleaned)
+    cleaned = _NAME_STYLE_SUFFIX_RE.sub("", cleaned)
     if cleaned == text:
         return text
     cleaned = re.sub(r"\s*,\s*(?=[,.;])", "", cleaned)

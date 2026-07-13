@@ -128,10 +128,16 @@ Style guidance for content:
 - Then vocal direction (if vocals): timbre, delivery, layering, processing.
 - Then mood arc / dynamics (intro builds, drops, breakdown, outro).
 
-⚠️  CRITICAL — NEVER USE ARTIST OR BAND NAMES IN THE OUTPUT:
-Suno's API REJECTS prompts containing specific artist, band, or musician names.
-If the user or assistant brief mentions an artist as a reference, translate their
-musical identity into DESCRIPTIVE CHARACTERISTICS only. Never output names.
+⚠️  CRITICAL — NEVER USE ARTIST, BAND OR PRODUCER NAMES IN THE OUTPUT:
+Suno's API REJECTS prompts containing specific artist, band, musician, PRODUCER,
+beatmaker, DJ, or engineer names — no exceptions for "just a producer" or "just
+describing a production style". If the user or assistant brief mentions any of
+these as a reference, translate their musical identity into DESCRIPTIVE
+CHARACTERISTICS only. Never output names, in ANY grammatical form — not as
+"X-style", "X style", "X-esque", "X-inspired", "in the style of X", or any other
+paraphrase. This applies just as much to producers associated with a genre's
+signature sound (e.g. a famous trap producer) as to performing artists — do not
+name-drop them even when they are the textbook reference for a sound.
 
 Translation examples (use these patterns):
   "Dua Lipa" →
@@ -153,6 +159,9 @@ Translation examples (use these patterns):
   "Taylor Swift (pop era)" →
     polished country-pop crossover, clear bright female vocals with emotional delivery,
     acoustic guitar mixed with synths, anthemic chorus, driving drum production
+  "Metro Boomin-style trap" (a PRODUCER, not a performer — same rule applies) →
+    dark moody trap production, sparse eerie piano/bell melodies, deep distorted
+    808 sub-bass, crisp rolling hi-hats, spacious atmosphere, cinematic tension
 
 When no artist is mentioned — just describe style directly.
 Return ONLY the prompt text — no names, no quotes, no labels.\
