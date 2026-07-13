@@ -29,6 +29,7 @@ import {
 } from "@/lib/library";
 import { TypeIcon } from "@/components/ui/TypeIcon";
 import { usePlayer } from "@/store/player";
+import { useGenerationStore } from "@/store/generation";
 import { FileActions } from "./FileActions";
 import { FileGhostsOverlay, useFileGhosts } from "./FileGhost";
 import { ImageViewer } from "@/components/ui/ImageViewer";
@@ -57,6 +58,10 @@ export function LibraryCard() {
       setRadioState: s.setRadioState,
     })),
   );
+
+  const trackPending = useGenerationStore((s) => s.trackPending);
+  const promotePending = useGenerationStore((s) => s.promotePending);
+  const dropPending = useGenerationStore((s) => s.dropPending);
 
   const { items, isLoading, authError } = useLibraryItems();
 
@@ -184,9 +189,23 @@ export function LibraryCard() {
   });
 
   const similarMutation = useMutation({
-    mutationFn: (generationId: string) => generateSimilar(generationId),
-    onSuccess: async () => {
+    mutationFn: (v: { generationId: string; title: string; type: LibraryItemType }) =>
+      generateSimilar(v.generationId),
+    // Optimistic sidebar card + mobile toast the instant «Сгенерировать
+    // похожий» is clicked — previously this path showed NO feedback at all
+    // until the finished track appeared in history.
+    onMutate: (v) => {
+      const tempId = `pending-libsim-${Date.now()}`;
+      const storeType = v.type === "instrumental" ? "instrumental" : "song";
+      trackPending(tempId, storeType, `Похожий трек: ${v.title}`);
+      return { tempId };
+    },
+    onSuccess: async (resp, _v, ctx) => {
+      if (ctx?.tempId) promotePending(ctx.tempId, resp.generation_id, resp.ws_url);
       await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.tempId) dropPending(ctx.tempId);
     },
   });
 
@@ -461,7 +480,7 @@ export function LibraryCard() {
                 }
                 onSimilar={
                   it.generationId
-                    ? () => similarMutation.mutate(it.generationId)
+                    ? () => similarMutation.mutate({ generationId: it.generationId, title: it.title, type: it.type })
                     : undefined
                 }
                 onEditTags={

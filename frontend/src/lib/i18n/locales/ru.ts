@@ -330,7 +330,7 @@ export const ru: LocaleTree = {
       aiPlaceholder: "Например: песня про летний город, ночные огни и свободу",
       generate: "✨ Сгенерировать текст",
       generating: "ИИ пишет текст…",
-      generatingDesc: "Обычно занимает 5–15 секунд. Окно переливается фирменными цветами, пока модель обдумывает строчки.",
+      generatingDesc: "Обычно занимает 5–15 секунд.",
       titleLabel: "Название:",
       accept: "✓ Принять текст",
       regenerate: "↻ Сгенерировать заново",
@@ -738,6 +738,11 @@ export const ru: LocaleTree = {
     hideCard: "Скрыть",
     closeAria: "Закрыть",
     genericTitle: "Генерация",
+  },
+
+  genLaunchToast: {
+    title: "Генерация запущена",
+    hint: "⬅️ следите за процессом в сайдбаре",
   },
 
   voiceRecorder: {

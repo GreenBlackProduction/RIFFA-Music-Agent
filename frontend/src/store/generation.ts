@@ -56,8 +56,22 @@ interface GenerationStore {
   active: Record<string, ActiveGeneration>;
   /** Dismissed generation ids — чтобы sync с сервера не возвращал их в сайдбар. */
   dismissed: string[];
+  /** Transient signal for the mobile launch toast. Bumped every time a
+   *  generation is launched; the toast component watches `ts` and shows the
+   *  «Генерация запущена» overlay, then auto-hides. Not persisted. */
+  launchNotice: { ts: number } | null;
   /** Start tracking a new generation and open its WebSocket. */
   track: (id: string, wsUrl: string, type: string, title: string) => void;
+  /** Optimistic placeholder shown INSTANTLY on click — before the (slow,
+   *  4-5s) auto-title + generate round-trip returns. No WebSocket yet; the
+   *  card sits in "queued/submitting" so the user knows the site is working.
+   *  Also fires the mobile launch toast. */
+  trackPending: (tempId: string, type: string, title: string) => void;
+  /** Swap a placeholder for the real generation id and open its WebSocket
+   *  once the backend responds. Keeps the card visually continuous. */
+  promotePending: (tempId: string, realId: string, wsUrl: string, title?: string, type?: string) => void;
+  /** Remove a placeholder (the launch request failed before it got an id). */
+  dropPending: (tempId: string) => void;
   /** Remove a completed/failed generation from active state. */
   dismiss: (id: string) => void;
   _update: (id: string, patch: Partial<ActiveGeneration>) => void;
@@ -141,6 +155,7 @@ export const useGenerationStore = create<GenerationStore>()(
     (set, get) => ({
       active: {},
       dismissed: [],
+      launchNotice: null,
 
       track(id, wsUrl, type, title) {
         const gen: ActiveGeneration = {
@@ -157,6 +172,58 @@ export const useGenerationStore = create<GenerationStore>()(
         };
         gen.ws = openWs(id, wsUrl, get);
         set((s) => ({ active: { ...s.active, [id]: gen } }));
+      },
+
+      trackPending(tempId, type, title) {
+        const gen: ActiveGeneration = {
+          id: tempId,
+          wsUrl: "",
+          type,
+          title,
+          status: "queued",
+          step: "submitting",
+          progress: 5,
+          result: null,
+          error: null,
+          ws: null,
+        };
+        set((s) => ({
+          active: { ...s.active, [tempId]: gen },
+          launchNotice: { ts: Date.now() },
+        }));
+      },
+
+      promotePending(tempId, realId, wsUrl, title, type) {
+        const prev = get().active[tempId];
+        // Build the real entry, keyed by the backend id, and open its socket.
+        const gen: ActiveGeneration = {
+          id: realId,
+          wsUrl,
+          type: type ?? prev?.type ?? "song",
+          title: title ?? prev?.title ?? "",
+          status: "queued",
+          step: null,
+          progress: prev?.progress ?? 0,
+          result: null,
+          error: null,
+          ws: null,
+        };
+        gen.ws = openWs(realId, wsUrl, get);
+        set((s) => {
+          const next = { ...s.active };
+          delete next[tempId];
+          next[realId] = gen;
+          return { active: next };
+        });
+      },
+
+      dropPending(tempId) {
+        set((s) => {
+          if (!s.active[tempId]) return s;
+          const next = { ...s.active };
+          delete next[tempId];
+          return { active: next };
+        });
       },
 
       dismiss(id) {
@@ -179,6 +246,9 @@ export const useGenerationStore = create<GenerationStore>()(
 
       reconnectAll() {
         for (const gen of Object.values(get().active)) {
+          // Skip optimistic placeholders — they have no real id / wsUrl yet and
+          // would otherwise poll a non-existent generation forever.
+          if (gen.id.startsWith("pending-") || !gen.wsUrl) continue;
           if ((gen.status === "queued" || gen.status === "processing") && !gen.ws) {
             const ws = openWs(gen.id, gen.wsUrl, get);
             get()._update(gen.id, { ws });
@@ -239,13 +309,21 @@ export const useGenerationStore = create<GenerationStore>()(
       // их WebSocket уже нет, повторно показывать нет смысла.
       onRehydrateStorage: () => (state) => {
         if (!state) return;
+        // Drop finished cards from a past session AND any optimistic
+        // placeholders that never got promoted (page left mid-launch) — a
+        // "pending-*" id can never resume, it has no backend generation.
         const stale = Object.keys(state.active).filter(
-          (id) => state.active[id].status === "completed" || state.active[id].status === "failed",
+          (id) =>
+            id.startsWith("pending-") ||
+            state.active[id].status === "completed" ||
+            state.active[id].status === "failed",
         );
         if (stale.length === 0) return;
         const next = { ...state.active };
         for (const id of stale) delete next[id];
-        const dismissed = [...new Set([...stale, ...state.dismissed])].slice(0, 50);
+        // Don't push transient placeholder ids into the dismissed history.
+        const realStale = stale.filter((id) => !id.startsWith("pending-"));
+        const dismissed = [...new Set([...realStale, ...state.dismissed])].slice(0, 50);
         state.active = next;
         state.dismissed = dismissed;
       },

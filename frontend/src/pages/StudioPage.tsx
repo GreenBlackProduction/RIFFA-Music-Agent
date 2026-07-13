@@ -835,7 +835,9 @@ export function StudioPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const submitRef = useRef<HTMLButtonElement | null>(null);
   const coverFileInputRef = useRef<HTMLInputElement | null>(null);
-  const trackGeneration = useGenerationStore((s) => s.track);
+  const trackPending = useGenerationStore((s) => s.trackPending);
+  const promotePending = useGenerationStore((s) => s.promotePending);
+  const dropPending = useGenerationStore((s) => s.dropPending);
 
   // Cover upload state
   const [isUploading, setIsUploading] = useState(false);
@@ -1396,6 +1398,16 @@ export function StudioPage() {
 
     setSubmitting(true);
     setSubmitError(null);
+
+    // Optimistic placeholder — appears in the sidebar INSTANTLY and fires the
+    // mobile launch toast, so the 4-5s auto-title + generate round-trip no
+    // longer feels like a frozen page. Promoted to the real id on success,
+    // dropped on any error / early return.
+    const pendingId = `pending-${Date.now()}`;
+    const pendingType = activeModule === "cover" ? "cover_song" : (activeModule ?? "song");
+    const provisionalTitle = state.trackName.trim() || moduleMeta.title;
+    trackPending(pendingId, pendingType, provisionalTitle);
+
     try {
       let response: { generation_id: string; ws_url: string };
       let title: string = moduleMeta.title;
@@ -1424,6 +1436,7 @@ export function StudioPage() {
         // Lyrics-first gating must be honoured — bail out if the user clicked submit somehow.
         if (state.lyricsState !== "approved") {
           setSubmitError(t("studio.errLyricsApproveFirst"));
+          dropPending(pendingId);
           setSubmitting(false);
           return;
         }
@@ -1510,6 +1523,7 @@ export function StudioPage() {
       } else if (activeModule === "cover_art") {
         if (!state.coverArtPrompt?.trim()) {
           setSubmitError(t("studio.errCoverArtNoPrompt"));
+          dropPending(pendingId);
           setSubmitting(false);
           return;
         }
@@ -1521,10 +1535,11 @@ export function StudioPage() {
           ...(state.coverArtRefUrl ? { reference_url: state.coverArtRefUrl } : {}),
         });
       } else {
+        dropPending(pendingId);
         return;
       }
 
-      trackGeneration(response.generation_id, response.ws_url, activeModule, title);
+      promotePending(pendingId, response.generation_id, response.ws_url, title);
       // Reset the form so the user can start a new generation immediately.
       setState(INITIAL_STATE);
       setSubmitError(null);
@@ -1532,6 +1547,7 @@ export function StudioPage() {
       const msg =
         err instanceof Error ? err.message : t("studio.errSubmitFailed");
       setSubmitError(msg);
+      dropPending(pendingId);
     } finally {
       setSubmitting(false);
     }
@@ -1569,6 +1585,13 @@ export function StudioPage() {
     const agentPromptVersion = result.promptVersion || "";
     const agentModel = result.model || "";
 
+    // Optimistic placeholder + mobile toast, same as the manual form — the
+    // agent path also runs the slow auto-title before it can show a card.
+    // cover_song is a redirect (no launch), so it drops the placeholder below.
+    const pendingId = `pending-agent-${Date.now()}`;
+    const pendingTitle = (params.description || "").trim().slice(0, 60) || "Агент · генерация";
+    trackPending(pendingId, intent.module, pendingTitle);
+
     // Track name: SAME rule as the manual form — "Artist - Idea (RIFFAMusic)".
     // The agent didn't request one, so the worker fell back to "Nick — <raw
     // description>". Compute it here via the same auto-title endpoint.
@@ -1585,6 +1608,7 @@ export function StudioPage() {
         const promptText = (enrichedPrompt || params.description || "").trim();
         if (!promptText) {
           setSubmitError("Агент не собрал prompt для обложки. Попробуй ещё раз.");
+          dropPending(pendingId);
           return;
         }
         const titleText =
@@ -1597,7 +1621,7 @@ export function StudioPage() {
           title: titleText,
         });
         update("coverArtPrompt", promptText);
-        trackGeneration(resp.generation_id, resp.ws_url, "cover_art", titleText);
+        promotePending(pendingId, resp.generation_id, resp.ws_url, titleText);
         setActiveModule("cover_art");
         setCoverArtAgentOpen(false);
         setAgentOpen(false);
@@ -1606,6 +1630,7 @@ export function StudioPage() {
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Не удалось запустить обложку";
         setSubmitError(msg);
+        dropPending(pendingId);
         throw err;
       }
       return;
@@ -1615,6 +1640,7 @@ export function StudioPage() {
       setSubmitError(
         "Чтобы сделать кавер, перейди в модуль Кавер и загрузи исходный mp3/m4a/wav — тогда я смогу запустить генерацию.",
       );
+      dropPending(pendingId);
       setActiveModule("cover");
       setAgentOpen(false);
       setAgentSeed(null);
@@ -1699,11 +1725,12 @@ export function StudioPage() {
         trackKind = "occasion";
       } else {
         // Exhaustive fallthrough — should be impossible thanks to the early returns above.
+        dropPending(pendingId);
         handleAgentComplete(result);
         return;
       }
 
-      trackGeneration(response.generation_id, response.ws_url, trackKind, title);
+      promotePending(pendingId, response.generation_id, response.ws_url, title, trackKind);
       setAgentOpen(false);
       setAgentSeed(null);
       setSubmitError(null);
@@ -1713,6 +1740,7 @@ export function StudioPage() {
           ? err.message
           : "Не получилось запустить генерацию. Попробуй ещё раз.";
       setSubmitError(msg);
+      dropPending(pendingId);
       throw err;
     }
   }

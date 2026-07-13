@@ -8,6 +8,7 @@ import { MobileTopbar } from "./MobileTopbar";
 import { NoticeBanner } from "./NoticeBanner";
 import { TermsAcceptanceModal } from "./TermsAcceptanceModal";
 import { CollapsedGenerationProgress } from "./ActiveGenerations";
+import { GenerationLaunchToast } from "./GenerationLaunchToast";
 import "./AppShell.css";
 
 interface AppShellProps {
@@ -39,6 +40,7 @@ export function AppShell({ children }: AppShellProps) {
       </main>
 
       <CollapsedGenerationProgress />
+      <GenerationLaunchToast />
       <ScrollToTop />
       <TermsAcceptanceModal />
     </div>

@@ -164,6 +164,9 @@ export function GlobalPlayer() {
   const renameInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const trackGeneration = useGenerationStore((s) => s.track);
+  const trackPending = useGenerationStore((s) => s.trackPending);
+  const promotePending = useGenerationStore((s) => s.promotePending);
+  const dropPending = useGenerationStore((s) => s.dropPending);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -864,19 +867,19 @@ export function GlobalPlayer() {
     const gId = extractGenId(currentId);
     if (!gId) return;
     setBoltOpen(false);
+    const pendingId = `pending-sim-${Date.now()}`;
+    const simTitle = t("globalPlayer.similarTrackTracking", {
+      defaultValue: "Похожий трек: {{title}}",
+      title: currentTitle,
+    });
+    // Instant placeholder + mobile toast so the tap from the (now-closed) bolt
+    // menu gives immediate feedback instead of 4-5s of silence.
+    trackPending(pendingId, "song", simTitle);
     try {
       const resp = await generateSimilar(gId);
-      trackGeneration(
-        resp.generation_id,
-        resp.ws_url,
-        "song",
-        t("globalPlayer.similarTrackTracking", {
-          defaultValue: "Похожий трек: {{title}}",
-          title: currentTitle,
-        }),
-      );
+      promotePending(pendingId, resp.generation_id, resp.ws_url, simTitle);
     } catch {
-      // sidebar generation card surfaces the error
+      dropPending(pendingId);
     }
   }
 
