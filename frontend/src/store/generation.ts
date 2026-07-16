@@ -56,9 +56,10 @@ interface GenerationStore {
   active: Record<string, ActiveGeneration>;
   /** Dismissed generation ids — чтобы sync с сервера не возвращал их в сайдбар. */
   dismissed: string[];
-  /** Transient signal for the mobile launch toast. Bumped every time a
-   *  generation is launched; the toast component watches `ts` and shows the
-   *  «Генерация запущена» overlay, then auto-hides. Not persisted. */
+  /** Transient "a generation just launched" signal. Bumped ONLY on user
+   *  launches (never on startup sync/reconnect). AppShell watches `ts` to
+   *  auto-open the collapsed sidebar drawer on mobile so the new card is
+   *  visible. Not persisted. */
   launchNotice: { ts: number } | null;
   /** Start tracking a new generation and open its WebSocket. */
   track: (id: string, wsUrl: string, type: string, title: string) => void;

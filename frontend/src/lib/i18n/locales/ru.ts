@@ -740,10 +740,6 @@ export const ru: LocaleTree = {
     genericTitle: "Генерация",
   },
 
-  genLaunchToast: {
-    title: "Генерация запущена",
-    hint: "⬅️ следите за процессом в сайдбаре",
-  },
 
   voiceRecorder: {
     recording: "Идёт запись",

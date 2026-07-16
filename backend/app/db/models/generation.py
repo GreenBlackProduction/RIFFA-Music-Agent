@@ -128,6 +128,22 @@ class Generation(Base, TimestampMixin):
     track_stats: Mapped[dict[str, Any]] = mapped_column(
         JSON, default=dict, nullable=False, server_default="{}"
     )
+    # Per-track PERSONAL rating (the owner's own like/dislike in their library):
+    # {"0": "like", "1": "dislike"}. Keys are stringified track indices. This is
+    # the source of truth for the per-track heart; the legacy gen-level `rating`
+    # above is kept as a mirror (= like if ANY variant is liked) so the
+    # "Моя коллекция" filter keeps working. Empty {} → fall back to gen.rating.
+    track_ratings: Mapped[dict[str, Any]] = mapped_column(
+        JSON, default=dict, nullable=False, server_default="{}"
+    )
+    # Per-track trash timestamps: {"0": "2026-...ISO"}. A variant is in the trash
+    # iff its index appears here. Independent from the whole-row `deleted_at`
+    # (which is set only when EVERY variant is trashed, so the 7-day row purge
+    # still frees storage). Lets the user trash V1 to the recoverable trash while
+    # V2 keeps living in the library — the two variants are fully independent.
+    track_trashed_at: Mapped[dict[str, Any]] = mapped_column(
+        JSON, default=dict, nullable=False, server_default="{}"
+    )
 
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

@@ -683,11 +683,15 @@ export function GlobalPlayer() {
       nextLocal === null ? "remove" : nextLocal;
 
     const tryOwn = currentIsOwn !== false;
-    const trackIndex = extractTrackIndex(currentId) ?? 0;
+    // Nullable: null for single-track items (sfx/wav) → whole-gen rating;
+    // a real index for multi-variant tracks → per-variant rating.
+    const ownIndex = extractTrackIndex(currentId);
+    // Radio vote always needs a concrete index.
+    const trackIndex = ownIndex ?? 0;
     let succeeded = false;
     try {
       if (tryOwn) {
-        await rateGeneration(genId, apiRating);
+        await rateGeneration(genId, apiRating, ownIndex);
       } else {
         await voteRadioTrack(genId, apiRating, trackIndex);
       }
@@ -702,7 +706,7 @@ export function GlobalPlayer() {
           if (tryOwn) {
             await voteRadioTrack(genId, apiRating, trackIndex);
           } else {
-            await rateGeneration(genId, apiRating);
+            await rateGeneration(genId, apiRating, ownIndex);
           }
           succeeded = true;
         } catch (err2) {

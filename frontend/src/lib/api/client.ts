@@ -347,6 +347,10 @@ export interface Track {
   image_url: string | null;
   duration: number;
   title: string;
+  /** Index of this variant within the generation (0 = V1, 1 = V2). */
+  track_index?: number;
+  /** This variant's OWN personal rating — independent per track. */
+  rating?: "like" | "dislike" | null;
 }
 
 export interface GenerationOut {
@@ -891,8 +895,9 @@ export function deleteGeneration(id: string, trackIndex?: number | null): Promis
   return apiFetch(`/api/v1/history/${id}${qs}`, { method: "DELETE" });
 }
 
-export function restoreGeneration(id: string): Promise<void> {
-  return apiFetch(`/api/v1/history/${id}/restore`, { method: "POST" });
+export function restoreGeneration(id: string, trackIndex?: number | null): Promise<void> {
+  const qs = trackIndex !== null && trackIndex !== undefined ? `?track_index=${trackIndex}` : "";
+  return apiFetch(`/api/v1/history/${id}/restore${qs}`, { method: "POST" });
 }
 
 export function fetchTrash(page?: number): Promise<HistoryPage> {
@@ -906,10 +911,15 @@ export function purgeTrash(): Promise<void> {
 export function rateGeneration(
   id: string,
   rating: "like" | "dislike" | "remove",
+  trackIndex?: number | null,
 ): Promise<void> {
   return apiFetch(`/api/v1/history/${id}/rating`, {
     method: "POST",
-    body: JSON.stringify({ rating }),
+    body: JSON.stringify(
+      trackIndex !== null && trackIndex !== undefined
+        ? { rating, track_index: trackIndex }
+        : { rating },
+    ),
   });
 }
 

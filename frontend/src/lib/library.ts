@@ -50,9 +50,12 @@ export interface LibraryItem {
   /** Per-variant: ``true`` when *this specific* track index is currently
    *  published on the public Radio. */
   isPublic: boolean;
-  /** ``true`` when you rated this generation "like" — drives the
-   *  "Понравились вам" filter on the Library page. */
+  /** ``true`` when you rated THIS specific track "like" — drives the
+   *  "Понравились вам" filter and the heart. Independent per variant. */
   liked: boolean;
+  /** This track's own rating, forwarded to the player so the thumbs seed
+   *  correctly (independent per variant). */
+  rating: "like" | "dislike" | null;
 }
 
 /**
@@ -146,7 +149,10 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
     : gen.published_track_index !== null && gen.published_track_index !== undefined
     ? [gen.published_track_index]
     : [];
-  const liked = gen.rating === "like";
+  // Single-output items (cover art / wav / no-tracks) have no per-variant
+  // rating — fall back to the gen-level one.
+  const genRating: "like" | "dislike" | null = gen.rating ?? null;
+  const liked = genRating === "like";
   // Cover art: image-only result — display image as cover, no audio.
   if (libType === "cover_art") {
     if (!gen.image_url) return [];
@@ -168,6 +174,7 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
         isOwn: true,
         isPublic: false,
         liked,
+        rating: genRating,
       },
     ];
   }
@@ -193,6 +200,7 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
         isOwn: true,
         isPublic: false,
         liked,
+        rating: genRating,
       },
     ];
   }
@@ -216,28 +224,36 @@ export function generationToItems(gen: GenerationOut): LibraryItem[] {
         isOwn: true,
         isPublic: false,
         liked,
+        rating: genRating,
       },
     ];
   }
-  return gen.tracks.map((t, i) => ({
-    id: gen.tracks.length > 1 ? `${gen.id}#${i}` : gen.id,
-    generationId: gen.id,
-    trackIndex: i,
-    title: t.title || gen.title || "Без названия",
-    type: libType,
-    genre: gen.genre ?? "",
-    mood: gen.mood ?? "",
-    tempo: gen.tempo ?? "",
-    createdAt: gen.created_at,
-    duration: formatDuration(t.duration),
-    audioUrl: t.audio_url,
-    coverUrl: t.image_url ?? null,
-    audioId: t.audio_id || undefined,
-    isOwn: true,
-    // Per-variant: check the indices array first (new), fall back to single index (legacy).
-    isPublic: gen.is_public && publishedIndices.includes(i),
-    liked,
-  }));
+  return gen.tracks.map((t, i) => {
+    // Prefer this track's real DB index (it survives filtering of trashed
+    // siblings on the backend); fall back to array position for old payloads.
+    const trackIdx = t.track_index ?? i;
+    const trackRating: "like" | "dislike" | null = t.rating ?? genRating;
+    return {
+      id: gen.tracks.length > 1 ? `${gen.id}#${trackIdx}` : gen.id,
+      generationId: gen.id,
+      trackIndex: trackIdx,
+      title: t.title || gen.title || "Без названия",
+      type: libType,
+      genre: gen.genre ?? "",
+      mood: gen.mood ?? "",
+      tempo: gen.tempo ?? "",
+      createdAt: gen.created_at,
+      duration: formatDuration(t.duration),
+      audioUrl: t.audio_url,
+      coverUrl: t.image_url ?? null,
+      audioId: t.audio_id || undefined,
+      isOwn: true,
+      // Per-variant: check the indices array first (new), fall back to single index (legacy).
+      isPublic: gen.is_public && publishedIndices.includes(trackIdx),
+      liked: trackRating === "like",
+      rating: trackRating,
+    };
+  });
 }
 
 interface UseLibraryItemsOptions {

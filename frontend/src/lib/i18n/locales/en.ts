@@ -735,10 +735,6 @@ export const en: TranslationKeys = {
     genericTitle: "Generation",
   },
 
-  genLaunchToast: {
-    title: "Generation started",
-    hint: "⬅️ follow the progress in the sidebar",
-  },
 
   voiceRecorder: {
     recording: "Recording",

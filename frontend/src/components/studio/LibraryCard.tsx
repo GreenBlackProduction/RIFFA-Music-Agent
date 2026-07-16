@@ -19,6 +19,7 @@ import {
   type HistoryPage,
 } from "@/lib/api/client";
 import {
+  generationToItems,
   HISTORY_QUERY_KEY,
   type LibraryItem,
   type LibraryItemType,
@@ -119,7 +120,8 @@ export function LibraryCard() {
   });
 
   const restoreMutation = useMutation({
-    mutationFn: (generationId: string) => restoreGeneration(generationId),
+    mutationFn: (v: { generationId: string; trackIndex: number | null }) =>
+      restoreGeneration(v.generationId, v.trackIndex),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["history", "trash"] });
       await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
@@ -145,7 +147,11 @@ export function LibraryCard() {
             ...old,
             items: old.items.map((g: GenerationOut) => {
               if (g.id !== generationId) return g;
-              const tracks = g.tracks.filter((_: unknown, i: number) => i !== trackIndex);
+              // Filter by the track's real DB index, not array position — after
+              // a sibling is trashed the positions no longer equal the indices.
+              const tracks = g.tracks.filter(
+                (tr, i: number) => (tr.track_index ?? i) !== trackIndex,
+              );
               return { ...g, tracks };
             }).filter((g: GenerationOut) => g.tracks.length > 0),
           };
@@ -246,7 +252,7 @@ export function LibraryCard() {
         cover: i.coverUrl ?? undefined,
         meta: [typeLabel(i.type), i.genre, i.mood, formatBpm(i.tempo)].filter(Boolean).join(" · "),
         isOwn: i.isOwn !== false,
-        rating: i.liked ? ("like" as const) : null,
+        rating: i.rating,
         canRadio: RADIO_TYPES.has(i.type) && i.isOwn !== false,
         isMusicType: MUSIC_TYPES.has(i.type),
         isPublic: i.isPublic,
@@ -260,7 +266,7 @@ export function LibraryCard() {
       cover: item.coverUrl ?? undefined,
       meta: [typeLabel(item.type), item.genre, item.mood, formatBpm(item.tempo)].filter(Boolean).join(" · "),
       isOwn: item.isOwn !== false,
-      rating: item.liked ? ("like" as const) : null,
+      rating: item.rating,
       canRadio: RADIO_TYPES.has(item.type) && item.isOwn !== false,
       isMusicType: MUSIC_TYPES.has(item.type),
       isPublic: item.isPublic,
@@ -517,22 +523,25 @@ export function LibraryCard() {
             </div>
           )}
           <div className="library-trash__list">
-            {(trashData?.items ?? []).map((gen) => {
+            {(trashData?.items ?? []).flatMap(generationToItems).map((it) => {
+              const restoreKey = { generationId: it.generationId, trackIndex: it.trackIndex };
               const restoring =
-                restoreMutation.isPending && restoreMutation.variables === gen.id;
+                restoreMutation.isPending &&
+                restoreMutation.variables?.generationId === it.generationId &&
+                restoreMutation.variables?.trackIndex === it.trackIndex;
               return (
-                <div key={gen.id} className="trash-item">
+                <div key={it.id} className="trash-item">
                   <div className="trash-item__info">
-                    <strong className="trash-item__title">{gen.title || gen.type}</strong>
+                    <strong className="trash-item__title">{it.title || it.type}</strong>
                     <span className="trash-item__meta">
-                      {gen.type} · {gen.deleted_at ? new Date(gen.deleted_at).toLocaleDateString("ru") : "—"}
+                      {typeLabel(it.type)}
                     </span>
                   </div>
                   <button
                     type="button"
                     className="filter-chip"
                     title={t("library.restore")}
-                    onClick={() => restoreMutation.mutate(gen.id)}
+                    onClick={() => restoreMutation.mutate(restoreKey)}
                     disabled={restoring}
                   >
                     {restoring ? "…" : t("library.restoreCta")}

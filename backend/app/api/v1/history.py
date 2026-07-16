@@ -5,7 +5,7 @@ from __future__ import annotations
 import contextlib
 import secrets
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from arq import create_pool
@@ -36,12 +36,21 @@ router = APIRouter(prefix="/history", tags=["history"])
 # ---------------------------------------------------------------------------
 
 
+# Trash retention window — variants older than this drop out of the trash view
+# (and whole rows get hard-purged by the worker). Must match the worker.
+TRASH_RETENTION_DAYS = 7
+
+
 class TrackOut(BaseModel):
     audio_url: str
     audio_id: str
     image_url: str | None = None
     duration: int = 0
     title: str = ""
+    # Index of this variant within the generation (0 = V1, 1 = V2).
+    track_index: int = 0
+    # This variant's own personal rating — independent per track.
+    rating: str | None = None
 
 
 class GenerationOut(BaseModel):
@@ -74,10 +83,66 @@ class GenerationOut(BaseModel):
     deleted_at: str | None
 
 
-def _to_out(gen: Generation) -> GenerationOut:
+def _trashed_indices(gen: Generation, *, within_days: int | None = None) -> set[int]:
+    """Indices of variants currently in the trash.
+
+    ``within_days`` (trash view) keeps only variants trashed inside the
+    retention window; older ones stay hidden from the library but drop out of
+    the trash. ``None`` (library view) counts any trashed variant as hidden.
+    """
+    raw = gen.track_trashed_at if isinstance(gen.track_trashed_at, dict) else {}
+    out: set[int] = set()
+    cutoff = (
+        datetime.now(UTC) - timedelta(days=within_days) if within_days is not None else None
+    )
+    for k, ts in raw.items():
+        try:
+            idx = int(k)
+        except (TypeError, ValueError):
+            continue
+        if cutoff is not None:
+            try:
+                when = datetime.fromisoformat(str(ts))
+            except (TypeError, ValueError):
+                when = None
+            if when is None or when < cutoff:
+                continue
+        out.add(idx)
+    # Backward-compat: legacy rows may still carry deleted_track_indices only.
+    if within_days is None:
+        out |= set(gen.deleted_track_indices or [])
+    return out
+
+
+def _track_rating(gen: Generation, idx: int) -> str | None:
+    """This variant's personal rating.
+
+    Once the per-track map has ANY entry it is authoritative — an absent index
+    means "not rated" (None), NOT a fall-back to the gen-level mirror. Falling
+    back would re-couple the variants: rating one flips the gen-level mirror,
+    and the untouched sibling would inherit it. Only a completely empty map
+    (un-migrated legacy row) falls back to the old gen-level rating.
+    """
+    ratings = gen.track_ratings if isinstance(gen.track_ratings, dict) else {}
+    if ratings:
+        val = ratings.get(str(idx))
+        return str(val) if val else None
+    return gen.rating.value if isinstance(gen.rating, GenerationRating) else (gen.rating or None)
+
+
+def _to_out(gen: Generation, *, trashed_view: bool = False) -> GenerationOut:
     result: dict[str, Any] = gen.result or {}
     raw_tracks = result.get("tracks", [])
-    deleted_idx = set(gen.deleted_track_indices or [])
+    if trashed_view:
+        # Show ONLY the variants that are in the trash (within retention).
+        show_idx = _trashed_indices(gen, within_days=TRASH_RETENTION_DAYS)
+        # Whole-row trash (deleted_at) with no per-variant entries → show all.
+        if not show_idx and gen.deleted_at is not None:
+            show_idx = {i for i, t in enumerate(raw_tracks) if t.get("audio_url")}
+        keep = lambda i: i in show_idx  # noqa: E731
+    else:
+        hidden = _trashed_indices(gen)
+        keep = lambda i: i not in hidden  # noqa: E731
     tracks = [
         TrackOut(
             # Route audio through our backend so crossOrigin="anonymous" works
@@ -87,9 +152,11 @@ def _to_out(gen: Generation) -> GenerationOut:
             image_url=t.get("image_url"),
             duration=int(t.get("duration", 0)),
             title=t.get("title", gen.title),
+            track_index=i,
+            rating=_track_rating(gen, i),
         )
         for i, t in enumerate(raw_tracks)
-        if t.get("audio_url") and i not in deleted_idx
+        if t.get("audio_url") and keep(i)
     ]
     return GenerationOut(
         id=str(gen.id),
@@ -131,6 +198,9 @@ class HistoryPage(BaseModel):
 
 class RatingRequest(BaseModel):
     rating: Literal["like", "dislike", "remove"]
+    # Which variant to rate (0 = V1, 1 = V2). None → rate the whole generation
+    # (legacy behaviour, used for single-output items: sfx / wav / cover art).
+    track_index: int | None = None
 
 
 class RenameRequest(BaseModel):
@@ -218,18 +288,37 @@ async def list_trash(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(db_session),
 ) -> HistoryPage:
-    """List generations the user has moved to trash (not yet purged)."""
-    from sqlalchemy import func
+    """List trashed items — whole generations AND individual trashed variants.
+
+    A row qualifies if it's fully trashed (``deleted_at``) or has any
+    per-variant trash entry (``track_trashed_at``). We serialize each with
+    ``trashed_view`` so only the trashed variants show, and drop rows whose
+    trashed variants have all aged out of the 7-day retention window.
+    """
+    from sqlalchemy import String, cast
 
     stmt = (
         select(Generation)
-        .where(Generation.user_id == user.id, Generation.deleted_at.is_not(None))
+        .where(
+            Generation.user_id == user.id,
+            (
+                Generation.deleted_at.is_not(None)
+                | (cast(Generation.track_trashed_at, String).notin_(("{}", "null", "")))
+            ),
+        )
+        .order_by(Generation.deleted_at.desc().nullslast(), desc(Generation.created_at))
     )
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await session.execute(count_stmt)).scalar_one()
-    stmt = stmt.order_by(desc(Generation.deleted_at)).offset((page - 1) * limit).limit(limit)
     rows = (await session.execute(stmt)).scalars().all()
-    return HistoryPage(items=[_to_out(g) for g in rows], total=total, page=page, limit=limit)
+    # Serialize in trash view; keep only rows that still have a visible trashed
+    # variant (something trashed within the retention window).
+    serialized = [_to_out(g, trashed_view=True) for g in rows]
+    visible = [
+        out for out, g in zip(serialized, rows)
+        if out.tracks or (g.deleted_at is not None and not (g.result or {}).get("tracks"))
+    ]
+    total = len(visible)
+    start = (page - 1) * limit
+    return HistoryPage(items=visible[start:start + limit], total=total, page=page, limit=limit)
 
 
 @router.delete("/trash/purge", status_code=status.HTTP_204_NO_CONTENT)
@@ -237,15 +326,38 @@ async def purge_trash(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(db_session),
 ) -> Response:
-    """Permanently delete all trashed items for this user."""
+    """Permanently empty the trash for this user.
+
+    Fully-trashed rows are hard-deleted (frees storage). Rows that only have a
+    single trashed variant (the sibling still lives in the library) can't be
+    row-deleted — we age their trash timestamps far into the past so the
+    variant leaves the trash for good while the sibling is untouched.
+    """
+    from sqlalchemy import String, cast
     from sqlalchemy import delete as sql_delete
 
+    # 1) Fully-trashed generations → hard delete.
     await session.execute(
         sql_delete(Generation).where(
             Generation.user_id == user.id,
             Generation.deleted_at.is_not(None),
         )
     )
+    # 2) Partially-trashed rows (live sibling) → drop the trashed variants out
+    #    of the trash permanently, keeping them hidden from the library.
+    rows = (
+        await session.execute(
+            select(Generation).where(
+                Generation.user_id == user.id,
+                Generation.deleted_at.is_(None),
+                cast(Generation.track_trashed_at, String).notin_(("{}", "null", "")),
+            )
+        )
+    ).scalars().all()
+    for gen in rows:
+        trashed = gen.track_trashed_at if isinstance(gen.track_trashed_at, dict) else {}
+        gen.track_trashed_at = {k: "2000-01-01T00:00:00+00:00" for k in trashed}
+        flag_modified(gen, "track_trashed_at")
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -300,16 +412,49 @@ async def rate_generation(
     if gen is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
 
-    if body.rating == "remove":
-        gen.rating = None
+    raw_tracks = (gen.result or {}).get("tracks") or []
+
+    if body.track_index is None:
+        # Whole-generation rating (single-output items, or legacy callers).
+        gen.rating = None if body.rating == "remove" else GenerationRating(body.rating)
+        # Keep the per-track map aligned so both stay consistent.
+        if raw_tracks:
+            gen.track_ratings = (
+                {} if body.rating == "remove"
+                else {str(i): body.rating for i in range(len(raw_tracks))}
+            )
+            flag_modified(gen, "track_ratings")
     else:
-        gen.rating = GenerationRating(body.rating)
+        idx = body.track_index
+        if not (0 <= idx < len(raw_tracks)):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="track_index out of range"
+            )
+        ratings = dict(gen.track_ratings) if isinstance(gen.track_ratings, dict) else {}
+        # Migrate-on-write: if this row still carries only the old gen-level
+        # rating, expand it onto every variant BEFORE applying the per-track
+        # change — otherwise the untouched sibling would keep inheriting the
+        # legacy rating and the two would stay coupled.
+        if not ratings and gen.rating is not None:
+            legacy = gen.rating.value if isinstance(gen.rating, GenerationRating) else str(gen.rating)
+            ratings = {str(i): legacy for i in range(len(raw_tracks))}
+        if body.rating == "remove":
+            ratings.pop(str(idx), None)
+        else:
+            ratings[str(idx)] = body.rating
+        gen.track_ratings = ratings
+        flag_modified(gen, "track_ratings")
+        # Mirror to the gen-level field so "Моя коллекция" (which filters on
+        # Generation.rating == like) still surfaces the row when ANY variant
+        # is liked. dislike-only → dislike; nothing → None.
+        vals = set(ratings.values())
+        gen.rating = (
+            GenerationRating.like if "like" in vals
+            else GenerationRating.dislike if "dislike" in vals
+            else None
+        )
 
-    # Rating (like/dislike/remove) only affects Generation.rating — never touches is_public.
-    # Public Radio publishing is a separate explicit action via POST /history/{id}/radio.
-    # Liked own tracks appear in "Моя коллекция" via the my_collection query filter,
-    # but is_public stays false unless the user explicitly publishes via the Radio button.
-
+    # Rating never touches is_public — Radio publishing is a separate action.
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -677,16 +822,23 @@ async def delete_generation(
     if gen is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
 
+    now = datetime.now(UTC)
+    raw_tracks = (gen.result or {}).get("tracks") or []
+    trashed = dict(gen.track_trashed_at) if isinstance(gen.track_trashed_at, dict) else {}
+
     if track_index is not None:
-        raw_tracks = (gen.result or {}).get("tracks") or []
         if not (0 <= track_index < len(raw_tracks)):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="track_index out of range",
             )
-        deleted = set(gen.deleted_track_indices or [])
-        deleted.add(track_index)
-        gen.deleted_track_indices = sorted(deleted)
+        # Move ONLY this variant to the trash (recoverable for 7 days). The
+        # sibling keeps living in the library — the two are fully independent.
+        trashed[str(track_index)] = now.isoformat()
+        gen.track_trashed_at = trashed
+        flag_modified(gen, "track_trashed_at")
+        # Keep the legacy hidden-index mirror consistent for any old readers.
+        gen.deleted_track_indices = sorted({int(k) for k in trashed})
         flag_modified(gen, "deleted_track_indices")
 
         # Unpublish only the targeted variant from Radio.
@@ -696,19 +848,28 @@ async def delete_generation(
         if track_index in pub_indices:
             pub_indices.remove(track_index)
             gen.published_track_indices = pub_indices or None
-        # If every surviving variant is gone we fall through and trash the
-        # whole row so it lands in the user's trash drawer.
-        live = [i for i in range(len(raw_tracks)) if i not in deleted]
+
+        live = [i for i in range(len(raw_tracks)) if str(i) not in trashed]
         if live:
-            # At least one variant remains — partial delete is complete.
+            # At least one variant remains → the row stays in the library.
             if not pub_indices and gen.published_track_index is None:
                 gen.is_public = False
                 gen.published_at = None
             await session.commit()
             return Response(status_code=status.HTTP_204_NO_CONTENT)
+        # Otherwise every variant is trashed → fall through to whole-row trash.
 
     # Whole-generation soft-delete (no track_index, OR last variant just left).
-    gen.deleted_at = datetime.now(UTC)
+    # Mark every variant trashed-now too, so the trash view + 7-day purge treat
+    # single-output items and multi-variant rows uniformly.
+    if raw_tracks:
+        for i in range(len(raw_tracks)):
+            trashed.setdefault(str(i), now.isoformat())
+        gen.track_trashed_at = trashed
+        flag_modified(gen, "track_trashed_at")
+        gen.deleted_track_indices = sorted({int(k) for k in trashed})
+        flag_modified(gen, "deleted_track_indices")
+    gen.deleted_at = now
     if gen.is_public:
         gen.is_public = False
         gen.published_track_index = None
@@ -721,10 +882,19 @@ async def delete_generation(
 @router.post("/{gen_id}/restore", status_code=status.HTTP_204_NO_CONTENT)
 async def restore_generation(
     gen_id: str,
+    track_index: int | None = None,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(db_session),
 ) -> Response:
-    """Restore a soft-deleted generation back to the user's library."""
+    """Restore a trashed generation — or just one trashed variant — back to
+    the library.
+
+    - ``track_index`` set → restore only that variant (the sibling is
+      untouched). If the row was fully trashed, clearing one variant also
+      brings the row back out of the whole-row trash.
+    - ``track_index`` omitted → restore the whole generation and all its
+      variants.
+    """
     try:
         gid = uuid.UUID(gen_id)
     except ValueError as exc:
@@ -736,12 +906,23 @@ async def restore_generation(
         )
     ).scalar_one_or_none()
 
-    if gen is None or gen.deleted_at is None:
+    trashed = dict(gen.track_trashed_at) if gen and isinstance(gen.track_trashed_at, dict) else {}
+    is_trashed = gen is not None and (gen.deleted_at is not None or bool(trashed))
+    if gen is None or not is_trashed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
 
-    gen.deleted_at = None
-    # Restore every variant — the user moved the row out of trash, so it
-    # would be confusing if half the variants stayed hidden.
-    gen.deleted_track_indices = None
+    if track_index is not None:
+        trashed.pop(str(track_index), None)
+        gen.track_trashed_at = trashed
+        flag_modified(gen, "track_trashed_at")
+        gen.deleted_track_indices = sorted({int(k) for k in trashed}) or None
+        flag_modified(gen, "deleted_track_indices")
+        # Any variant back in the library → the row is no longer fully trashed.
+        gen.deleted_at = None
+    else:
+        gen.deleted_at = None
+        gen.track_trashed_at = {}
+        gen.deleted_track_indices = None
+        flag_modified(gen, "track_trashed_at")
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
