@@ -25,4 +25,6 @@ USER appuser
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 2 workers = one per vCPU. Cross-process state is safe: WS progress goes
+# through Redis pub/sub, anti_repeat is documented best-effort shared-nothing.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

@@ -54,7 +54,18 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         settings = get_settings()
-        _engine = create_async_engine(settings.database_url, future=True, echo=False)
+        # pool_size/max_overflow: 20 connections per process. With 2 uvicorn
+        # workers + 1 arq worker that's max 60 — well under Postgres' 100.
+        # pre_ping revalidates pooled connections so a Postgres restart doesn't
+        # leave the app throwing on stale sockets.
+        _engine = create_async_engine(
+            settings.database_url,
+            future=True,
+            echo=False,
+            pool_size=10,
+            max_overflow=10,
+            pool_pre_ping=True,
+        )
     return _engine
 
 
