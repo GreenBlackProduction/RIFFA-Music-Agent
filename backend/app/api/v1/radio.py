@@ -180,7 +180,15 @@ def _to_out(
     raw_audio_url, image_url, duration = _track_at(gen, track_index)
     if not raw_audio_url:
         return None
-    audio_url = f"/api/v1/tracks/{gen.id}/{track_index}/public-stream"
+    # The public proxy only serves is_public tracks. "Моя коллекция" also lists
+    # the owner's OWN liked tracks that were never published to Radio — route
+    # those through the authenticated owner endpoint so they actually play (the
+    # URL is same-origin, so the session cookie is sent). Public tracks keep the
+    # cacheable public proxy.
+    if is_own and not gen.is_public:
+        audio_url = f"/api/v1/tracks/{gen.id}/{track_index}/stream"
+    else:
+        audio_url = f"/api/v1/tracks/{gen.id}/{track_index}/public-stream"
     kind = _TYPE_TO_KIND.get(gen.type, "song")
     likes, dislikes, plays = _track_stats(gen, track_index)
     return RadioTrackOut(
