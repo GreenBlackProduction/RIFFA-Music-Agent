@@ -10,8 +10,8 @@
  *   - One react-query cache key — invalidating on either page refreshes both.
  */
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { fetchHistory, type GenerationOut } from "@/lib/api/client";
 import { useGenerationStore } from "@/store/generation";
@@ -267,14 +267,26 @@ export interface UseLibraryItemsResult {
   authError: boolean;
   /** Force a refetch (e.g. after a destructive mutation). */
   invalidate: () => Promise<void>;
+  /** Load the next page of generations (infinite scroll). No-op once the
+   *  whole library is loaded. */
+  fetchNextPage: () => void;
+  /** ``true`` while more generations remain unfetched. */
+  hasNextPage: boolean;
+  /** ``true`` while the next page is currently being fetched. */
+  isFetchingNextPage: boolean;
+  /** Total generations in the library across all pages. */
+  total: number;
 }
 
 /**
  * Single source of truth for per-track items rendered by both StudioPage's
  * LibraryCard and ProfilePage's "Мои файлы" panel.
  *
- * Re-runs whenever the global generation store reports a new ``completed``
- * generation, so both pages refresh together as soon as Suno finishes.
+ * Pages the history endpoint (infinite scroll): the grid loads more as the
+ * user scrolls, so the whole catalogue is reachable — not only the newest
+ * page. Re-runs whenever the global generation store reports a new
+ * ``completed`` generation, so both pages refresh together as soon as Suno
+ * finishes.
  */
 export function useLibraryItems(opts: UseLibraryItemsOptions = {}): UseLibraryItemsResult {
   const limit = opts.limit ?? 50;
@@ -284,11 +296,29 @@ export function useLibraryItems(opts: UseLibraryItemsOptions = {}): UseLibraryIt
     Object.values(s.active).filter((g) => g.status === "completed").length,
   );
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: [...HISTORY_QUERY_KEY, completedCount, limit],
-    queryFn: () => fetchHistory({ limit }),
-    retry: false,
-  });
+  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: [...HISTORY_QUERY_KEY, limit],
+      queryFn: ({ pageParam }) => fetchHistory({ limit, page: pageParam }),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage, allPages) => {
+        const loaded = allPages.reduce((n, p) => n + p.items.length, 0);
+        return loaded < lastPage.total ? allPages.length + 1 : undefined;
+      },
+      retry: false,
+    });
+
+  // A Suno generation finishing in the background bumps completedCount. Refetch
+  // the already-loaded pages IN PLACE rather than keying the query on the count
+  // (which would discard every page past the first and reset the user's scroll
+  // position). Fire only on an increase, never on mount.
+  const prevCompleted = useRef(completedCount);
+  useEffect(() => {
+    if (completedCount > prevCompleted.current) {
+      void queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
+    }
+    prevCompleted.current = completedCount;
+  }, [completedCount, queryClient]);
 
   const authError =
     error !== null &&
@@ -298,9 +328,26 @@ export function useLibraryItems(opts: UseLibraryItemsOptions = {}): UseLibraryIt
     (error as { status: number }).status === 401;
 
   const items = useMemo<LibraryItem[]>(() => {
-    if (!data) return [];
-    return data.items.flatMap(generationToItems);
+    const pages = data?.pages ?? [];
+    // Offset pagination can repeat an item across a page boundary when a new
+    // generation is inserted at the top between fetches — de-dupe by id.
+    const seen = new Set<string>();
+    const out: LibraryItem[] = [];
+    for (const page of pages) {
+      for (const gen of page.items) {
+        for (const it of generationToItems(gen)) {
+          if (seen.has(it.id)) continue;
+          seen.add(it.id);
+          out.push(it);
+        }
+      }
+    }
+    return out;
   }, [data]);
+
+  const loadMore = useCallback(() => {
+    void fetchNextPage();
+  }, [fetchNextPage]);
 
   return {
     items,
@@ -309,5 +356,9 @@ export function useLibraryItems(opts: UseLibraryItemsOptions = {}): UseLibraryIt
     invalidate: async () => {
       await queryClient.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
     },
+    fetchNextPage: loadMore,
+    hasNextPage: !!hasNextPage,
+    isFetchingNextPage,
+    total: data?.pages[0]?.total ?? 0,
   };
 }

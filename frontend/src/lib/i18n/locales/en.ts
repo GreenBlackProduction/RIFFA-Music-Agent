@@ -630,6 +630,7 @@ export const en: TranslationKeys = {
     filterAll: "all",
     trash: "Trash",
     loadingFiles: "Loading files…",
+    loadingMore: "Loading more…",
     signInPrompt: "Sign in — and your generations will appear here.",
     emptyStart: "Empty — start your first generation from the module tiles above.",
     trashEmpty: "Trash is empty. Deleted files are kept for 7 days, then erased forever.",

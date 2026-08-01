@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 
@@ -50,6 +50,7 @@ export function LibraryCard() {
   const { ghosts, showGhost } = useFileGhosts();
   const queryClient = useQueryClient();
   const [viewerImage, setViewerImage] = useState<{ url: string; title: string } | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const { playOrToggle, currentId, isPlaying, setRadioState } = usePlayer(
     useShallow((s) => ({
@@ -64,7 +65,8 @@ export function LibraryCard() {
   const promotePending = useGenerationStore((s) => s.promotePending);
   const dropPending = useGenerationStore((s) => s.dropPending);
 
-  const { items, isLoading, authError } = useLibraryItems();
+  const { items, isLoading, authError, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useLibraryItems();
 
   // Unique genres and moods extracted from actual items (non-empty, sorted).
   // Genre is reduced to its PRIMARY style and de-duplicated case-insensitively
@@ -134,18 +136,41 @@ export function LibraryCard() {
     }
   }, [items, setRadioState]);
 
+  // Infinite scroll: load the next page when the sentinel below the grid nears
+  // the viewport. rootMargin pre-fetches ~1 screen early so scrolling stays
+  // smooth. When a filter shrinks the list so the sentinel is already visible,
+  // this chains pages until the filter fills the screen or the library is fully
+  // loaded — so filters cover the whole catalogue, not just the first page.
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "600px 0px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   const deleteMutation = useMutation({
     mutationFn: ({ generationId, trackIndex }: { generationId: string; trackIndex: number | null }) =>
       deleteGeneration(generationId, trackIndex),
     onMutate: async ({ generationId, trackIndex }) => {
       await queryClient.cancelQueries({ queryKey: HISTORY_QUERY_KEY });
-      const snapshots = queryClient.getQueriesData<HistoryPage>({ queryKey: HISTORY_QUERY_KEY });
-      queryClient.setQueriesData<HistoryPage>({ queryKey: HISTORY_QUERY_KEY }, (old) => {
-        if (!old?.items) return old;
+      const snapshots = queryClient.getQueriesData<InfiniteData<HistoryPage>>({
+        queryKey: HISTORY_QUERY_KEY,
+      });
+      // The library is an infinite query, so the cache holds { pages: [...] }.
+      // Apply the optimistic edit to every loaded page.
+      const editPage = (page: HistoryPage): HistoryPage => {
         if (trackIndex !== null) {
           return {
-            ...old,
-            items: old.items.map((g: GenerationOut) => {
+            ...page,
+            items: page.items.map((g: GenerationOut) => {
               if (g.id !== generationId) return g;
               // Filter by the track's real DB index, not array position — after
               // a sibling is trashed the positions no longer equal the indices.
@@ -157,11 +182,15 @@ export function LibraryCard() {
           };
         }
         return {
-          ...old,
-          items: old.items.filter((g: GenerationOut) => g.id !== generationId),
-          total: Math.max(0, (old.total ?? 0) - 1),
+          ...page,
+          items: page.items.filter((g: GenerationOut) => g.id !== generationId),
+          total: Math.max(0, (page.total ?? 0) - 1),
         };
-      });
+      };
+      queryClient.setQueriesData<InfiniteData<HistoryPage>>(
+        { queryKey: HISTORY_QUERY_KEY },
+        (old) => (old?.pages ? { ...old, pages: old.pages.map(editPage) } : old),
+      );
       return { snapshots };
     },
     onError: (_err, _id, ctx) => {
@@ -502,6 +531,17 @@ export function LibraryCard() {
           );
         })}
       </div>
+
+      {filter !== "trash" && hasNextPage && (
+        <div ref={loadMoreRef} className="library-card__more" aria-hidden="true">
+          {isFetchingNextPage && (
+            <span className="library-card__hint library-card__hint--loading">
+              {t("library.loadingMore", { defaultValue: "Загружаем ещё…" })}
+            </span>
+          )}
+        </div>
+      )}
+
       <FileGhostsOverlay ghosts={ghosts} />
 
       {/* ── Trash section ── */}

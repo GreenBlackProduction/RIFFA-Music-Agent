@@ -103,6 +103,14 @@
   align-content: start;
 }
 
+/* Infinite-scroll sentinel: a slim strip below the grid the observer watches. */
+.library-card__more {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 32px;
+}
+
 /* Bigger file-item cards in library context */
 .library-card__grid .file-item {
   height: auto;
