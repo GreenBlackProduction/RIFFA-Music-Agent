@@ -116,12 +116,9 @@ async def auto_title(
     short_title = ""
     if settings.openai_api_key:
         try:
-            from app.services.lyrics import LyricsClient
+            from app.services.lyrics import make_lyrics_client
 
-            client = LyricsClient(
-                api_key=settings.openai_api_key,
-                base_url=settings.openai_base_url or "https://api.apiyi.com/v1",
-            )
+            client = make_lyrics_client(settings)
             short_title = (await client.generate_title(body.idea)).strip()
         except Exception as exc:  # GPT is best-effort, never fatal here.
             logger.warning("auto_title GPT call failed: {}", exc)

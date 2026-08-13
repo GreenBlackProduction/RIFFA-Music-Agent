@@ -29,7 +29,6 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, sta
 from app.core.limiter import limiter
 from fastapi.responses import StreamingResponse
 from loguru import logger
-from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +37,7 @@ from app.core.config import Settings, get_settings
 from app.core.deps import current_user, db_session
 from app.db.models import Generation, GenerationStatus, GenerationType, User
 from app.services.genre_canonical import canonical_genre
+from app.services.llm_client import ChatClient, make_chat_client
 from app.services.mood_canonical import canonical_mood
 from app.services.track_reference import detect_reference_url, resolve_reference
 
@@ -1646,7 +1646,7 @@ _REPLY_FIELD_RE = re.compile(r'"reply"\s*:\s*"((?:[^"\\]|\\.)*)')
 
 async def _stream_agent_completion(
     body: AgentChatRequest,
-    client: AsyncOpenAI,
+    client: ChatClient,
     chat_messages: list[dict[str, str]],
     chosen_model: str,
     reply_lang: str,
@@ -1759,7 +1759,7 @@ _REF_GROUNDING_RULE = (
 _REF_HINT_RE = re.compile(r"[A-Za-z]{2,}|[А-ЯЁ][а-яё]+")
 
 
-async def _reference_facts(windowed: list[Any], client: AsyncOpenAI, settings: Settings) -> tuple[str, dict | None]:
+async def _reference_facts(windowed: list[Any], client: ChatClient, settings: Settings) -> tuple[str, dict | None]:
     """Ground a user-named artist/song reference with real catalogue data.
 
     • URL (Spotify/YT/Deezer) → Deezer (exact BPM/genre/era/Last.fm tags).
@@ -1961,14 +1961,14 @@ async def agent_chat(
             model="canned",
         )
 
-    api_key = settings.apiyi_key or settings.openai_api_key
+    api_key = settings.openrouter_api_key or settings.apiyi_key or settings.openai_api_key
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Agent is not configured",
         )
 
-    client = AsyncOpenAI(api_key=api_key, base_url=settings.openai_base_url)
+    client = make_chat_client(settings)
 
     # Sliding window — only the last 40 turns go to GPT (keeps context tight
     # and token cost predictable for long chats).
@@ -2356,14 +2356,14 @@ async def agent_chat_stream(
 
         return StreamingResponse(_canned(), media_type="text/event-stream")
 
-    api_key = settings.apiyi_key or settings.openai_api_key
+    api_key = settings.openrouter_api_key or settings.apiyi_key or settings.openai_api_key
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Agent is not configured",
         )
 
-    client = AsyncOpenAI(api_key=api_key, base_url=settings.openai_base_url)
+    client = make_chat_client(settings)
     windowed = body.messages[-40:]
     reply_lang = _detect_reply_language(windowed, ui_lang=body.lang)
     chat_messages: list[dict[str, str]] = [
@@ -2533,14 +2533,14 @@ async def agent_classify(
     default (module_hint, empty slots, too_vague=true) on any error so the
     scripted flow can still proceed.
     """
-    api_key = settings.apiyi_key or settings.openai_api_key
+    api_key = settings.openrouter_api_key or settings.apiyi_key or settings.openai_api_key
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Agent is not configured",
         )
 
-    client = AsyncOpenAI(api_key=api_key, base_url=settings.openai_base_url)
+    client = make_chat_client(settings)
     try:
         resp = await client.chat.completions.create(  # type: ignore[call-overload]
             model="gpt-4o-mini",

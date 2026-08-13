@@ -75,6 +75,15 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     lastfm_api_key: str = ""
     openrouter_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    # Chat-LLM fallback chain, tried in order. A provider is skipped when its
+    # key is empty, and the next one takes over on quota / auth / 5xx.
+    llm_providers: str = "openrouter,apiyi"
+    # Prompt pipeline for song / instrumental: "old" = preset assembler + GPT
+    # enricher, "new" = parse → fill gaps → compose → validate. See
+    # PROMPT-REBUILD.md. Kept switchable so a bad day is one env var away from
+    # the previous behaviour.
+    prompt_pipeline: str = "old"
 
     # Payments — Robokassa
     robokassa_merchant_login: str = ""

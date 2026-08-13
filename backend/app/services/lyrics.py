@@ -254,8 +254,16 @@ Composition rules:
 
 
 class LyricsClient:
-    def __init__(self, api_key: str, base_url: str = "https://api.apiyi.com/v1") -> None:
-        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+    def __init__(
+        self,
+        api_key: str = "",
+        base_url: str = "https://api.apiyi.com/v1",
+        *,
+        client: Any = None,
+    ) -> None:
+        # ``client`` is the provider chain from ``llm_client.make_chat_client``;
+        # the api_key/base_url form stays for direct single-provider use.
+        self._client = client or AsyncOpenAI(api_key=api_key, base_url=base_url)
 
     async def generate_lyrics(self, prompt: str, style_hint: str = "") -> str:
         user_msg = f"{prompt}\nStyle: {style_hint}" if style_hint else prompt
@@ -485,5 +493,6 @@ class LyricsClient:
 
 
 def make_lyrics_client(settings: Any) -> LyricsClient:
-    key = settings.apiyi_key or settings.openai_api_key
-    return LyricsClient(api_key=key, base_url=settings.openai_base_url)
+    from app.services.llm_client import make_chat_client
+
+    return LyricsClient(client=make_chat_client(settings))

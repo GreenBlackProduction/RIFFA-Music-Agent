@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 
 from loguru import logger
-from openai import AsyncOpenAI
 
 from app.core.config import Settings
 
@@ -46,11 +45,12 @@ async def normalize_freeform_genre(
     text = f"{custom_genre} {description}".strip()
     if not text:
         return None
-    api_key = settings.apiyi_key or settings.openai_api_key
-    if not api_key:
+    from app.services.llm_client import make_chat_client, resolve_providers
+
+    if not resolve_providers(settings):
         return None
 
-    client = AsyncOpenAI(api_key=api_key, base_url=settings.openai_base_url, timeout=12.0)
+    client = make_chat_client(settings, timeout=12.0)
     try:
         resp = await client.chat.completions.create(
             model="gpt-4o-mini",
