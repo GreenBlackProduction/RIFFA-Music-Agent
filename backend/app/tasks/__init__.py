@@ -141,6 +141,120 @@ def _ensure_rich_style(enriched: str | None, preset_style: str) -> str:
     return enriched
 
 
+async def _build_style_payload(
+    *,
+    settings: Any,
+    lyrics_client: Any,
+    params: dict[str, Any],
+    description: str,
+    instrumental: bool,
+    user_id: int,
+    learned_presets: dict[str, Any],
+    approved_lyrics: str = "",
+) -> tuple[str, str, float, float, dict[str, Any]]:
+    """Build the Suno style payload — the one place song/instrumental/occasion share.
+
+    Returns ``(style, negative_tags, style_weight, weirdness, meta)``.
+
+    ``settings.prompt_pipeline`` chooses between the shipped assembler and the
+    rebuilt pipeline (see PROMPT-REBUILD.md). Both paths live here so the three
+    generation branches cannot drift apart again, and so the dry-run measures
+    the same code that ships.
+    """
+    agent_mp: dict[str, Any] = params.get("agent_music_params") or {}
+    agent_research = params.get("agent_research_notes", "")
+    agent_prompt_text = params.get("agent_prompt", "")
+    vocal = "no_vocal" if instrumental else (agent_mp.get("vocal") or params.get("vocal", ""))
+
+    if (getattr(settings, "prompt_pipeline", "old") or "old").lower() == "new":
+        from app.services.llm_client import make_chat_client, resolve_providers
+        from app.services.prompt_pipeline import build_suno_prompt
+
+        # No provider configured → run the pipeline deterministically rather
+        # than fail the generation. It still beats the old assembler.
+        chat_client = make_chat_client(settings) if resolve_providers(settings) else None
+
+        brief = (description or "").strip()
+        if agent_prompt_text and agent_prompt_text.strip() not in brief:
+            brief = f"{brief}. {agent_prompt_text.strip()}".strip(". ")
+        if agent_research:
+            brief = f"{brief}\nResearch notes: {agent_research}".strip()
+
+        result = await build_suno_prompt(
+            description=brief,
+            genre=(
+                agent_mp.get("subgenre")
+                or agent_mp.get("custom_genre")
+                or params.get("custom_genre", "")
+                or agent_mp.get("genre")
+                or params.get("genre", "")
+            ),
+            mood=agent_mp.get("mood") or params.get("mood", ""),
+            tempo=agent_mp.get("tempo") or params.get("tempo", ""),
+            instrumental=instrumental,
+            vocal=vocal if vocal in {"male", "female"} else "",
+            chat_client=chat_client,
+            learned_presets=learned_presets,
+        )
+        logger.info(
+            "prompt pipeline=new source={} faithfulness={:.0%} understood={}",
+            result.source, result.faithfulness, result.parsed.locked_summary(),
+        )
+        meta = {
+            "pipeline": "new",
+            "source": result.source,
+            "faithfulness": round(result.faithfulness, 2),
+            "understood": result.parsed.locked_summary(),
+            "unmet": result.failures,
+        }
+        return (
+            result.style,
+            result.negative_tags,
+            result.style_weight,
+            result.weirdness,
+            meta,
+        )
+
+    song_params = SongParams(
+        user_description=description,
+        genre=agent_mp.get("genre") or params.get("genre", ""),
+        custom_genre=agent_mp.get("custom_genre") or params.get("custom_genre", ""),
+        subgenre=agent_mp.get("subgenre", ""),
+        mood=agent_mp.get("mood") or params.get("mood", ""),
+        tempo=agent_mp.get("tempo") or params.get("tempo", ""),
+        vocal=vocal,
+        era=agent_mp.get("era", ""),
+        techniques=agent_mp.get("techniques", []),
+        key_instruments=agent_mp.get("key_instruments", []),
+        constraints=agent_mp.get("constraints", ""),
+        suggested_bpm=agent_mp.get("suggested_bpm", ""),
+        negative_tags=agent_mp.get("negative_tags") or [],
+        style_prompt=_style_head_text(agent_research, agent_prompt_text),
+    )
+    preset_style, weight, constraint, negative_tags = build_suno_style(
+        song_params, user_id=user_id, learned_presets=learned_presets
+    )
+    style = await lyrics_client.enrich_music_prompt(
+        user_description=description,
+        genre=song_params.genre,
+        custom_genre=song_params.custom_genre,
+        mood=song_params.mood,
+        tempo=song_params.tempo,
+        vocal="" if instrumental else song_params.vocal,
+        instrumental=instrumental,
+        approved_lyrics=approved_lyrics,
+        agent_prompt=agent_prompt_text,
+        agent_research_notes=agent_research,
+        preset_style_hint=preset_style,
+        negative_tags=negative_tags,
+    )
+    style = cap_style_len(_ensure_rich_style(style, preset_style))
+    style, _leaked_neg = extract_negatives(style, keep_vocal_text=True)
+    negative_tags = _merge_negative_tags(negative_tags, _leaked_neg)
+    style = strip_inline_artist_clause(style)
+    return style, negative_tags, weight, constraint, {"pipeline": "old"}
+
+
 async def _publish(ctx: dict[str, Any], gen_id: str, payload: dict[str, Any]) -> None:
     redis = ctx["redis"]
     await redis.publish(_PROGRESS_CHANNEL.format(gen_id), json.dumps(payload))
@@ -408,55 +522,17 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                     track_artist, strip_artist_references(short_title.strip())
                 )
 
-            # Agent-provided structured params override form fields
-            agent_mp = params.get("agent_music_params") or {}
-            agent_research = params.get("agent_research_notes", "")
-            agent_prompt_text = params.get("agent_prompt", "")
-
-            song_params = SongParams(
-                user_description=params.get("description", ""),
-                genre=agent_mp.get("genre") or params.get("genre", ""),
-                custom_genre=agent_mp.get("custom_genre") or params.get("custom_genre", ""),
-                subgenre=agent_mp.get("subgenre", ""),
-                mood=agent_mp.get("mood") or params.get("mood", ""),
-                tempo=agent_mp.get("tempo") or params.get("tempo", ""),
-                vocal=agent_mp.get("vocal") or params.get("vocal", ""),
-                era=agent_mp.get("era", ""),
-                techniques=agent_mp.get("techniques", []),
-                key_instruments=agent_mp.get("key_instruments", []),
-                constraints=agent_mp.get("constraints", ""),
-                suggested_bpm=agent_mp.get("suggested_bpm", ""),
-                negative_tags=agent_mp.get("negative_tags") or [],
-                style_prompt=_style_head_text(agent_research, agent_prompt_text),
-            )
-            preset_style, weight, constraint, negative_tags = build_suno_style(
-                song_params,
+            await _publish(ctx, gen_id, {"status": "processing", "step": "enriching_music"})
+            style, negative_tags, weight, constraint, style_meta = await _build_style_payload(
+                settings=settings,
+                lyrics_client=lyrics_client,
+                params=params,
+                description=params.get("description", ""),
+                instrumental=False,
                 user_id=gen.user_id,
                 learned_presets=learned_genre_presets,
-            )
-
-            # GPT-4o composes the adaptive Suno music prompt; falls back to preset on failure.
-            await _publish(ctx, gen_id, {"status": "processing", "step": "enriching_music"})
-            style = await lyrics_client.enrich_music_prompt(
-                user_description=params.get("description", ""),
-                genre=song_params.genre,
-                custom_genre=song_params.custom_genre,
-                mood=song_params.mood,
-                tempo=song_params.tempo,
-                vocal=song_params.vocal,
-                instrumental=False,
                 approved_lyrics=lyrics,
-                agent_prompt=agent_prompt_text,
-                agent_research_notes=agent_research,
-                preset_style_hint=preset_style,
-                negative_tags=negative_tags,
             )
-            style = cap_style_len(_ensure_rich_style(style, preset_style))
-            # Safety net: negations that survived into the final style text
-            # act as attractors — move them into negativeTags.
-            style, _leaked_neg = extract_negatives(style, keep_vocal_text=True)
-            negative_tags = _merge_negative_tags(negative_tags, _leaked_neg)
-            style = strip_inline_artist_clause(style)
 
             _dump_payload(gen_id, "song", {
                 "title": gen.title,
@@ -467,6 +543,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 "style_weight": weight,
                 "weirdness_constraint": constraint,
                 "negative_tags": negative_tags,
+                **style_meta,
             })
             await _publish(ctx, gen_id, {"status": "processing", "step": "music"})
             suno_result = await suno.generate_music(
@@ -497,31 +574,6 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             }
 
         elif gen.type == GenerationType.instrumental:
-            agent_mp = params.get("agent_music_params") or {}
-            agent_research = params.get("agent_research_notes", "")
-            agent_prompt_text = params.get("agent_prompt", "")
-
-            song_params = SongParams(
-                user_description=params.get("description", ""),
-                genre=agent_mp.get("genre") or params.get("genre", ""),
-                custom_genre=agent_mp.get("custom_genre") or params.get("custom_genre", ""),
-                subgenre=agent_mp.get("subgenre", ""),
-                mood=agent_mp.get("mood") or params.get("mood", ""),
-                tempo=agent_mp.get("tempo") or params.get("tempo", ""),
-                vocal="no_vocal",
-                era=agent_mp.get("era", ""),
-                techniques=agent_mp.get("techniques", []),
-                key_instruments=agent_mp.get("key_instruments", []),
-                constraints=agent_mp.get("constraints", ""),
-                suggested_bpm=agent_mp.get("suggested_bpm", ""),
-                negative_tags=agent_mp.get("negative_tags") or [],
-                style_prompt=_style_head_text(agent_research, agent_prompt_text),
-            )
-            preset_style, weight, constraint, negative_tags = build_suno_style(
-                song_params,
-                user_id=gen.user_id,
-                learned_presets=learned_genre_presets,
-            )
             if not gen.title:
                 short_title = (params.get("description", "") or "Instrumental")[:60]
                 gen.title = compose_track_title(
@@ -530,23 +582,15 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             title = gen.title
 
             await _publish(ctx, gen_id, {"status": "processing", "step": "enriching_music"})
-            style = await lyrics_client.enrich_music_prompt(
-                user_description=params.get("description", ""),
-                genre=song_params.genre,
-                custom_genre=song_params.custom_genre,
-                mood=song_params.mood,
-                tempo=song_params.tempo,
-                vocal="",
+            style, negative_tags, weight, constraint, style_meta = await _build_style_payload(
+                settings=settings,
+                lyrics_client=lyrics_client,
+                params=params,
+                description=params.get("description", ""),
                 instrumental=True,
-                approved_lyrics="",
-                agent_prompt=params.get("agent_prompt", ""),
-                preset_style_hint=preset_style,
-                negative_tags=negative_tags,
+                user_id=gen.user_id,
+                learned_presets=learned_genre_presets,
             )
-            style = cap_style_len(_ensure_rich_style(style, preset_style))
-            style, _leaked_neg = extract_negatives(style, keep_vocal_text=True)
-            negative_tags = _merge_negative_tags(negative_tags, _leaked_neg)
-            style = strip_inline_artist_clause(style)
 
             _dump_payload(gen_id, "instrumental", {
                 "title": title,
@@ -555,6 +599,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 "style_weight": weight,
                 "weirdness_constraint": constraint,
                 "negative_tags": negative_tags,
+                **style_meta,
             })
             suno_result = await suno.generate_music(
                 prompt="",
@@ -845,50 +890,17 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                     track_artist, strip_artist_references(short_title.strip())
                 )
 
-            agent_mp = params.get("agent_music_params") or {}
-            agent_research = params.get("agent_research_notes", "")
-            agent_prompt_text = params.get("agent_prompt", "")
-
-            song_params = SongParams(
-                user_description=description,
-                genre=agent_mp.get("genre") or params.get("genre", ""),
-                custom_genre=agent_mp.get("custom_genre", ""),
-                subgenre=agent_mp.get("subgenre", ""),
-                mood=agent_mp.get("mood") or params.get("mood", ""),
-                tempo=agent_mp.get("tempo") or params.get("tempo", ""),
-                vocal=agent_mp.get("vocal") or params.get("vocal", ""),
-                era=agent_mp.get("era", ""),
-                techniques=agent_mp.get("techniques", []),
-                key_instruments=agent_mp.get("key_instruments", []),
-                constraints=agent_mp.get("constraints", ""),
-                suggested_bpm=agent_mp.get("suggested_bpm", ""),
-                negative_tags=agent_mp.get("negative_tags") or [],
-                style_prompt=_style_head_text(agent_research, agent_prompt_text),
-            )
-            preset_style, weight, constraint, negative_tags = build_suno_style(
-                song_params, user_id=gen.user_id,
-                learned_presets=learned_genre_presets,
-            )
-
             await _publish(ctx, gen_id, {"status": "processing", "step": "enriching_music"})
-            style = await lyrics_client.enrich_music_prompt(
-                user_description=description,
-                genre=song_params.genre,
-                custom_genre=song_params.custom_genre,
-                mood=song_params.mood,
-                tempo=song_params.tempo,
-                vocal=song_params.vocal,
+            style, negative_tags, weight, constraint, style_meta = await _build_style_payload(
+                settings=settings,
+                lyrics_client=lyrics_client,
+                params=params,
+                description=description,
                 instrumental=False,
+                user_id=gen.user_id,
+                learned_presets=learned_genre_presets,
                 approved_lyrics=lyrics,
-                agent_prompt=agent_prompt_text,
-                agent_research_notes=agent_research,
-                preset_style_hint=preset_style,
-                negative_tags=negative_tags,
             )
-            style = cap_style_len(_ensure_rich_style(style, preset_style))
-            style, _leaked_neg = extract_negatives(style, keep_vocal_text=True)
-            negative_tags = _merge_negative_tags(negative_tags, _leaked_neg)
-            style = strip_inline_artist_clause(style)
 
             _dump_payload(gen_id, "occasion", {
                 "title": gen.title,
@@ -899,6 +911,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 "style_weight": weight,
                 "weirdness_constraint": constraint,
                 "negative_tags": negative_tags,
+                **style_meta,
             })
             await _publish(ctx, gen_id, {"status": "processing", "step": "music"})
             suno_result = await suno.generate_music(
