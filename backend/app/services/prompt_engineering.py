@@ -143,6 +143,11 @@ _RU_NEG_MAP = (
     ("голос", "vocals"),
     ("барабан", "drums"),
     ("ударн", "drums"),
+    ("перкусс", "percussion"),
+    ("бочк", "kick"),
+    ("бит", "beat"),
+    ("бас", "bass"),
+    ("дополнительн", "additional instruments"),
     ("гитар", "guitars"),
     ("электрон", "electronic elements"),
     ("автотюн", "autotune"),
@@ -159,6 +164,80 @@ def _translate_negative(obj: str) -> str:
         if stem in low:
             return en
     return obj
+
+
+_NEG_TAGS_RE = None  # compiled lazily
+_ENUM_SPLIT_RE = None
+
+
+# English exclusion vocabulary — deliberately small. A continuation of an
+# enumeration is only an exclusion if every word is a thing you can exclude
+# from a track; "medium tempo" is not, and that is where the list ends.
+_EN_EXCLUSION_WORDS: frozenset[str] = frozenset({
+    "drum", "drums", "drumkit", "kick", "kicks", "beat", "beats", "percussion",
+    "snare", "snares", "hat", "hats", "hi-hats", "hihats", "cymbals", "808", "909",
+    "vocal", "vocals", "voice", "voices", "singing", "choir", "chants", "autotune",
+    "synth", "synths", "synthesizer", "synthesizers", "pad", "pads", "arpeggios",
+    "guitar", "guitars", "bass", "basslines", "piano", "keys", "organ",
+    "strings", "violin", "brass", "horns", "orchestra", "orchestration",
+    "samples", "sampling", "noise", "distortion", "reverb", "sfx",
+    "layers", "instruments", "melody", "lyrics",
+})
+
+
+def _is_exclusion_object(text: str) -> bool:
+    """Does this look like a THING being excluded, rather than a new clause?
+
+    Used to decide where an enumeration ends: «без ударных, бита и бочки,
+    средний темп» excludes three things and then talks about tempo.
+    """
+    if _translate_negative(text) != text:
+        return True  # a known Russian instrument/trait stem
+    words = [w.strip("-'’") for w in text.lower().split()]
+    return bool(words) and len(words) <= 2 and all(w in _EN_EXCLUSION_WORDS for w in words)
+
+
+def extract_negative_tags(text: str) -> list[str]:
+    """Exclusion tags from a free-form user description — TAGS ONLY.
+
+    ``extract_negatives`` also rewrites the text it is given, so it has to stop
+    at the first comma or it would swallow half a sentence. The user's
+    ``description`` never becomes style text (the GPT enricher receives it
+    separately), so here we can read across commas and pick up the whole
+    enumeration — which is how a real brief is written:
+
+        «без ударных, бита и бочки, средний темп»  →  [drums, beat, kick]
+
+    Measured 2026-08-13: exclusions from the description reached Suno's
+    ``negativeTags`` in 1 of 21 corpus runs, because nothing ever read them.
+    """
+    global _NEG_TAGS_RE, _ENUM_SPLIT_RE
+    if not text:
+        return []
+    import re
+    if _NEG_TAGS_RE is None:
+        _NEG_TAGS_RE = re.compile(
+            r"(?:\b(?:no|without|avoid|never use)\s+"
+            r"|\b(?:без|никаких|никакого|никакой)\s+)"
+            r"([a-zа-яё0-9][a-zа-яё0-9'’\-, ]{1,80}?)(?=\s*(?:[.;:!)\n]|$))",
+            re.IGNORECASE,
+        )
+        _ENUM_SPLIT_RE = re.compile(r"\s*(?:,|;|\bи\b|\band\b|&|/)\s*", re.IGNORECASE)
+
+    tags: list[str] = []
+    for match in _NEG_TAGS_RE.finditer(text):
+        parts = [p.strip(" .,;:-—") for p in _ENUM_SPLIT_RE.split(match.group(1))]
+        for index, part in enumerate(parts):
+            if not part:
+                continue
+            # The first object is always an exclusion; later ones only while
+            # they still look like things — that ends the enumeration.
+            if index and not _is_exclusion_object(part):
+                break
+            tags.append(_translate_negative(part))
+
+    seen: set[str] = set()
+    return [t for t in tags if not (t.lower() in seen or seen.add(t.lower()))]
 
 
 def extract_negatives(text: str, *, keep_vocal_text: bool = False) -> tuple[str, list[str]]:
@@ -294,6 +373,10 @@ def build_suno_style(
 
     # ── Negations never stay in style text — collect them for negativeTags ─
     negatives: list[str] = [t.strip() for t in params.negative_tags if t and t.strip()]
+    # The form path sends neither `constraints` nor `style_prompt` — the user's
+    # own sentence is the only place their exclusions live. Read it for tags
+    # (the description itself never enters the style text).
+    negatives.extend(extract_negative_tags(params.user_description))
     style_prompt, neg = extract_negatives(params.style_prompt, keep_vocal_text=True)
     negatives.extend(neg)
     constraints, neg = extract_negatives(params.constraints)
@@ -472,6 +555,7 @@ __all__ = [
     "TEMPO_PROFILES",
     "SongParams",
     "build_suno_style",
+    "extract_negative_tags",
     "extract_negatives",
     "vocal_gender",
 ]
