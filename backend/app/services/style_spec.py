@@ -54,10 +54,42 @@ _FAMILY_WORDS: dict[str, tuple[str, ...]] = {
 
 _BPM_RE = re.compile(r"(\d{2,3})\s*(?:-|–|to)?\s*(\d{2,3})?\s*bpm", re.IGNORECASE)
 
+# The tempo picker in the UI is labelled with these ranges ("🏃 Fast · 120–140
+# BPM"), but only the bucket name reaches the backend. Resolving it back to the
+# advertised numbers is what makes the prompt say what the user was shown —
+# and gives every other BPM statement something to lose to.
+_TEMPO_BPM: dict[str, tuple[int, int]] = {
+    "very_slow": (60, 80),
+    "slow": (80, 100),
+    "medium": (100, 120),
+    "fast": (120, 140),
+    "very_fast": (140, 180),
+}
+
+# Words that imply a beat. Excluding drums has to take these with it, or the
+# prompt asks for no drums and a "steady groove" in the same breath.
+_RHYTHM_IMPLYING: tuple[str, ...] = (
+    "groove", "driving", "pulse", "pulsing", "four-on-the-floor", "backbeat",
+    "danceable", "club-ready", "rhythmic", "beat-driven", "steady rhythm",
+)
+_RHYTHM_FAMILIES: frozenset[str] = frozenset({"drums", "beat", "percussion", "kick"})
+
 _TEMPO_WORDS: tuple[str, ...] = (
     "slow", "fast", "medium", "mid-tempo", "midtempo", "uptempo", "downtempo",
     "adagio", "moderato", "allegro", "rapid", "brisk", "driving",
 )
+
+
+def _is_artist_reference(fragment: str) -> bool:
+    """"Robert Hood / Ricardo Villalobos influenced" — Suno rejects artist names.
+
+    81 preset fragments carry one. A genre reference ("rock-influenced energy",
+    "hip-hop influenced drums") has no capitalised name and is kept.
+    """
+    low = fragment.lower()
+    if "influenc" not in low and "inspired" not in low:
+        return False
+    return any(word[:1].isupper() for word in fragment.split() if len(word) > 2)
 
 
 def _words_for(term: str) -> tuple[str, ...]:
@@ -75,6 +107,9 @@ def _fragment_conflicts(fragment: str, forbidden: list[str]) -> bool:
         for word in _words_for(term):
             if re.search(r"\b" + re.escape(word), low):
                 return True
+    if any(t.strip().lower() in _RHYTHM_FAMILIES for t in forbidden):
+        if any(word in low for word in _RHYTHM_IMPLYING):
+            return True
     return False
 
 
@@ -170,20 +205,26 @@ def build_style_spec(
         spec.locked.append("featuring " + ", ".join(parsed.instruments_required[:8]))
     if parsed.mood:
         spec.locked.append(parsed.mood)
-    if parsed.bpm_min:
-        span = (
-            f"{parsed.bpm_min}-{parsed.bpm_max}"
-            if parsed.bpm_max and parsed.bpm_max != parsed.bpm_min
-            else str(parsed.bpm_min)
-        )
-        spec.locked.append(f"around {span} BPM")
+
+    # ONE tempo statement, resolved once and used everywhere below. Priority:
+    # a BPM the user wrote > the range behind the tempo bucket they picked.
+    bpm_min, bpm_max = parsed.bpm_min, parsed.bpm_max
+    if not bpm_min:
+        span = _TEMPO_BPM.get(parsed.tempo_word.strip().lower().replace(" ", "_"))
+        if span:
+            bpm_min, bpm_max = span
+    if bpm_min:
+        text = f"{bpm_min}-{bpm_max}" if bpm_max and bpm_max != bpm_min else str(bpm_min)
+        spec.locked.append(f"around {text} BPM")
     elif parsed.tempo_word:
         spec.locked.append(f"{parsed.tempo_word.replace('_', ' ')} tempo")
     if parsed.era:
         spec.locked.append(f"{parsed.era} production")
     spec.locked.extend(parsed.notes[:4])
     if parsed.usage:
-        spec.locked.append(f"intended as {parsed.usage}")
+        usage = parsed.usage.strip()
+        lead = "" if usage.lower().startswith(("for ", "as ", "background")) else "for "
+        spec.locked.append(f"intended {lead}{usage}")
 
     spec.negative_tags = list(forbidden)
 
@@ -198,18 +239,26 @@ def build_style_spec(
     for fragment in (f.strip() for f in preset.get("style", "").split(",")):
         if not fragment:
             continue
+        if _is_artist_reference(fragment):
+            spec.dropped.append(fragment)
+            continue
         if _fragment_conflicts(fragment, forbidden):
             spec.dropped.append(fragment)
             continue
-        if _fragment_states_other_bpm(fragment, parsed.bpm_min, parsed.bpm_max):
+        # Tempo is settled above; anything else claiming a tempo is a second,
+        # conflicting statement. Live failure 2026-08-14: the Techno preset's
+        # "driving 130-140 BPM" survived next to a "medium tempo" and Suno
+        # obeyed the preset.
+        if bpm_min and _BPM_RE.search(fragment):
             spec.dropped.append(fragment)
             continue
-        # The brief named a tempo in words — preset tempo talk would fight it.
-        if parsed.tempo_word and any(w in fragment.lower() for w in _TEMPO_WORDS):
+        if _fragment_states_other_bpm(fragment, bpm_min, bpm_max):
             spec.dropped.append(fragment)
             continue
-        if parsed.bpm_min and _BPM_RE.search(fragment):
-            spec.dropped.append(fragment)   # duplicate BPM statement
+        if (bpm_min or parsed.tempo_word) and any(
+            w in fragment.lower() for w in _TEMPO_WORDS
+        ):
+            spec.dropped.append(fragment)
             continue
         spec.filler.append(fragment)
 
@@ -219,8 +268,8 @@ def build_style_spec(
         if profile:
             spec.filler.append(profile["description"])
 
-    # Tempo texture only when neither a BPM nor a tempo word was stated.
-    if "bpm" in open_fields and not parsed.bpm_min and not parsed.tempo_word:
+    # Tempo texture only when the brief settled no tempo at all.
+    if "bpm" in open_fields and not bpm_min and not parsed.tempo_word:
         profile = TEMPO_PROFILES.get("medium")
         if profile:
             spec.filler.append(profile["description"])

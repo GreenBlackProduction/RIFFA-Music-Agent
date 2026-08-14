@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.services.brief_parser import ParsedBrief
-from app.services.style_spec import build_style_spec
+from app.services.style_spec import _is_artist_reference, build_style_spec
 
 
 def test_preset_fragment_contradicting_an_exclusion_is_dropped() -> None:
@@ -68,6 +68,49 @@ def test_locked_material_survives_the_length_budget() -> None:
     assert style.startswith("Techno")
     assert "analog synthesizers" in style
     assert len(style) <= 90
+
+
+def test_tempo_bucket_resolves_to_the_range_the_user_was_shown() -> None:
+    """The picker says "Fast · 120–140 BPM" but only sends "fast".
+
+    Live failure 2026-08-14: the bucket did not become a number, so the Techno
+    preset's own "driving 130-140 BPM" filled the gap instead.
+    """
+    style = build_style_spec(
+        ParsedBrief(genre="Techno", tempo_word="fast", open=["texture"])
+    ).render().lower()
+
+    assert "120-140 bpm" in style
+    assert "130-140" not in style
+    assert style.count("bpm") == 1
+
+
+def test_excluding_drums_also_drops_rhythm_filler() -> None:
+    """"no drums" and "steady groove" in one prompt is the pipeline arguing."""
+    spec = build_style_spec(
+        ParsedBrief(
+            genre="Techno",
+            instruments_forbidden=["drums", "vocals"],
+            vocals="none",
+            tempo_word="medium",
+            open=["texture", "production"],
+        )
+    )
+    style = spec.render().lower()
+
+    for word in ("groove", "driving", "four-on-the-floor", "percussion", "kick"):
+        assert word not in style
+
+
+def test_artist_references_never_leave_the_preset() -> None:
+    """Suno hard-rejects artist names; 81 preset fragments carry one."""
+    spec = build_style_spec(ParsedBrief(genre="Minimal Techno", open=["texture"]))
+
+    assert "villalobos" not in spec.render().lower()
+    assert any("influenced" in d.lower() for d in spec.dropped)
+    # A genre reference is not an artist reference.
+    assert not _is_artist_reference("rock-influenced energy")
+    assert _is_artist_reference("Steve Reich influenced")
 
 
 def test_nothing_random() -> None:

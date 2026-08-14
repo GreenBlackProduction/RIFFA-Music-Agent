@@ -54,6 +54,12 @@ into two parts:
            Do not write "no drums"; write an arrangement that has none. These
            go to Suno through a separate parameter.
 
+When something rhythmic is excluded, say POSITIVELY what carries the movement
+instead — "pulse carried by arpeggiated synth figures and bass motion",
+"momentum from filter sweeps and swelling pads". A genre whose default is a
+strong beat will bring one back unless the text gives the motion somewhere
+else to live; the exclusion parameter alone does not win that argument.
+
 RULES
 - English only. Comma-separated descriptors and short clauses, no prose
   paragraphs, no markdown, no headings, no quotes around the whole answer.
@@ -143,7 +149,7 @@ async def build_suno_prompt(
 
     # ── stage 2: fill the gaps ──────────────────────────────────────────
     spec = build_style_spec(parsed, learned_presets=learned_presets)
-    deterministic = spec.render(limit=_STYLE_LIMIT)
+    deterministic = strip_inline_artist_clause(spec.render(limit=_STYLE_LIMIT))
     negative_tags = spec.negative_tags_text()
     intent = _intent_from_parsed(parsed)
 

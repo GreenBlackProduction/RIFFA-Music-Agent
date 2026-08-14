@@ -139,3 +139,31 @@ async def test_locked_material_reaches_the_composer() -> None:
     assert "EXCLUDED:" in compose_request
     assert "drums" in compose_request
     assert "synthesizers" in compose_request
+
+
+@pytest.mark.asyncio
+async def test_tag_selections_survive_a_parser_that_forgets_them() -> None:
+    """mood/tempo/genre come from the form — the model may not echo them back.
+
+    Live failure 2026-08-14: tags mood=anxious tempo=fast reached the worker,
+    the parse came back with neither, and the tempo gap was then filled by a
+    genre preset at 130-140 BPM.
+    """
+    forgetful = json.dumps({
+        "genre": "", "subgenre": "", "instruments_required": [],
+        "instruments_forbidden": ["drums"], "bpm_min": None, "bpm_max": None,
+        "tempo_word": "", "mood": "", "vocals": "none", "usage": "", "era": "",
+        "notes": [], "references": [], "open": ["genre", "mood", "bpm"],
+    })
+    client = _ScriptedClient([forgetful, "Minimal Techno, instrumental, anxious, 120-140 BPM"])
+
+    result = await build_suno_prompt(
+        description="инструментал для детективного видео, без ударных",
+        genre="Minimal Techno", mood="anxious", tempo="fast", instrumental=True,
+        chat_client=client,
+    )
+
+    assert result.parsed.genre == "Minimal Techno"
+    assert result.parsed.mood == "anxious"
+    assert result.parsed.tempo_word == "fast"
+    assert "120-140 BPM" in "\n".join(result.spec.locked)

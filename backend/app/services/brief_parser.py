@@ -129,7 +129,8 @@ class ParsedBrief:
         if self.vocals:
             bits.append(f"vocals={self.vocals}")
         if self.usage:
-            bits.append(f"for {self.usage}")
+            usage = self.usage.strip()
+            bits.append(usage if usage.lower().startswith("for ") else f"for {usage}")
         return "; ".join(bits) or "(nothing stated)"
 
 
@@ -333,6 +334,17 @@ class BriefParser:
             )
 
         parsed = _reconcile_exclusions(description, _coerce(raw if isinstance(raw, dict) else {}))
+
+        # Tag selections are facts we already have — the model is not allowed
+        # to lose them. Live failure 2026-08-14: a brief with mood=anxious and
+        # tempo=fast came back with neither, so stage 2 filled the tempo gap
+        # from a preset and the prompt ended up at 130-140 BPM.
+        for field_name, value in (("genre", genre), ("mood", mood), ("tempo_word", tempo)):
+            if value and not getattr(parsed, field_name):
+                setattr(parsed, field_name, value)
+        filled = {"genre" if genre else "", "mood" if mood else "", "bpm" if tempo else ""}
+        parsed.open = [f for f in parsed.open if f not in filled]
+
         if instrumental:
             parsed.vocals = "none"
             if not any("vocal" in f.lower() for f in parsed.instruments_forbidden):
