@@ -64,10 +64,13 @@ async def notify_generation_done(
         "Открой студию чтобы послушать и скачать."
     )
 
-    mini_app_url = f"https://t.me/{bot_username}?startapp=gen_{gen.id}"
+    # Inline web_app button opens the Mini App directly (the bot's domain is
+    # registered in BotFather). A plain t.me/?startapp= URL only works if a
+    # "Main Mini App" is configured — it wasn't, so the button did nothing.
+    open_url = f"https://riffastudio.site/?gen={gen.id}"
     reply_markup = {
         "inline_keyboard": [
-            [{"text": "🎧 Открыть в студии", "url": mini_app_url}],
+            [{"text": "🎧 Открыть в студии", "web_app": {"url": open_url}}],
             [{"text": "🔕 Отключить эти уведомления", "callback_data": "disable_gen_notifications"}],
         ]
     }
