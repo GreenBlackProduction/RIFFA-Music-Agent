@@ -57,7 +57,7 @@ class SongRequest(BaseModel):
     text_mode: Literal["ai", "custom", "none"] = "ai"
     lyrics: str = Field(default="", max_length=5000)
     genre: str = Field(default="", max_length=64)
-    custom_genre: str = Field(default="", max_length=128)
+    custom_genre: str = Field(default="", max_length=1000)
     mood: str = Field(default="", max_length=32)
     tempo: str = Field(default="", max_length=32)
     vocal: str = Field(default="", max_length=32)
@@ -80,7 +80,7 @@ class SongRequest(BaseModel):
 class InstrumentalRequest(BaseModel):
     description: str = Field(default="", max_length=500)
     genre: str = Field(default="", max_length=64)
-    custom_genre: str = Field(default="", max_length=128)
+    custom_genre: str = Field(default="", max_length=1000)
     mood: str = Field(default="", max_length=32)
     tempo: str = Field(default="", max_length=32)
     agent_prompt: str = Field(default="", max_length=5000)
@@ -139,7 +139,7 @@ class OccasionRequest(BaseModel):
 class CoverSongRequest(BaseModel):
     upload_url: str = Field(min_length=1, max_length=1024)
     genre: str = Field(default="", max_length=64)
-    custom_genre: str = Field(default="", max_length=128)
+    custom_genre: str = Field(default="", max_length=1000)
     mood: str = Field(default="", max_length=32)
     tempo: str = Field(default="", max_length=32)
     style: str = Field(default="", max_length=500)
