@@ -2,11 +2,14 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
+import { useAuth } from "@/lib/auth";
 import { AgentChat } from "@/components/studio/AgentChat";
 import "./AgentPage.css";
 
 export function AgentPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userId = String(user?.id ?? "");
   const { i18n } = useTranslation();
   const isEN = (i18n.resolvedLanguage || i18n.language || "ru").startsWith("en");
   useEffect(() => {
@@ -33,6 +36,7 @@ export function AgentPage() {
 
       <div className="agent-chat-wrap">
         <AgentChat
+          userId={userId}
           agentInitiates
           module="song"
           onLaunch={async (r) => {
