@@ -208,7 +208,24 @@ async def get_or_create_user_by_telegram(
         if account.id in settings.admin_id_set and not user.is_admin:
             user.is_admin = True
         user.last_seen_at = datetime.now(UTC)
+
+        # Backfill: a "ghost" row created by the bot's /start handler before it
+        # ran full onboarding — bare stub with balance_tokens=0, no
+        # referral_code, no welcome bonus, no admin ping (see git history).
+        # `referral_code IS NULL` reliably marks such a row, since the proper
+        # creation path right below always generates one. The first time this
+        # person actually reaches the website, run the real onboarding once.
+        needs_onboarding = not user.referral_code
+        if needs_onboarding:
+            user.referral_code = await _generate_referral_code(session)
+            await _grant_welcome_bonus(session, user)
+            await _apply_referral(session, user, referral_code)
+
         await session.flush()
+
+        if needs_onboarding:
+            await _notify_admin_signup(user, "telegram")
+
         return user, False
 
     user = User(
