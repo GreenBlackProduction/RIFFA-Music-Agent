@@ -104,8 +104,10 @@ class SunoLyricsResult:
 
 class SunoClient:
     def __init__(
-        self, api_key: str, base_url: str = _SUNO_BASE, callback_url: str = ""
+        self, api_key: str, base_url: str = _SUNO_BASE, callback_url: str = "",
+        model: str = "V5_5",
     ) -> None:
+        self._model = model
         self._headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -285,9 +287,12 @@ class SunoClient:
             "title": title[:80],       # Suno title limit
             "customMode": True,
             "instrumental": instrumental,
-            "model": "V5_5",
+            "model": self._model,
             "callBackUrl": self._callback_url,
         }
+        # V6 documents lyrics in a dedicated `lyrics` field (it wins over prompt).
+        if self._model.startswith("V6") and not instrumental:
+            payload["lyrics"] = prompt[:5000]
         if vocal_gender in {"m", "f"}:
             payload["vocalGender"] = vocal_gender
         if style_weight is not None:
@@ -640,4 +645,5 @@ def make_suno_client(settings: Any) -> SunoClient:
         api_key=settings.suno_api_key,
         base_url=settings.suno_base_url,
         callback_url=getattr(settings, "suno_callback_url", "") or "",
+        model=getattr(settings, "suno_model", "") or "V5_5",
     )

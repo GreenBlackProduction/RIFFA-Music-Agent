@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     # Where Suno POSTs the async result. We poll regardless (source of truth),
     # but a real RIFFA endpoint beats pinging an unrelated third party.
     suno_callback_url: str = ""
+    # Model for song generation (/generate). Cover/extend/sounds stay pinned
+    # until their V6 support is confirmed.
+    suno_model: str = "V5_5"
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     apiyi_key: str = ""
