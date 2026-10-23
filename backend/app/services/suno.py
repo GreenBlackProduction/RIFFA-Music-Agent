@@ -406,7 +406,7 @@ class SunoClient:
     ) -> SunoResult:
         payload: dict[str, Any] = {
             "prompt": prompt[:500],
-            "model": "V5",
+            "model": self._model,
             "soundLoop": False,
             "soundKey": "Any",
         }
@@ -467,7 +467,7 @@ class SunoClient:
                 "uploadUrl": upload_url,
                 "customMode": True,
                 "instrumental": True,
-                "model": "V5_5",
+                "model": self._model,
                 "style": clean_style,
                 "title": clean_title,
                 "callBackUrl": self._callback_url,
@@ -477,12 +477,14 @@ class SunoClient:
                 "uploadUrl": upload_url,
                 "customMode": True,
                 "instrumental": False,
-                "model": "V5_5",
+                "model": self._model,
                 "style": clean_style,
                 "title": clean_title,
                 "prompt": prompt[:5000],
                 "callBackUrl": self._callback_url,
             }
+            if self._model.startswith("V6"):
+                payload["lyrics"] = prompt[:5000]
         else:
             # Custom Mode requires prompt when not instrumental; without lyrics
             # fall back to Non-Custom Mode where only prompt+uploadUrl are sent.
@@ -493,7 +495,7 @@ class SunoClient:
                 "uploadUrl": upload_url,
                 "customMode": False,
                 "instrumental": False,
-                "model": "V5_5",
+                "model": self._model,
                 "prompt": desc,
                 "callBackUrl": self._callback_url,
             }
@@ -544,14 +546,14 @@ class SunoClient:
             payload: dict[str, Any] = {
                 "defaultParamFlag": False,
                 "audioId": audio_id,
-                "model": "V5_5",
+                "model": self._model,
                 "callBackUrl": self._callback_url,
             }
         else:
             payload = {
                 "defaultParamFlag": True,
                 "audioId": audio_id,
-                "model": "V5_5",
+                "model": self._model,
                 "callBackUrl": self._callback_url,
                 "prompt": prompt[:5000],
                 "style": style[:1000],
