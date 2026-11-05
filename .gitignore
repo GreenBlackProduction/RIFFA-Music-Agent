@@ -29,6 +29,7 @@ dist/
 .env.local
 .env.dev
 .env.*.local
+.env.backup*
 *.pem
 *.key
 secrets/
@@ -105,6 +106,7 @@ static_beta/
 RiffaSupportBot/
 New logo/
 backend/static_dist.backup-*/
+/backups/
 
 # ─── Локальные скриншоты / черновики в корне ───
 /radio-360.png
