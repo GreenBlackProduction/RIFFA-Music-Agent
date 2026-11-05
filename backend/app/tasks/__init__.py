@@ -125,6 +125,10 @@ _PROGRESS_CHANNEL = "gen:progress:{}"
 # via params["audio_weight"].
 _COVER_AUDIO_WEIGHT_DEFAULT = 0.7
 
+# Requested length for song / instrumental / occasion. Left to itself V6 lands
+# around 2:10; the owner's floor is 3 minutes.
+_TRACK_DURATION_SEC = 180
+
 
 def _ensure_rich_style(enriched: str | None, preset_style: str) -> str:
     """Never ship a lazier prompt than the deterministic preset.
@@ -498,6 +502,10 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
             await _publish(ctx, gen_id, {"status": "processing", "step": "lyrics"})
 
             text_mode = params.get("text_mode", "ai")
+            # «Без текста» in the song module promises "no vocals, no lyrics".
+            # Sent as a vocal song with empty lyrics, Suno returned ~1-minute
+            # sketches — generate it as a real instrumental instead.
+            no_lyrics = text_mode == "none"
             # When description is empty (agent flow), fall back to the
             # agent_prompt so we still have something to feed the lyrics/title
             # generator.
@@ -528,18 +536,19 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 lyrics_client=lyrics_client,
                 params=params,
                 description=params.get("description", ""),
-                instrumental=False,
+                instrumental=no_lyrics,
                 user_id=gen.user_id,
                 learned_presets=learned_genre_presets,
                 approved_lyrics=lyrics,
             )
+            song_vocal_gender = None if no_lyrics else vocal_gender(params.get("vocal", ""))
 
             _dump_payload(gen_id, "song", {
                 "title": gen.title,
                 "style": style,
                 "lyrics": lyrics,
-                "instrumental": False,
-                "vocal_gender": vocal_gender(params.get("vocal", "")),
+                "instrumental": no_lyrics,
+                "vocal_gender": song_vocal_gender,
                 "style_weight": weight,
                 "weirdness_constraint": constraint,
                 "negative_tags": negative_tags,
@@ -550,11 +559,12 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 prompt=lyrics,
                 style=style,
                 title=gen.title,
-                instrumental=False,
-                vocal_gender=vocal_gender(params.get("vocal", "")),
+                instrumental=no_lyrics,
+                vocal_gender=song_vocal_gender,
                 style_weight=weight,
                 weirdness_constraint=constraint,
                 negative_tags=negative_tags or None,
+                duration=_TRACK_DURATION_SEC,
                 progress_cb=progress_cb,
             )
             result = {
@@ -609,6 +619,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 style_weight=weight,
                 weirdness_constraint=constraint,
                 negative_tags=negative_tags or None,
+                duration=_TRACK_DURATION_SEC,
                 progress_cb=progress_cb,
             )
             result = {
@@ -923,6 +934,7 @@ async def run_generation(ctx: dict[str, Any], gen_id: str) -> None:
                 style_weight=weight,
                 weirdness_constraint=constraint,
                 negative_tags=negative_tags or None,
+                duration=_TRACK_DURATION_SEC,
                 progress_cb=progress_cb,
             )
             result = {

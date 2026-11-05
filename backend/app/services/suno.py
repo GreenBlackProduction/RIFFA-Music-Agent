@@ -278,6 +278,7 @@ class SunoClient:
         style_weight: float | None = None,
         weirdness_constraint: float | None = None,
         negative_tags: str | None = None,
+        duration: int | None = None,
         progress_cb: ProgressCb | None = None,
     ) -> SunoResult:
         clean_style = _strip_artist_names(style)[:1000]
@@ -303,6 +304,10 @@ class SunoClient:
             # "Music styles or traits to exclude" — the ONLY reliable exclusion
             # channel; negations inside `style` text attract what they negate.
             payload["negativeTags"] = negative_tags[:200]
+        # Track length in seconds (10-360). Only V5_5 and the V6 family accept
+        # it; without it V6 settles around 2:10 regardless of the brief.
+        if duration and (self._model == "V5_5" or self._model.startswith("V6")):
+            payload["duration"] = max(10, min(360, int(duration)))
 
         if progress_cb:
             progress_cb({"step": "submitting"})
