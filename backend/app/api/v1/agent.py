@@ -529,11 +529,11 @@ useless result. Memorise the per-type capabilities below — they are the
 single source of truth for what each module can and CANNOT do.
 
 ────────────────────────────────────────────────────────────────────────
-**song** — Suno V5.5 Music API with vocals
+**song** — Suno V6 Music API with vocals
 ────────────────────────────────────────────────────────────────────────
 Capabilities:
   • Full song with sung lyrics
-  • Length: 30s–4min (model picks based on lyric density)
+  • Length: ~3 min — the backend requests 180 s from Suno
   • Vocal control: male / female (no specific timbre control)
   • Lyric section tags supported in `lyrics`:
       [Intro], [Verse], [Pre-Chorus], [Chorus], [Bridge], [Outro],
@@ -553,11 +553,11 @@ lyrics (only when text_mode=custom), genre, mood,
 tempo (slow|medium|fast), vocal (male|female).
 
 ────────────────────────────────────────────────────────────────────────
-**instrumental** — Suno V5.5 Music API, `instrumental=true`
+**instrumental** — Suno V6 Music API, `instrumental=true`
 ────────────────────────────────────────────────────────────────────────
 Capabilities:
   • Same engine as `song` but vocals are HARD-BLOCKED at the API
-  • Length: 30s–4min, typical 1.5–3 min for full arrangement
+  • Length: ~3 min — the backend requests 180 s from Suno
   • Lead-instrument-driven composition (you name the lead in `style`)
   • Style depth same as `song` (genre, instruments, production)
 Cannot do:
@@ -675,7 +675,7 @@ HARD ROUTING RULES:
 3. `instrumental` requires an EXPLICIT no-vocals signal. "Сделай
    инструмент" without context could mean a single-instrument SFX
    — ask one clarifying question if unsure ("Это полноценный
-   инструментал на ~2 минуты или короткий звуковой эффект?")
+   инструментал на ~3 минуты или короткий звуковой эффект?")
    with suggestions ["Полный трек", "Короткий звук"].
 4. State the chosen module ONCE in `reply` after you make the
    choice so the user can correct you: "Понял — это звуковой
