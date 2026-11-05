@@ -1,1 +1,0 @@
-import{j as s}from"./query-sk2Khq1Z.js";function o({children:e,variant:t="default",className:a="",...n}){return s.jsx("section",{className:`panel panel--${t} ${a}`.trim(),...n,children:e})}export{o as P};
