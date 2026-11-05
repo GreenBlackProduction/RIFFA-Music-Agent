@@ -77,12 +77,15 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ### Структура workspace (запомни)
 
+**С 2026-11-05 `main` = то, что работает на проде. Вся работа отталкивается от `main`.** Каталог `/root` стоит на `main`; других рабочих веток для прода нет.
+
 | Каталог | Ветка | Сайт | Можно трогать? |
 |---|---|---|---|
 | `/root/frontend/` | `main` | https://riffastudio.site (прод) | **НЕТ** — только по явному «деплой в прод» |
 | `/root/frontend-beta/` | `design-v3` | https://beta.riffastudio.site (beta) | Да — основная рабочая зона для дизайна |
 | `/root/backend/static_dist/` | — | прод-фронт | **НЕТ** без явного указания |
 | `/root/static_beta/` | — | beta-фронт | Да — деплой beta-билдов |
+| `/root/backups/` | — (в `.gitignore`) | — | Резервные копии. `postgres/` — ночные дампы БД, не трогать |
 
 ### Критические правила (из горького опыта 2026-05-25)
 
@@ -91,6 +94,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - **Никогда** не пересобирать прод «заодно» при работе над beta
 - **Большие коммиты (>50 файлов)** — почти всегда признак замешивания разных типов изменений
 - **После compaction** контекста — НЕ импровизировать, перечитать этот файл и связанные
+- **Бета (`design-v3`) НИКОГДА не переносится в `main`/прод** — решение владельца 2026-11-05, без исключений
+- **`.env` и `.env.backup*` никогда не коммитить** — в них пароли и ключи (оба в `.gitignore`)
 
 ### Связанные файлы памяти
 
@@ -99,3 +104,4 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - `/root/.claude/projects/-root/memory/project_riffa_design_v3.md` — токены, шрифты, палитра
 - `/root/.claude/projects/-root/memory/feedback_git_safety.md` — git-правила безопасности
 - `/root/.claude/projects/-root/memory/feedback_user_workflow.md` — правила работы с пользователем
+- `/root/.claude/projects/-root/memory/riffa-deploy-commands.md` — команды деплоя, состояние веток
